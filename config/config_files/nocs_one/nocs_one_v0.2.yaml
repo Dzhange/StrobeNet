@@ -1,0 +1,36 @@
+##################################################################################################
+# dataset root
+DATASET_ROOT: 'nocs_nips_all'
+DATASET_CATES: ['02958343'] #'02691156',,'02958343']
+# choose dataset
+DATASET: 'nocs_one_dataset'
+DATASET_INDEX: ['resource/data/index/car_2048_train.json',
+                'resource/data/index/car_2048_vali.json',
+                'resource/data/index/car_2048_test.json']
+##################################################################################################
+MODES: ['train','vali']
+MODEL: 'nocs_one_v0_2'
+
+GPU: [0,1,2,3]
+BATCHSIZE: 128
+DATALOADER_WORKERS: 28
+EPOCH_TOTAL: 1000
+
+LR: 3e-4
+OPTI_DECAY_RATE: 0.8
+OPTI_DECAY_INTERVAL: 30
+OPTI_DECAY_MIN: 1e-6
+
+LOG_DIR: 'nocs-one-v0.2'
+LOGGER: 'logger_s1'
+LOGGER_SELECT: ['metric','image','model']
+MODEL_SAVE_PER_N_EPOCH: 1
+VIS_PER_N_BATCH: 5
+VIS_ONE_PER_BATCH: True
+VIS_TRAIN_PER_BATCH: 40
+BACKUP_FILES: ['core/net_bank/uresnet.py',
+               'core/net_bank/nocs_surface_mlps.py',
+               'core/net_bank/loss.py',
+               'resource/data/index/car_2048_train.json',
+               'resource/data/index/car_2048_vali.json',
+               'resource/data/index/car_2048_test.json']

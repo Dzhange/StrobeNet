@@ -1,0 +1,45 @@
+##################################################################################################
+# dataset root
+DATASET_ROOT: 'nocs_nips_all'
+DATASET_CATES: ['02958343'] #'02691156',,'02958343']
+PROPORTION: 1.0
+# choose dataset
+DATASET: 'mv_correspondence_dataset'
+DATASET_INDEX: ['resource/data/index/car_2048_train.json',
+                'resource/data/index/car_2048_vali.json',
+                'resource/data/index/car_2048_test.json']
+##################################################################################################
+MODES: ['train','vali']
+MODEL: 'vi_mv_v8_62'
+
+GPU: [0,1,2,3]
+BATCHSIZE: 12
+DATALOADER_WORKERS: 16
+EPOCH_TOTAL: 2000
+
+LR: 3e-5
+OPTI_DECAY_RATE: 0.5
+OPTI_DECAY_INTERVAL: 100
+OPTI_DECAY_MIN: 1e-8
+
+LOG_DIR: 'vi_mv_v8.6.2'
+LOGGER: 'logger_s1'
+LOGGER_SELECT: ['metric','image','model','xls']
+MODEL_SAVE_PER_N_EPOCH: 15
+VIS_PER_N_BATCH: 20
+VIS_ONE_PER_BATCH: True
+VIS_TRAIN_PER_BATCH: 40
+
+#RESUME: True
+#RESUME_EPOCH_ID: 22
+
+RESUME: False
+MODEL_INIT_PATH: ['log/nips-baseline1/model/epoch_60.model']
+#MODEL_INIT_PATH: ['log/SERVER-DOWNLOAD/v8.2_epoch_39.model']
+
+BACKUP_FILES: ['core/net_bank/vgg.py',
+               'core/net_bank/nsc_net_new.py',
+               'core/net_bank/loss.py',
+               'resource/data/index/car_2048_train.json',
+               'resource/data/index/car_2048_vali.json',
+               'resource/data/index/car_2048_test.json']

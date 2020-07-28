@@ -1,0 +1,44 @@
+##################################################################################################
+# dataset root
+DATASET_ROOT: 'nocs_nips_all'
+DATASET_CATES: ['03001627'] #'02691156',,'02958343']
+# choose dataset
+DATASET: 'nips_dataset'
+DATASET_INDEX: ['resource/data/index/chair_2048_train.json',
+                'resource/data/index/chair_2048_vali.json',
+                'resource/data/index/chair_2048_test.json']
+##################################################################################################
+MODES: ['train','vali']
+MODEL: 'vgg_mlp_v8_0'
+
+GPU: [0,1,2,3]
+BATCHSIZE: 32
+DATALOADER_WORKERS: 20
+EPOCH_TOTAL: 2000
+
+LR: 3e-5
+OPTI_DECAY_RATE: 0.5
+OPTI_DECAY_INTERVAL: 50
+OPTI_DECAY_MIN: 1e-8
+
+LOG_DIR: 'vgg-mlp-v8.0-chair'
+LOGGER: 'logger_s1'
+LOGGER_SELECT: ['metric','image','model','xls']
+MODEL_SAVE_PER_N_EPOCH: 3
+VIS_PER_N_BATCH: 10
+VIS_ONE_PER_BATCH: True
+VIS_TRAIN_PER_BATCH: 20
+
+#RESUME: True
+#RESUME_EPOCH_ID: 22
+
+RESUME: False
+#MODEL_INIT_PATH: ['log/nip_s-baseline-chair/model/epoch_30.model']
+MODEL_INIT_PATH: ['log/SERVER-DOWNLOAD/vgg_chair_epoch_30.model']
+
+BACKUP_FILES: ['core/net_bank/vgg.py',
+               'core/net_bank/nox_mlp.py',
+               'core/net_bank/loss.py',
+               'resource/data/index/chair_2048_train.json',
+               'resource/data/index/chair_2048_vali.json',
+               'resource/data/index/chair_2048_test.json']

@@ -1,0 +1,44 @@
+##################################################################################################
+# dataset root
+DATASET_ROOT: 'hand_rig_dataset_v3'
+DATASET_CATES: ['hand'] #'02691156',,'02958343','02958343']
+# choose dataset
+DATASET: 'hand_mv_dataset'
+DATASET_INDEX: ['resource/data/index/hand_pn_train.json',
+                'resource/data/index/hand_pn_val.json']
+##################################################################################################
+MODES: ['train','val']
+MODEL: 'hand_v3_1'
+
+GPU: [0,1,2,3]
+BATCHSIZE: 12
+DATALOADER_WORKERS: 8
+EPOCH_TOTAL: 20000
+
+LR: 3e-5
+OPTI_DECAY_RATE: 0.5
+OPTI_DECAY_INTERVAL: 100
+OPTI_DECAY_MIN: 1e-8
+
+LOG_DIR: 'hand-v3.1'
+LOGGER: 'logger_s1'
+LOGGER_SELECT: ['metric','image','model','xls']
+MODEL_SAVE_PER_N_EPOCH: 5
+VIS_PER_N_EPOCH: 1
+VIS_PER_N_BATCH: 20
+VIS_ONE_PER_BATCH: True
+VIS_TRAIN_PER_BATCH: 40
+
+#RESUME: True
+#RESUME_EPOCH_ID: 8
+
+RESUME: False
+MODEL_INIT_PATH: ['log/hand_nocsreg_epoch_31.model']
+#MODEL_INIT_PATH: ['log1/SERVER-DOWNLOAD/vgg_car_epoch_60.model']
+#MODEL_INIT_PATH: ['log/sv-v1-cell-p1/model/epoch_30.model']
+
+BACKUP_FILES: ['core/net_bank/vgg.py',
+               'core/net_bank/uv_amp_mlp.py',
+               'core/net_bank/loss.py',
+               'resource/data/index/hand_pn_train.json',
+               'resource/data/index/hand_pn_val.json']

@@ -1,0 +1,41 @@
+##################################################################################################
+# dataset root
+DATASET_ROOT: 'nocs_nips_all_net'
+DATASET_CATES: ['02958343'] #'02691156',,'02958343']
+# choose dataset
+DATASET: 'nox_divide_2d_dataset'
+DATASET_INDEX: ['resource/data/index/car_2048_train.json',
+                'resource/data/index/car_2048_vali.json',
+                'resource/data/index/car_2048_test.json']
+##################################################################################################
+MODES: ['vali','test']
+MODEL: 'fish_v6_5_eval'
+
+GPU: [0]
+BATCHSIZE: 2
+DATALOADER_WORKERS: 8
+EPOCH_TOTAL: 2
+
+LR: 1e-4
+OPTI_DECAY_RATE: 0.7
+OPTI_DECAY_INTERVAL: 50
+OPTI_DECAY_MIN: 1e-8
+
+LOG_DIR: 'fish-v6.5-64-eval512'
+LOGGER: 'logger_s1'
+LOGGER_SELECT: ['metric','image','model']
+MODEL_SAVE_PER_N_EPOCH: 1
+VIS_PER_N_BATCH: 5
+VIS_ONE_PER_BATCH: True
+VIS_TRAIN_PER_BATCH: 15
+
+
+RESUME: False
+MODEL_INIT_PATH: ['log/fish-v6.5-64/model/epoch_16.model']
+
+BACKUP_FILES: ['core/net_bank/uresnet.py',
+               'core/net_bank/nox_mlp.py',
+               'core/net_bank/loss.py',
+               'resource/data/index/car_2048_train.json',
+               'resource/data/index/car_2048_vali.json',
+               'resource/data/index/car_2048_test.json']

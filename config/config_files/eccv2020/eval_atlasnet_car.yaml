@@ -1,0 +1,34 @@
+##################################################################################################
+# dataset root
+DATASET_ROOT: 'shapenet_plain'
+DATASET_CATES: ['02958343'] # '02691156',,'02958343']
+# choose dataset
+DATASET: 'atlas_eval_2way_new_dataset'
+PROPORTION: 1.0
+#DATASET: 'nips_dataset'
+#PROPORTION: 0.00025
+DATASET_INDEX: ['resource/data/index/atlas_car_test.json']
+##################################################################################################
+MODES: ['test']
+MODEL: 'atlasnet_mveval'
+
+GPU: [0]
+BATCHSIZE: 1
+DATALOADER_WORKERS: 16
+EPOCH_TOTAL: 1
+
+LR: 0.0
+OPTI_DECAY_RATE: 0.5
+OPTI_DECAY_INTERVAL: 100
+OPTI_DECAY_MIN: 1e-8
+
+LOG_DIR: 'eccv-comparison-atlasnet-car-plain'
+LOGGER: 'logger_s1'
+LOGGER_SELECT: ['metric','image','model','xls']
+MODEL_SAVE_PER_N_EPOCH: 10
+VIS_PER_N_EPOCH: 1
+VIS_PER_N_BATCH: 20
+VIS_ONE_PER_BATCH: True
+VIS_TRAIN_PER_BATCH: 30
+
+BACKUP_FILES: []

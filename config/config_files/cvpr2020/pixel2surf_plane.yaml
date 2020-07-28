@@ -1,0 +1,48 @@
+##################################################################################################
+# dataset root
+DATASET_ROOT: 'nocs_nips_all'
+DATASET_CATES: ['02691156'] #'02691156',,'02958343']
+# choose dataset
+DATASET: 'nips_dataset'
+#DATASET: 'nocs_atlas_dataset'
+PROPORTION: 1.0
+DATASET_INDEX: ['resource/data/index/plane_2048_train.json',
+                'resource/data/index/plane_2048_vali.json',
+                'resource/data/index/plane_2048_test.json']
+##################################################################################################
+MODES: ['train','vali']
+MODEL: 'final_v0'
+
+GPU: [0,1,2,3]
+BATCHSIZE: 32
+DATALOADER_WORKERS: 8
+EPOCH_TOTAL: 20000
+
+LR: 3e-5
+OPTI_DECAY_RATE: 0.5
+OPTI_DECAY_INTERVAL: 100
+OPTI_DECAY_MIN: 1e-8
+
+LOG_DIR: 'final-plane-sv-sc-v0'
+LOGGER: 'logger_s1'
+LOGGER_SELECT: ['metric','image','model','xls']
+MODEL_SAVE_PER_N_EPOCH: 5
+VIS_PER_N_EPOCH: 1
+VIS_PER_N_BATCH: 20
+VIS_ONE_PER_BATCH: True
+VIS_TRAIN_PER_BATCH: 30
+
+#RESUME: True
+#RESUME_EPOCH_ID: 400
+
+RESUME: False
+MODEL_INIT_PATH: ['log/nips-baseline-plane/model/epoch_60.model']
+#MODEL_INIT_PATH: ['log1/SERVER-DOWNLOAD/vgg_car_epoch_60.model']
+#MODEL_INIT_PATH: ['log/sv-v1-cell-p1/model/epoch_30.model']
+
+BACKUP_FILES: ['core/net_bank/vgg.py',
+               'core/net_bank/uv_amp_mlp.py',
+               'core/net_bank/loss.py',
+               'resource/data/index/plane_2048_train.json',
+               'resource/data/index/plane_2048_vali.json',
+               'resource/data/index/plane_2048_test.json']

@@ -1,0 +1,36 @@
+##################################################################################################
+DATASET_ROOT: 'kaggle_mv_car_mask'
+DATASET_CATES: ['car']
+DATASET: 'mv_real_car_mask_dataset'
+PROPORTION: 1.0
+DATASET_INDEX: ['resource/data/index/kaggle_car_mask_real.json']
+##################################################################################################
+MODES: ['test']
+MODEL: 'kaggle_render_svx'
+
+GPU: [0]
+BATCHSIZE: 1
+DATALOADER_WORKERS: 4
+EPOCH_TOTAL: 1
+
+LR: 0.0
+
+LOG_DIR: 'eccv-real-kaggle-svx'
+LOGGER: 'logger_s1'
+LOGGER_SELECT: ['metric','image','model','xls']
+MODEL_SAVE_PER_N_EPOCH: 1
+VIS_PER_N_EPOCH: 1
+VIS_PER_N_BATCH: 1
+VIS_ONE_PER_BATCH: False
+VIS_TRAIN_PER_BATCH: 30
+
+
+RESUME: False
+MODEL_INIT_PATH: ['final_log/pix2surf-svx-weight/eccv_pix2surf_svx_car_plain_epoch_102.model']
+#MODEL_INIT_PATH: ['final_log/pix2surf-mv-weight/eccv_pix2surf_mv_car_plain_epoch_21.model']
+#MODEL_INIT_PATH: ['log/nocsmlp_mv5_car_e25.model']
+
+BACKUP_FILES: ['core/net_bank/vgg.py',
+               'core/net_bank/uv_amp_mlp.py',
+               'core/net_bank/loss.py',
+               'core/toolbox/evaluation.py']

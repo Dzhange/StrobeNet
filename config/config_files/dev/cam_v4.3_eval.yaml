@@ -1,0 +1,43 @@
+##################################################################################################
+# dataset root
+DATASET_ROOT: 'nocs_nips_all'
+DATASET_CATES: ['02958343'] #'02691156',,'02958343']
+# choose dataset
+DATASET: 'nox_dense_dataset'
+DATASET_INDEX: ['resource/data/index/car_2048_train.json',
+                'resource/data/index/car_2048_vali.json',
+                'resource/data/index/car_2048_test.json']
+##################################################################################################
+MODES: ['test','vali']
+MODEL: 'cam_v4_3_eval'
+
+GPU: [0,1,2,3]
+BATCHSIZE: 12
+DATALOADER_WORKERS: 12
+EPOCH_TOTAL: 1000
+
+LR: 3e-4
+OPTI_DECAY_RATE: 0.8
+OPTI_DECAY_INTERVAL: 30
+OPTI_DECAY_MIN: 1e-6
+
+LOG_DIR: 'cam-v4.3-eval-f'
+LOGGER: 'logger_s1'
+LOGGER_SELECT: ['metric','model']
+MODEL_SAVE_PER_N_EPOCH: 1
+VIS_PER_N_BATCH: 15
+VIS_ONE_PER_BATCH: True
+VIS_TRAIN_PER_BATCH: 15
+
+#RESUME: True
+#RESUME_EPOCH_ID: 12
+
+RESUME: False
+MODEL_INIT_PATH: ['log/cam-v4.3-p2/model/epoch_30.model']
+
+BACKUP_FILES: ['core/net_bank/uresnet.py',
+               'core/net_bank/nox_mlp.py',
+               'core/net_bank/loss.py',
+               'resource/data/index/car_2048_train.json',
+               'resource/data/index/car_2048_vali.json',
+               'resource/data/index/car_2048_test.json']
