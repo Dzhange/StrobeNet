@@ -9,7 +9,7 @@ class L2Loss(nn.Module):
         """
         mask is 1 channel
         """
-        mask = pred[:, -1, :, :].clone().requires_grad_(True).unsqueeze(1)
+        mask = target[:, -1, :, :].clone().requires_grad_(True).unsqueeze(1)
 
         # assert mask.max() <= 1 + 1e-6
 
@@ -33,7 +33,6 @@ class L2Loss(nn.Module):
             loss = torch.sum(loss) / non_zero_count
         return loss
 
-
 class LPMaskLoss(nn.Module):
     Thresh = 0.7 # PARAM
     def __init__(self, Thresh=0.7, MaskWeight=0.7, ImWeight=0.3, P=2): # PARAM
@@ -47,8 +46,8 @@ class LPMaskLoss(nn.Module):
         self.DebugLoss = nn.MSELoss()
 
     def forward(self, output, target):
-        # return self.computeLoss(output, target)
-        return self.computeLossDebug(output, target)
+        return self.computeLoss(output, target)
+        # return self.computeLossDebug(output, target)
 
     def computeLossDebug(self,output,target):
         # print(output)
@@ -58,7 +57,7 @@ class LPMaskLoss(nn.Module):
     def computeLoss(self, output, target):
         OutIm = output
         nChannels = OutIm.size(1)
-        TargetIm = target[0]
+        TargetIm = target
         if nChannels%4 != 0:
             raise RuntimeError('Empty or mismatched batch (should be multiple of 4). Check input size {}.'.format(OutIm.size()))
         if nChannels != TargetIm.size(1):
@@ -84,7 +83,7 @@ class LPMaskLoss(nn.Module):
         OutMask = self.Sigmoid(OutMask)
 
         MaskLoss = self.MaskLoss(OutMask, TargetMask)
-
+        
         TargetIm = target[:, :-1, :, :].detach()
         OutIm = output[:, :-1, :, :].clone().requires_grad_(True)
 

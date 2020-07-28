@@ -109,6 +109,19 @@ def convertData(RGB, Targets, isMaskNOX=False):
 
     return Color00, OutTupRGB, OutTupMask
 
+def sendToDevice(TupleOrTensor, Device):
+    TupleOrTensorTD = TupleOrTensor
+    if isinstance(TupleOrTensorTD, tuple) == False and isinstance(TupleOrTensorTD, list) == False:
+        TupleOrTensorTD = TupleOrTensor.to(Device)
+    else:
+        for Ctr in range(len(TupleOrTensor)):
+            if isinstance(TupleOrTensor[Ctr], torch.Tensor):
+                TupleOrTensorTD[Ctr] = TupleOrTensor[Ctr].to(Device)
+            else:
+                TupleOrTensorTD[Ctr] = TupleOrTensor[Ctr]
+
+    return TupleOrTensorTD
+
 def torch2np(ImageTorch):
     # OpenCV does [height, width, channels]
     # PyTorch stores images as [channels, height, width]

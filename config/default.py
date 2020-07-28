@@ -59,6 +59,8 @@ def get_default_cfg():
     cfg.OUTPUT_DIR = ''
     cfg.SAVE_FREQ = 1
     cfg.DATA_LIMIT = 10
-    cfg.IMAGE_SIZE = (320,240)
+    cfg.IMAGE_SIZE = (320, 240)
     cfg.EXPT_NAME = "UNKNOWN"
+    cfg.TEST_ON_TRAIN = True
+
     return cfg

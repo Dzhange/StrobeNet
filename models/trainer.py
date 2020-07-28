@@ -15,7 +15,6 @@ class Trainer:
     """
     this class does the training job
     """
-
     def __init__(self, config, model, data_loader_dict, objective, device):
         self.model = model
         self.config = config
@@ -23,7 +22,7 @@ class Trainer:
         self.val_data_loader = data_loader_dict['val']
         self.objective = objective
         self.device = device
-        self.model.net.to(device)
+        self.model.net.to(device)        
 
     def train(self):
         self.model.setup_checkpoint(self.device)
@@ -37,6 +36,7 @@ class Trainer:
                 Tic = getCurrentEpochTime()
                 # for data in self.train_data_loader:
                 for i, data in enumerate(self.train_data_loader, 0):  # Get each batch
+                    ################### START WEIGHT UPDATE ################################                    
                     self.model.optimizer.zero_grad()
                     net_input, target = self.model.preprocess(data, self.device)
                     output = self.model.net(net_input)
@@ -44,8 +44,7 @@ class Trainer:
                     loss.backward()
                     self.model.optimizer.step()
                     epoch_losses.append(loss.item())
-
-                    ######################## Monitor ################################
+                    ####################### START MONITOR ################################
                     Toc = getCurrentEpochTime()
                     Elapsed = math.floor((Toc - Tic) * 1e-6)
                     TotalElapsed = math.floor((Toc - AllTic) * 1e-6)
@@ -59,7 +58,9 @@ class Trainer:
                                     np.mean(np.asarray(epoch_losses)), getTimeDur(Elapsed), getTimeDur(TotalElapsed), getTimeDur(ETA-TotalElapsed))
                     sys.stdout.write(ProgressStr.ljust(150))
                     sys.stdout.flush()                    
+                    ########################## END MONITOR ################################
                 sys.stdout.write('\n')
+                cur_epoch += 1
             except (KeyboardInterrupt, SystemExit):
                 print('\n[ INFO ]: KeyboardInterrupt detected. Saving checkpoint.')
                 self.model.save_checkpoint(cur_epoch, time_string='eot', print_str='$'*3)
