@@ -38,5 +38,6 @@ model = model_NOCS(cfg)
 objective = L2MaskLoss()
 device = torch.device("cuda:1")
 validater = Validater(cfg, model, val_dataloader, objective, device)
+
 # start
 validater.validate()
