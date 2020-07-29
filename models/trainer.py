@@ -29,36 +29,46 @@ class Trainer:
         self.model.net.train()
         cur_epoch = 0
 
-        AllTic = getCurrentEpochTime()
+        all_tic = getCurrentEpochTime()
         while cur_epoch < self.config.EPOCH_TOTAL:
             try:
                 epoch_losses = [] # For all batches in an epoch
-                Tic = getCurrentEpochTime()
+                tic = getCurrentEpochTime()
                 # for data in self.train_data_loader:
                 for i, data in enumerate(self.train_data_loader, 0):  # Get each batch
                     ################### START WEIGHT UPDATE ################################                    
                     self.model.optimizer.zero_grad()
                     net_input, target = self.model.preprocess(data, self.device)
-                    output = self.model.net(net_input)
+                    output = self.model.net(net_input)                    
                     loss = self.objective(output, target)
                     loss.backward()
-                    self.model.optimizer.step()
-                    epoch_losses.append(loss.item())
+                    self.model.optimizer.step()                                        
                     ####################### START MONITOR ################################
-                    Toc = getCurrentEpochTime()
-                    Elapsed = math.floor((Toc - Tic) * 1e-6)
-                    TotalElapsed = math.floor((Toc - AllTic) * 1e-6)
+                    epoch_losses.append(loss.item())
+                    toc = getCurrentEpochTime()
+                    elapsed = math.floor((toc - tic) * 1e-6)
+                    total_elapsed = math.floor((toc - all_tic) * 1e-6)
                     done = int(50 * (i+1) / len(self.train_data_loader))
                     # Compute ETA
-                    TimePerBatch = (Toc - AllTic) / ((cur_epoch * len(self.train_data_loader)) + (i+1)) # Time per batch
-                    ETA = math.floor(TimePerBatch * self.config.EPOCH_TOTAL * len(self.train_data_loader) * 1e-6)
+                    time_per_batch = (toc - all_tic) / ((cur_epoch * len(self.train_data_loader)) + (i+1)) # Time per batch
+                    ETA = math.floor(time_per_batch * self.config.EPOCH_TOTAL * len(self.train_data_loader) * 1e-6)
 
-                    ProgressStr = ('\r[{}>{}] epoch - {}/{}, train loss - {:.8f} | epoch - {}, total - {} ETA - {} |')\
-                                    .format('=' * done, '-' * (50 - done), self.model.start_epoch + cur_epoch + 1, self.model.start_epoch + self.config.EPOCH_TOTAL,
-                                    np.mean(np.asarray(epoch_losses)), getTimeDur(Elapsed), getTimeDur(TotalElapsed), getTimeDur(ETA-TotalElapsed))
-                    sys.stdout.write(ProgressStr.ljust(150))
+                    progress_str = ('\r[{}>{}] epoch - {}/{}, train loss - {:.8f} | epoch - {}, total - {} ETA - {} |')\
+                                            .format('=' * done, '-' * (50 - done),
+                                                    self.model.start_epoch + cur_epoch + 1,
+                                                    self.model.start_epoch + self.config.EPOCH_TOTAL,
+                                                    np.mean(np.asarray(epoch_losses)),
+                                                    getTimeDur(elapsed),
+                                                    getTimeDur(total_elapsed),
+                                                    getTimeDur(ETA-total_elapsed))
+
+                    sys.stdout.write(progress_str.ljust(150))
                     sys.stdout.flush()                    
-                    ########################## END MONITOR ################################
+                    ########################## END LOOP ####################################
+                ########################## SAVE CHECKPOINT ##############################
+                if cur_epoch % self.config.SAVE_FREQ == 0 and cur_epoch > 0:
+                    print("[ INFO ]: Save checkpoint for epoch {}.".format(cur_epoch))
+                    self.model.save_checkpoint(cur_epoch, time_string='eot', print_str='$'*3)                        
                 sys.stdout.write('\n')
                 cur_epoch += 1
             except (KeyboardInterrupt, SystemExit):
@@ -69,3 +79,5 @@ class Trainer:
                 print(traceback.format_exc())
                 print('\n[ WARN ]: Exception detected. *NOT* saving checkpoint. {}'.format(error))
                 break
+
+        self.model.save_checkpoint(cur_epoch, time_string='eot', print_str='$'*3)

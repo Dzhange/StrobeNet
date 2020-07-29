@@ -6,7 +6,7 @@ from itertools import groupby
 
 import numpy as np
 import torch
-import torch.utils.data.Dataset
+import torch.utils.data
 from utils.DataUtils import *
 
 class HandDataset(torch.utils.data.Dataset):
@@ -14,15 +14,15 @@ class HandDataset(torch.utils.data.Dataset):
     A basic dataloader for HandRigDatasetv3
     Most codes copied from HandRigDatasetV3 from Srinath
     """
-    def __init__(self, root, Train=True, Transform=None,
-                 ImgSize=(320, 240), Limit=100, frame_load_str=None, required='color00'):        
+    def __init__(self, root, train=True, transform=None,
+                 img_size=(320, 240), limit=100, frame_load_str=None, required='color00'):        
         self.num_cameras = 10
         self.file_name = 'hand_rig_dataset_v3.zip'
         self.frame_load_str = ['color00', 'color01', 'normals00', 'normals01',\
                         'nox00', 'nox01', 'pnnocs00', 'pnnocs01',\
                         'uv00', 'uv01'] if frame_load_str is None else frame_load_str
 
-        self.init(root, Train, Transform, ImgSize, Limit, self.frame_load_str, required)
+        self.init(root, train, transform, img_size, limit, self.frame_load_str, required)
         self.load_data()
 
     def init(self, root, train=True, transform=None,
@@ -30,7 +30,7 @@ class HandDataset(torch.utils.data.Dataset):
         self.dataset_dir = root
         self.is_train_data = train
         self.transform = transform
-        self.image_size = img_size
+        self.img_size = img_size
         self.required = required
         self.frame_load_str = frame_load_str
         if limit <= 0.0 or limit > 100.0:
@@ -47,7 +47,7 @@ class HandDataset(torch.utils.data.Dataset):
         return len(self.frame_files[self.frame_load_str[0]])
 
     def __getitem__(self, idx):
-        RGB, load_tup = self.loadImages(idx)
+        RGB, load_tup = self.load_images(idx)
         load_imgs = torch.cat(load_tup, 0)
         # print(RGB,RGB.shape)
         return RGB, load_imgs
@@ -101,11 +101,13 @@ class HandDataset(torch.utils.data.Dataset):
         for k in self.frame_files:
             self.frame_files[k] = self.frame_files[k][:dataset_length]
 
-    def loadImages(self, idx):
+    def load_images(self, idx):
+        """
+        actual implementation of __getitem__
+        """
         frame = {}
-
         for k in self.frame_files:
-            frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.image_size).type(torch.FloatTensor)
+            frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)
             if k != self.required:
                 frame[k] = torch.cat((frame[k], createMask(frame[k])), 0).type(torch.FloatTensor)
             if self.transform is not None:

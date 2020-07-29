@@ -22,14 +22,14 @@ cfg = get_cfg()
 # DatasetClass = get_dataset(cfg.DATASET)
 dataloader_dict = dict()
 
-val_dataset = HandDataset(Root=cfg.DATASET_ROOT, Train=True if cfg.TEST_ON_TRAIN else False,
-                                Limit=cfg.DATA_LIMIT, ImgSize=cfg.IMAGE_SIZE,
-                                FrameLoadStr=["color00", "nox00"])
+val_dataset = HandDataset(root=cfg.DATASET_ROOT, train=cfg.TEST_ON_TRAIN,
+                          limit=cfg.DATA_LIMIT, img_size=cfg.IMAGE_SIZE,
+                          frame_load_str=["color00", "nox00"])
 
 val_dataloader = DataLoader(val_dataset, batch_size=1,
-                                       shuffle=False,
-                                       num_workers=1, pin_memory=True,
-                                       drop_last=True)
+                            shuffle=False,
+                            num_workers=1, pin_memory=True,
+                            drop_last=True)
 
 # prepare models
 model = model_NOCS(cfg)

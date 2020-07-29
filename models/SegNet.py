@@ -8,11 +8,10 @@ class SegNet(nn.Module):
         super().__init__()
 
         self.in_channels = in_channels
-        self.withSkipConnections = withSkipConnections
-        print(self.in_channels)
+        self.withSkipConnections = withSkipConnections        
         self.down1 = segnetDown2(self.in_channels, 64, withFeatureMap=self.withSkipConnections)
         self.down2 = segnetDown2(64, 128, withFeatureMap=self.withSkipConnections)
-        self.down3 = segnetDown3(128, 256, withFeatureMap=self.withSkipConnections)
+        self.down3 = segnetDown3(128, 256, withFeatureMap=self.withSkipC·onnections)
         self.down4 = segnetDown3(256, 512, withFeatureMap=self.withSkipConnections)
         self.down5 = segnetDown3(512, 512, withFeatureMap=self.withSkipConnections)
 

@@ -14,6 +14,19 @@ import matplotlib.pyplot as plt
 from models.loss import L2MaskLoss
 
 ################################ DATA RELATED UTILS ####################################
+def torch2np(ImageTorch):
+    # OpenCV does [height, width, channels]
+    # PyTorch stores images as [channels, height, width]
+    if ImageTorch.size()[0] == 3:
+            return np.transpose(ImageTorch.numpy(), (1, 2, 0))
+    return ImageTorch.numpy()
+
+def np2torch(ImageNP):
+    # PyTorch stores images as [channels, height, width]
+    # OpenCV does [height, width, channels]
+    if ImageNP.shape[-1] == 3:
+            return torch.from_numpy(np.transpose(ImageNP, (2, 0, 1)))
+    return torch.from_numpy(ImageNP)
 
 def imread_rgb_torch(Path, Size=None, interp=cv2.INTER_NEAREST): # Use only for loading RGB images
     ImageCV = cv2.imread(Path, -1)
@@ -121,20 +134,6 @@ def sendToDevice(TupleOrTensor, Device):
                 TupleOrTensorTD[Ctr] = TupleOrTensor[Ctr]
 
     return TupleOrTensorTD
-
-def torch2np(ImageTorch):
-    # OpenCV does [height, width, channels]
-    # PyTorch stores images as [channels, height, width]
-    if ImageTorch.size()[0] == 3:
-            return np.transpose(ImageTorch.numpy(), (1, 2, 0))
-    return ImageTorch.numpy()
-
-def np2torch(ImageNP):
-    # PyTorch stores images as [channels, height, width]
-    # OpenCV does [height, width, channels]
-    if ImageNP.shape[-1] == 3:
-            return torch.from_numpy(np.transpose(ImageNP, (2, 0, 1)))
-    return torch.from_numpy(ImageNP)
 
 def expandTilde(Path):
     if '~' == Path[0]:

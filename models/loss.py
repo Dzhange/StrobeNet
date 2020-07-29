@@ -43,16 +43,9 @@ class LPMaskLoss(nn.Module):
         self.Thresh = Thresh
         self.MaskWeight = MaskWeight
         self.ImWeight = ImWeight
-        self.DebugLoss = nn.MSELoss()
 
     def forward(self, output, target):
         return self.computeLoss(output, target)
-        # return self.computeLossDebug(output, target)
-
-    def computeLossDebug(self,output,target):
-        # print(output)
-        # print(target)
-        return self.DebugLoss(output,target[0])
 
     def computeLoss(self, output, target):
         OutIm = output
@@ -77,31 +70,30 @@ class LPMaskLoss(nn.Module):
         return TotalLoss
 
     def computeMaskedLPLoss(self, output, target):
-        BatchSize = target.size(0)
-        TargetMask = target[:, -1, :, :]
-        OutMask = output[:, -1, :, :].clone().requires_grad_(True)
-        OutMask = self.Sigmoid(OutMask)
+        batch_size = target.size(0)
+        target_mask = target[:, -1, :, :]
+        out_mask = output[:, -1, :, :].clone().requires_grad_(True)
+        out_mask = self.Sigmoid(out_mask)
 
-        MaskLoss = self.MaskLoss(OutMask, TargetMask)
-        
-        TargetIm = target[:, :-1, :, :].detach()
-        OutIm = output[:, :-1, :, :].clone().requires_grad_(True)
+        mask_loss = self.MaskLoss(out_mask, target_mask)
 
-        Diff = OutIm - TargetIm
-        DiffNorm = torch.norm(Diff, p=self.P, dim=1)  # Same size as WxH
-        MaskedDiffNorm = torch.where(OutMask > self.Thresh, DiffNorm,
-                                        torch.zeros(DiffNorm.size(), device=DiffNorm.device))
-        NOCSLoss = 0
-        for i in range(0, BatchSize):
-            nNonZero = torch.nonzero(MaskedDiffNorm[i]).size(0)
-            if nNonZero > 0:
-                NOCSLoss += torch.sum(MaskedDiffNorm[i]) / nNonZero
+        target_img = target[:, :-1, :, :].detach()
+        out_img = output[:, :-1, :, :].clone().requires_grad_(True)
+
+        diff = out_img - target_img
+        diff_norm = torch.norm(diff, p=self.P, dim=1)  # Same size as WxH
+        masked_diff_norm = torch.where(out_mask > self.Thresh, diff_norm,
+                                        torch.zeros(diff_norm.size(), device=diff_norm.device))
+        nocs_loss = 0
+        for i in range(0, batch_size):
+            num_non_zero = torch.nonzero(masked_diff_norm[i]).size(0)
+            if num_non_zero > 0:
+                nocs_loss += torch.sum(masked_diff_norm[i]) / num_non_zero
             else:
-                NOCSLoss += torch.mean(DiffNorm[i])
-
-        Loss = (self.MaskWeight*MaskLoss) + (self.ImWeight*(NOCSLoss / BatchSize))
-        return Loss
+                nocs_loss += torch.mean(diff_norm[i])
+        loss = (self.MaskWeight*mask_loss) + (self.ImWeight*(nocs_loss / batch_size))
+        return loss
 
 class L2MaskLoss(LPMaskLoss):
     def __init__(self, Thresh=0.7, MaskWeight=0.7, ImWeight=0.3): # PARAM
-        super().__init__(Thresh, MaskWeight, ImWeight, P=2)        
+        super().__init__(Thresh, MaskWeight, ImWeight, P=2)

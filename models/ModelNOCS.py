@@ -4,7 +4,8 @@ The model to train, validate and test NOCS
 import os
 import glob
 import torch
-from models.SegNet import SegNet
+from models.SegNet import SegNet as old_SegNet
+from models.say4n_SegNet import SegNet as new_SegNet
 from utils.DataUtils import *
 
 class model_NOCS(object):
@@ -12,21 +13,20 @@ class model_NOCS(object):
     def __init__(self, config):
         self.config = config
         self.lr = config.LR # set learning rate        
-        self.net = SegNet(out_channels=4)
+        # self.net = old_SegNet(out_channels=4, withSkipConnections=False)
+        self.net = new_SegNet(input_channels=3, output_channels=4)
         self.loss_history = []
         self.val_loss_history = []
         self.start_epoch = 0
         self.expt_dir_path = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME)
-        print(self.expt_dir_path)
+        # print(self.expt_dir_path)
         if os.path.exists(self.expt_dir_path) == False:            
             os.makedirs(self.expt_dir_path)
         self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr,
                                           betas=(self.config.ADAM_BETA1, self.config.ADAM_BETA2))
         
-
     # def load_check_point(self):
     def setup_checkpoint(self, TrainDevice):
-        
         latest_checkpoint_dict = None
         all_checkpoints = glob.glob(os.path.join(self.expt_dir_path, '*.tar'))
         if len(all_checkpoints) > 0:
