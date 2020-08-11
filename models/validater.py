@@ -7,6 +7,7 @@ import torch
 from utils.DataUtils import *
 from loaders.HandDataset import *
 import trimesh, mcubes
+import shutil
 
 class Validater:
 
@@ -87,6 +88,7 @@ class Validater:
         for i, data in enumerate(self.val_dataloader, 0):  # Get each batch
             if i > (num_samples-1): break                 
             logits_list = []
+            target = None
             for points in grid_points_split:
                 with torch.no_grad():
                     net_input, target = self.model.preprocess(data, self.device)
@@ -99,9 +101,13 @@ class Validater:
             logits = torch.cat(logits_list, dim=0).numpy()
 
             mesh = self.mesh_from_logits(logits, resolution)
-            export_path = os.path.join(output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
-            print(export_path)
-            mesh.export(export_path)
+            export_pred_path = os.path.join(output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
+            export_gt_path = os.path.join(output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
+
+            print(export_pred_path)
+            mesh.export(export_pred_path)
+            
+            shutil.copyfile(target['mesh'][0], export_gt_path)
 
     @staticmethod
     def mesh_from_logits(logits, resolution):

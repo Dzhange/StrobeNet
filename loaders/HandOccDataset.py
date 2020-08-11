@@ -9,7 +9,7 @@ import torch
 import torch.utils.data
 from utils.DataUtils import *
 from models.loss import L2MaskLoss, L2Loss, LBSLoss
-
+import trimesh
 
 class HandOccDataset(torch.utils.data.Dataset):
     """
@@ -198,13 +198,16 @@ class HandOccDataset(torch.utils.data.Dataset):
         assert len(points) == self.num_sample_points
         assert len(occupancies) == self.num_sample_points
         assert len(coords) == self.num_sample_points
-
+        
+        gt_mesh_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
+                                                    "isosurf_scaled.off")            
         # None of the if-data would be needed if in validation mode
         if_data = {
             'grid_coords':np.array(coords, dtype=np.float32),
             'occupancies': np.array(occupancies, dtype=np.float32),
             'translation': nocs_transform['translation'],
-            'scale': nocs_transform['scale']
+            'scale': nocs_transform['scale'],
+            'mesh': gt_mesh_path
             }
 
         return if_data

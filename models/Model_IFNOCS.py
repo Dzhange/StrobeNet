@@ -95,11 +95,15 @@ class model_IFNOCS(object):
                 dict_td = {}
                 keys = item.keys()
                 for key in keys:
-                    dict_td[key] = item[key].to(device)
+                    if isinstance(item[key], torch.Tensor):
+                        dict_td[key] = item[key].to(device)
                 data_to_device.append(dict_td)
-            else:
+            elif isinstance(tuple_or_tensor, torch.Tensor):
                 tuple_or_tensor_td = tuple_or_tensor.to(device)
                 data_to_device.append(tuple_or_tensor_td)
+            else:
+                # for gt mesh
+                continue
         
         # print("len is ", len(data_to_device))
         # data_to_device = [COLOR_TENSOR,[TARGET_NOCS_TENSOR,OCCUPANCY{}]]
@@ -115,6 +119,7 @@ class model_IFNOCS(object):
         targets = {}
         targets['NOCS'] = data_to_device[1]
         targets['occupancies'] = data_to_device[2]['occupancies']
+        targets['mesh'] = data[2]['mesh']
 
         return inputs, targets
 

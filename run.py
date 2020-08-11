@@ -53,8 +53,7 @@ for mode in cfg.MODES:
     print("[ INFO ] {} dataset has {} elements.".format(mode, len(phase_dataset)))
     dataloader_dict[mode] = DataLoader(phase_dataset, batch_size=cfg.BATCHSIZE,
                                        shuffle=mode in ['train'],
-                                       num_workers=cfg.DATALOADER_WORKERS, pin_memory=True,
-                                       drop_last=True)
+                                       num_workers=cfg.DATALOADER_WORKERS, drop_last=True)
 
 # prepare models
 # model = model_NOCS(cfg)
