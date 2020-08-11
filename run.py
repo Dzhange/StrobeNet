@@ -44,7 +44,7 @@ if task == "nocs":
     objective = L2MaskLoss()
 
 for mode in cfg.MODES:
-    
+
     phase_dataset = Dataset(root=cfg.DATASET_ROOT,
                             train=mode in ['train'] or cfg.TEST_ON_TRAIN,
                             limit=cfg.DATA_LIMIT, img_size=cfg.IMAGE_SIZE,
@@ -58,11 +58,10 @@ for mode in cfg.MODES:
 
 # prepare models
 # model = model_NOCS(cfg)
-
 # register dataset, models, logger to trainer
 
 device = torch.device(cfg.GPU)
-print(device)
+print("[ INFO ]running on device ", device)
 trainer = Trainer(cfg, Model, dataloader_dict, objective, device)
 # start
 trainer.train()

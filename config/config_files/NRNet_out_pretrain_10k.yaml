@@ -21,8 +21,8 @@ TARGETS: "pnnocs00"
 TASK: "pretrain"
 
 NRNET_TYPE: "out_feature"
-NRNET_PRETRAIN: True
-NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/pnnocs/old_seg_100k"
+# NRNET_PRETRAIN: True
+# NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/pnnocs/old_seg_100k"
 OUT_CHANNELS: 4
 FEATURE_CHANNELS: 64
 

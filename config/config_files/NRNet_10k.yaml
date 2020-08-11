@@ -18,7 +18,8 @@ IMAGE_SIZE: (320,240)
 MODEL_INIT_PATH: ['log/hand_nocsreg_epoch_31.model']
 TARGETS: "pnnocs00"
 TASK: "occupancy"
-OUT_CHANNELS: 68
+OUT_CHANNELS: 4
+FEATURE_CHANNELS: 64
 EXPT_NAME: NRNet_10k
 
 
