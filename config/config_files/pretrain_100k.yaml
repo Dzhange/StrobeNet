@@ -1,0 +1,33 @@
+##################################################################################################
+# This is the pretrain stage for the NRNet
+# where only supervise the model with PNNOCS
+# the weights should be used later in NRNet
+
+# dataset root
+# DATASET_ROOT: '/workspace/Data/8_7_cut_BW_IF'
+DATASET_ROOT: '/workspace/Data/full_hand_dataset/hand_rig_dataset_v3'
+# TASK: "nocs"
+TASK: "pretrain"
+
+
+OUTPUT_DIR: '/workspace/nrnocs_dev/output/'
+
+MODES: ['train','val']
+
+BATCHSIZE: 2
+DATALOADER_WORKERS: 2
+EPOCH_TOTAL: 10 # First pretrain the model with only supervison
+
+LR: 1e-3
+
+SAVE_FREQ: 5
+DATA_LIMIT: 100
+IMAGE_SIZE: (320,240)
+MODEL_INIT_PATH: ['log/hand_nocsreg_epoch_31.model']
+TARGETS: "pnnocs00"
+
+OUT_CHANNELS: 68 # Temporarily, only 4 channels would be supervised.
+EXPT_NAME: NRNet_pretrain_100k
+
+
+GPU: 1

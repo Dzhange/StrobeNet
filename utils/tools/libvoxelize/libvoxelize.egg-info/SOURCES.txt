@@ -1,0 +1,6 @@
+setup.py
+voxelize.c
+libvoxelize.egg-info/PKG-INFO
+libvoxelize.egg-info/SOURCES.txt
+libvoxelize.egg-info/dependency_links.txt
+libvoxelize.egg-info/top_level.txt

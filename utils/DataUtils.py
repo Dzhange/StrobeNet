@@ -12,6 +12,10 @@ import torch.nn.functional as F
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 from models.loss import L2MaskLoss
+import re
+    
+def find_frame_num(path):
+    return re.findall(r'%s(\d+)' % "frame_",path)[0]
 
 ################################ DATA RELATED UTILS ####################################
 def torch2np(ImageTorch):
@@ -59,6 +63,39 @@ def imread_rgb_torch(Path, Size=None, interp=cv2.INTER_NEAREST): # Use only for 
     Image = np2torch(ImageCV) # Range: 0-255
 
     return Image
+
+def imread_gray_torch(Path, Size=None, interp=cv2.INTER_NEAREST): # Use only for loading RGB images
+    ImageCV = cv2.imread(Path, -1)
+    # Discard 4th channel since we are loading as RGB
+    if ImageCV.shape[-1] != 3:
+        ImageCV = ImageCV[:, :, :3]
+
+    ImageCV = cv2.cvtColor(ImageCV, cv2.COLOR_BGR2GRAY)
+    if Size is not None:
+        # Check if the aspect ratios are the same
+        OrigSize = ImageCV.shape[:]        
+        OrigAspectRatio = OrigSize[1] / OrigSize[0] # W / H
+        ReqAspectRatio = Size[0] / Size[1] # W / H # CAUTION: Be aware of flipped indices
+        # print(OrigAspectRatio)
+        # print(ReqAspectRatio)
+        if math.fabs(OrigAspectRatio-ReqAspectRatio) > 0.01:
+            # Different aspect ratio detected. So we will be fitting the smallest of the two images into the larger one while centering it
+            # After centering, we will crop and finally resize it to the request dimensions
+            if ReqAspectRatio < OrigAspectRatio:
+                NewSize = [OrigSize[0], int(OrigSize[0] * ReqAspectRatio)] # Keep height
+                Center = int(OrigSize[1] / 2) - 1
+                HalfSize = int(NewSize[1] / 2)
+                ImageCV = ImageCV[:, Center-HalfSize:Center+HalfSize, :]
+            else:
+                NewSize = [int(OrigSize[1] / ReqAspectRatio), OrigSize[1]] # Keep width
+                Center = int(OrigSize[0] / 2) - 1
+                HalfSize = int(NewSize[0] / 2)
+                ImageCV = ImageCV[Center-HalfSize:Center+HalfSize, :, :]
+        ImageCV = cv2.resize(ImageCV, dsize=Size, interpolation=interp)
+    
+    Image = torch.from_numpy(np.transpose(ImageCV, (0, 1)))
+    return Image
+
 
 def saveData(Items, OutPath='.'):
     for Ctr, I in enumerate(Items, 0):
@@ -134,6 +171,25 @@ def sendToDevice(TupleOrTensor, Device):
                 TupleOrTensorTD[Ctr] = TupleOrTensor[Ctr]
 
     return TupleOrTensorTD
+
+def normalizeInput(Image, format='imagenet'):
+    # All pre-trained models expect input images normalized in the same way, i.e. mini-batches of 3-channel RGB images of shape (3 x H x W), where H and W are expected to be atleast 224.
+    # The images have to be loaded in to a range of [0, 1] and then normalized using mean=[0.485, 0.456, 0.406] and std=[0.229, 0.224, 0.225]
+
+    ImageN = Image # Assuming that input is in 0-1 range already
+    if 'imagenet' in format:
+        # Apply ImageNet batch normalization for input
+        # https://discuss.pytorch.org/t/about-normalization-using-pre-trained-vgg16-networks/23560
+        # Assuming torch image 3 x W x H
+        # mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+        ImageN[0] = (ImageN[0] - 0.485 ) / 0.229
+        ImageN[1] = (ImageN[1] - 0.456 ) / 0.224
+        ImageN[2] = (ImageN[2] - 0.406 ) / 0.225
+    else:
+        print('[ WARN ]: Input normalization implemented only for ImageNet.')
+
+    return ImageN
+
 
 def expandTilde(Path):
     if '~' == Path[0]:

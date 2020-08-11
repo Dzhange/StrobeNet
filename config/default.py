@@ -20,7 +20,7 @@ def get_default_cfg():
     cfg.ROOT_DIR = os.getcwd()
     cfg.CONFIG_FILE = 'None'
     cfg.MODES = ['train', 'vali']
-    cfg.GPU = [0]
+    cfg.GPU = 0
 
     cfg.BATCHSIZE = 2
     cfg.DATALOADER_WORKERS = 2
@@ -54,13 +54,20 @@ def get_default_cfg():
     cfg.VIS_TRAIN_PER_BATCH = 20
 
     cfg.BACKUP_FILES = []
-    
+
     #added by Ge
     cfg.OUTPUT_DIR = ''
     cfg.SAVE_FREQ = 1
     cfg.DATA_LIMIT = 10
     cfg.IMAGE_SIZE = (320, 240)
     cfg.EXPT_NAME = "UNKNOWN"
-    cfg.TEST_ON_TRAIN = True
+    cfg.TEST_ON_TRAIN = False
+    cfg.OUT_CHANNELS = 4
+    cfg.FEATURE_CHANNELS = 64
+    cfg.TASK = "occupancy"
+    cfg.TARGETS = "nox00"
 
+    cfg.NRNET_TYPE = "out_feature" # inter_feature
+    cfg.NRNET_PRETRAIN = False
+    cfg.NRNET_PRETRAIN_PATH = "./"
     return cfg

@@ -214,18 +214,17 @@ class segnetUp2(nn.Module):
         self.withSkipConnections = withSkipConnections
         self.unpool = nn.MaxUnpool2d(2, 2)
         if self.withSkipConnections:
-            self.conv1 = conv2DBatchNormRelu(2 * in_size, 2 * in_size, 3, 1, 1)
+            self.conv1 = deconv2DBatchNormRelu(2 * in_size, 2 * in_size, 3, 1, 1)
             if last_layer:
-                self.conv2 = nn.Conv2d(in_channels=2 * in_size, out_channels=out_size, kernel_size=3, padding=1,
-                                       stride=1)
+                self.conv2 = nn.ConvTranspose2d(in_channels=2 * in_size, out_channels=out_size, kernel_size=3, padding=1, stride=1)
             else:
-                self.conv2 = conv2DBatchNormRelu(2 * in_size, out_size, 3, 1, 1)
+                self.conv2 = deconv2DBatchNormRelu(2 * in_size, out_size, 3, 1, 1)
         else:
-            self.conv1 = conv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
+            self.conv1 = deconv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
             if last_layer:
-                self.conv2 = nn.Conv2d(in_channels=in_size, out_channels=out_size, kernel_size=3, padding=1, stride=1)
+                self.conv2 = nn.ConvTranspose2d(in_channels=in_size, out_channels=out_size, kernel_size=3, padding=1, stride=1)
             else:
-                self.conv2 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
+                self.conv2 = deconv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
 
     def forward(self, inputs, indices, output_shape, SkipFeatureMap=None):
         if self.withSkipConnections and SkipFeatureMap is None:
@@ -246,13 +245,13 @@ class segnetUp3(nn.Module):
         self.withSkipConnections = withSkipConnections
         self.unpool = nn.MaxUnpool2d(2, 2)
         if self.withSkipConnections:
-            self.conv1 = conv2DBatchNormRelu(2 * in_size, 2 * in_size, 3, 1, 1)
-            self.conv2 = conv2DBatchNormRelu(2 * in_size, 2 * in_size, 3, 1, 1)
-            self.conv3 = conv2DBatchNormRelu(2 * in_size, out_size, 3, 1, 1)
+            self.conv1 = deconv2DBatchNormRelu(2 * in_size, 2 * in_size, 3, 1, 1)
+            self.conv2 = deconv2DBatchNormRelu(2 * in_size, 2 * in_size, 3, 1, 1)
+            self.conv3 = deconv2DBatchNormRelu(2 * in_size, out_size, 3, 1, 1)
         else:
-            self.conv1 = conv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
-            self.conv2 = conv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
-            self.conv3 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
+            self.conv1 = deconv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
+            self.conv2 = deconv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
+            self.conv3 = deconv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
 
     def forward(self, inputs, indices, output_shape, SkipFeatureMap=None):
         if self.withSkipConnections and SkipFeatureMap is None:
@@ -265,82 +264,3 @@ class segnetUp3(nn.Module):
         outputs = self.conv2(outputs)
         outputs = self.conv3(outputs)
         return outputs
-
-
-# ------- UNet
-
-class UNet_ConvBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0):
-        super().__init__()
-
-        self.Conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding)
-        self.BN = nn.BatchNorm2d(out_channels)
-        self.ReLU = nn.ReLU()
-
-    def forward(self, x):
-        x = self.Conv(x)
-        x = self.BN(x)
-        x = self.ReLU(x)
-
-        return x
-
-
-class UNet_DownBlock(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-
-        self.Block1 = UNet_ConvBlock(in_channels, out_channels, kernel_size=(3, 3), stride=1,
-                                     padding=0)  # Fixed kernel sizes
-        self.Block2 = UNet_ConvBlock(out_channels, out_channels, kernel_size=(3, 3), stride=1, padding=0)
-        self.Pool = nn.MaxPool2d(kernel_size=(2, 2), stride=2)
-
-    def forward(self, x):
-        x = self.Block1(x)
-        x = self.Block2(x)
-        FeatureMap = x
-        x = self.Pool(x)
-
-        return x, FeatureMap
-
-
-class UNet_UpBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, up_size):
-        super().__init__()
-
-        # Doing what's in the original paper: Upsample the feature map and then a 2x2 conv (and another upsample to match feature sizes)
-        self.UpSample = nn.Upsample(size=up_size, mode='bilinear')
-        self.Conv2 = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=(2, 2), stride=1,
-                               padding=0)
-        self.UpSample2 = nn.Upsample(size=up_size, mode='bilinear')
-        self.Block1 = UNet_ConvBlock(in_channels, out_channels, kernel_size=(3, 3), stride=1, padding=0)
-        self.Block2 = UNet_ConvBlock(out_channels, out_channels, kernel_size=(3, 3), stride=1, padding=0)
-
-    def CopyCropConcat(self, Upsampled, CopiedFeatureMap):
-        PadHalfSize = (CopiedFeatureMap.size()[2] - Upsampled.size()[2]) // 2  # Floor division //
-        # print('PadHalfSize:', PadHalfSize)
-        # Crop copied feature map
-        # Remove PadHalfSize from both sides for both dimensions (starting from the last: width, then height)
-        CopiedFeatureMap = F.pad(CopiedFeatureMap, (-PadHalfSize, -PadHalfSize, -PadHalfSize, -PadHalfSize))
-        # print('CopiedFeatureMap:', CopiedFeatureMap.size())
-        # print('Upsampled:', Upsampled.size())
-        # Concat the features
-        Concated = torch.cat((CopiedFeatureMap, Upsampled), 1)  # Is this correct?
-        # print('Concated:', Concated.size())
-        return Concated
-
-    def forward(self, x, CopiedFeatureMap):
-        # print('-----------------------')
-        # print('Input:', x.size())
-        # Doing what's in the original paper: Upsample the feature map and then a 2x2 conv
-        x = self.UpSample(x)
-        x = self.Conv2(x)
-        x = self.UpSample2(x)
-        # Copy and crop here
-        x = self.CopyCropConcat(x, CopiedFeatureMap)
-        # print('After copycropconcat:', x.size())
-        x = self.Block1(x)
-        x = self.Block2(x)
-        # print('Output:', x.size())
-        # print('-----------------------')
-
-        return x

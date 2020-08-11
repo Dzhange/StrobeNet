@@ -17,7 +17,7 @@ class Validater:
         self.val_dataloader = val_dataloader                
         
         self.model.net.to(device)
-        self.output_dir = os.path.join(self.model.expt_dir_path,"ValResults")
+        self.output_dir = os.path.join(self.model.expt_dir_path, "ValResults")
         if os.path.exists(self.output_dir) == False:
             os.makedirs(self.output_dir)
 
@@ -27,18 +27,25 @@ class Validater:
 
         ValLosses = []
         
-        
+        max_num = 30
+        epoch_losses = []
         for i, data in enumerate(self.val_dataloader, 0):  # Get each batch        
-            print("validating on the {}th data".format(i))
+            if i >= max_num:
+                break
+            
             net_input, target = self.model.preprocess(data, self.device)
             output = self.model.net(net_input)
             loss = self.objective(output, target)
-        
+            epoch_losses.append(loss.item())
+
+            print("validating on the {}th data, loss is {}".format(i,loss))
+            print("average validation loss is ",np.mean(np.asarray(epoch_losses)))            
+
             InputIm, GTOutTupRGB, GTOutTupMask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(target, 'cpu'))
             _, PredOutTupRGB, PredOutTupMask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(output.detach(), 'cpu'), isMaskNOX=True)
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_color00.png').format(str(i).zfill(3)),  cv2.cvtColor(InputIm, cv2.COLOR_BGR2RGB))
 
-            OutTargetStr = ["nox00"]
+            OutTargetStr = [self.config.TARGETS]
             if 'color00' in OutTargetStr:
                 OutTargetStr.remove('color00')
             if 'camera' in OutTargetStr:
@@ -54,5 +61,5 @@ class Validater:
                 cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_03predmask.png').format(str(i).zfill(3), Targetstr),
                             PredMask)
         
-            
+        print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
             

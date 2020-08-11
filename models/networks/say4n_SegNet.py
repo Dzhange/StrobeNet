@@ -31,7 +31,7 @@ decoder_dims = [
 
 
 class SegNet(nn.Module):
-    def __init__(self, input_channels, output_channels):
+    def __init__(self, input_channels=3, output_channels=4):
         super(SegNet, self).__init__()
 
         self.input_channels = input_channels
@@ -231,12 +231,10 @@ class SegNet(nn.Module):
                                                                    padding=1)
                                                ])
 
-
     def forward(self, input_img):
         """
         Forward pass `input_img` through the network
         """
-
         # Encoder
 
         # Encoder Stage - 1

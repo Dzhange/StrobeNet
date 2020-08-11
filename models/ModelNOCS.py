@@ -4,28 +4,26 @@ The model to train, validate and test NOCS
 import os
 import glob
 import torch
-from models.SegNet import SegNet as old_SegNet
-from models.say4n_SegNet import SegNet as new_SegNet
+from models.networks.SegNet import SegNet as old_SegNet
+from models.networks.say4n_SegNet import SegNet as new_SegNet
 from utils.DataUtils import *
 
 class model_NOCS(object):
 
     def __init__(self, config):
         self.config = config
-        self.lr = config.LR # set learning rate        
-        # self.net = old_SegNet(out_channels=4, withSkipConnections=False)
-        self.net = new_SegNet(input_channels=3, output_channels=4)
+        self.lr = config.LR # set learning rate
+        # self.net = new_SegNet(input_channels=3, output_channels=config.OUT_CHANNELS)
+        self.net = old_SegNet(output_channels=config.OUT_CHANNELS) # 3 + 1 + 16 * 1 = 116
         self.loss_history = []
         self.val_loss_history = []
         self.start_epoch = 0
-        self.expt_dir_path = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME)
-        # print(self.expt_dir_path)
+        self.expt_dir_path = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME)        
         if os.path.exists(self.expt_dir_path) == False:            
             os.makedirs(self.expt_dir_path)
         self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr,
                                           betas=(self.config.ADAM_BETA1, self.config.ADAM_BETA2))
-        
-    # def load_check_point(self):
+
     def setup_checkpoint(self, TrainDevice):
         latest_checkpoint_dict = None
         all_checkpoints = glob.glob(os.path.join(self.expt_dir_path, '*.tar'))
@@ -54,9 +52,8 @@ class model_NOCS(object):
             else:
                 print('[ INFO ]: Experiment names do not match. Training from scratch.')
 
-    # def save_check_point(self):
     def save_checkpoint(self, epoch, time_string='humanlocal', print_str='*'*3):
-        CheckpointDict = {
+        checkpoint_dict = {
             'Name': self.config.EXPT_NAME,
             'ModelStateDict': self.net.state_dict(),
             'OptimizerStateDict': self.optimizer.state_dict(),
@@ -65,35 +62,26 @@ class model_NOCS(object):
             'Epoch': self.start_epoch + epoch + 1,
             'SavedTimeZ': getZuluTimeString(),
         }
-        OutFilePath = savePyTorchCheckpoint(CheckpointDict, self.expt_dir_path, TimeString=time_string)
-        saveLossesCurve(self.loss_history, self.val_loss_history, out_path=os.path.splitext(OutFilePath)[0] + '.png',
-                                xlim=[0, int(self.config.EPOCH_TOTAL + self.start_epoch)],
-                                legend=["train loss","val loss"], title=self.config.EXPT_NAME)
+        out_file_path = savePyTorchCheckpoint(checkpoint_dict, self.expt_dir_path, TimeString=time_string)
+        saveLossesCurve(self.loss_history, self.val_loss_history, out_path=os.path.splitext(out_file_path)[0] + '.png',
+                        xlim=[0, int(self.config.EPOCH_TOTAL + self.start_epoch)],
+                        legend=["train loss", "val loss"], title=self.config.EXPT_NAME)
         # print('[ INFO ]: Checkpoint saved.')
         print(print_str) # Checkpoint saved. 50 + 3 characters [>]
 
-    def preprocess(self, Data, Device):
-        DataTD = []
-        for item in Data:
-            TupleOrTensor = item
-            TupleOrTensorTD = item
-            if isinstance(TupleOrTensorTD, tuple) == False and isinstance(TupleOrTensorTD, list) == False:
-                TupleOrTensorTD = TupleOrTensor.to(Device)
+    def preprocess(self, data, device):
+        data_todevice = []
+        for item in data:
+            tuple_or_tensor = item
+            tuple_or_tensor_td = item
+            if not isinstance(tuple_or_tensor_td, (tuple, list)):
+                tuple_or_tensor_td = tuple_or_tensor.to(device)
             else:
-                for Ctr in range(len(TupleOrTensor)):
-                    if isinstance(TupleOrTensor[Ctr], torch.Tensor):
-                        TupleOrTensorTD[Ctr] = TupleOrTensor[Ctr].to(Device)
+                for ctr in range(len(tuple_or_tensor)):
+                    if isinstance(tuple_or_tensor[ctr], torch.Tensor):
+                        tuple_or_tensor_td[ctr] = tuple_or_tensor[ctr].to(device)
                     else:
-                        TupleOrTensorTD[Ctr] = TupleOrTensor[Ctr]
+                        tuple_or_tensor_td[ctr] = tuple_or_tensor[ctr]
 
-            DataTD.append(TupleOrTensorTD)
-        return DataTD
-
-
-    def train_step(self):
-        pass
-
-    def val_step(self):
-        pass
-    
-
+            data_todevice.append(tuple_or_tensor_td)
+        return data_todevice

@@ -1,0 +1,26 @@
+##################################################################################################
+#  Basic training on the largest dataset
+
+DATASET_ROOT: '/workspace/Data/full_hand_dataset/hand_rig_dataset_v3/'
+OUTPUT_DIR: '/workspace/nrnocs_dev/output/'
+
+MODES: ['train','val']
+
+GPU: [1]
+BATCHSIZE: 2
+DATALOADER_WORKERS: 4
+EPOCH_TOTAL: 100
+
+LR: 1e-3
+
+SAVE_FREQ: 5
+DATA_LIMIT: 100
+IMAGE_SIZE: (320,240)
+MODEL_INIT_PATH: ['log/hand_nocsreg_epoch_31.model']
+TARGETS: "pnnocs00"
+TASK: "nocs"
+
+EXPT_NAME: oldSeg_100k
+
+
+GPU: 2

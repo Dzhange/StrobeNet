@@ -10,6 +10,7 @@ import traceback
 import torch
 from utils.DataUtils import *
 from loaders.HandDataset import *
+import gc
 
 class Trainer:
     """
@@ -22,7 +23,7 @@ class Trainer:
         self.val_data_loader = data_loader_dict['val']
         self.objective = objective
         self.device = device
-        self.model.net.to(device)        
+        self.model.net.to(device)
 
     def train(self):
         self.model.setup_checkpoint(self.device)
@@ -36,13 +37,14 @@ class Trainer:
                 tic = getCurrentEpochTime()
                 # for data in self.train_data_loader:
                 for i, data in enumerate(self.train_data_loader, 0):  # Get each batch
-                    ################### START WEIGHT UPDATE ################################                    
+                    ################### START WEIGHT UPDATE ################################
                     self.model.optimizer.zero_grad()
                     net_input, target = self.model.preprocess(data, self.device)
-                    output = self.model.net(net_input)                    
+                    output = self.model.net(net_input)
+                    
                     loss = self.objective(output, target)
                     loss.backward()
-                    self.model.optimizer.step()                                        
+                    self.model.optimizer.step()
                     ####################### START MONITOR ################################
                     epoch_losses.append(loss.item())
                     toc = getCurrentEpochTime()
@@ -63,13 +65,19 @@ class Trainer:
                                                     getTimeDur(ETA-total_elapsed))
 
                     sys.stdout.write(progress_str.ljust(150))
-                    sys.stdout.flush()                    
-                    ########################## END LOOP ####################################
+                    sys.stdout.flush()    
+                sys.stdout.write('\n')
+                gc.collect()
+                self.model.loss_history.append(np.mean(np.asarray(epoch_losses)))
+                ######################  DO VALIDATION  ##########################
+                val_losses = self.validate()
+                self.model.val_loss_history.append(np.mean(np.asarray(val_losses)))
                 ########################## SAVE CHECKPOINT ##############################
                 if cur_epoch % self.config.SAVE_FREQ == 0 and cur_epoch > 0:
-                    print("[ INFO ]: Save checkpoint for epoch {}.".format(cur_epoch))
-                    self.model.save_checkpoint(cur_epoch, time_string='eot', print_str='$'*3)                        
-                sys.stdout.write('\n')
+                    
+                    print("[ INFO ]: Save checkpoint for epoch {}.".format(cur_epoch))                    
+                    self.model.save_checkpoint(cur_epoch, print_str='~'*3)                        
+                
                 cur_epoch += 1
             except (KeyboardInterrupt, SystemExit):
                 print('\n[ INFO ]: KeyboardInterrupt detected. Saving checkpoint.')
@@ -81,3 +89,30 @@ class Trainer:
                 break
 
         self.model.save_checkpoint(cur_epoch, time_string='eot', print_str='$'*3)
+
+    def validate(self):
+        """
+        Do validation, only to record loss, don't save any results
+        """    
+        self.model.net.eval()         #switch to evaluation mode
+        val_losses = []
+        tic = getCurrentEpochTime()
+        # print('Val length:', len(ValDataLoader))
+        for i, data in enumerate(self.val_data_loader, 0):  # Get each batch
+            
+            net_input, target = self.model.preprocess(data, self.device)
+            output = self.model.net(net_input)
+            loss = self.objective(output, target)
+            val_losses.append(loss.item())
+
+            # Print stats
+            toc = getCurrentEpochTime()
+            elapsed = math.floor((toc - tic) * 1e-6)
+            done = int(50 * (i+1) / len(self.val_data_loader))
+            sys.stdout.write(('\r[{}>{}] val loss - {:.8f}, elapsed - {}')
+                             .format('+' * done, '-' * (50 - done), np.mean(np.asarray(val_losses)), getTimeDur(elapsed)))
+            sys.stdout.flush()
+        sys.stdout.write('\n')
+        self.model.net.train()     #switch back to train mode
+        
+        return val_losses

@@ -1,0 +1,26 @@
+##################################################################################################
+# dataset root
+DATASET_ROOT: '/workspace/Data/meshedNOCS/hand_rig_dataset_v3/'
+OUTPUT_DIR: '/workspace/nrnocs_dev/output/'
+
+MODES: ['train','val']
+
+GPU: [1]
+BATCHSIZE: 2
+DATALOADER_WORKERS: 4
+EPOCH_TOTAL: 2000
+
+LR: 1e-3
+
+SAVE_FREQ: 5
+DATA_LIMIT: 100
+IMAGE_SIZE: (320,240)
+MODEL_INIT_PATH: ['log/hand_nocsreg_epoch_31.model']
+# EXPT_NAME: debug_28
+EXPT_NAME: say4n_10k
+# EXPT_NAME: debug_29_woSkip
+
+OUT_CHANNELS: 4
+LBS: False
+TARGETS: "nox00"
+GPU: 1

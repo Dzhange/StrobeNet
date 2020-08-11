@@ -1,17 +1,17 @@
 import torch.nn as nn
 import torchvision.models as models
-from models.modules import *
+from models.networks.modules import *
 
 class SegNet(nn.Module):
-    def __init__(self, out_channels=8, in_channels=3,
+    def __init__(self, output_channels=8, input_channels=3,
                  pretrained=True, withSkipConnections=True):
         super().__init__()
 
-        self.in_channels = in_channels
-        self.withSkipConnections = withSkipConnections        
+        self.in_channels = input_channels
+        self.withSkipConnections = withSkipConnections
         self.down1 = segnetDown2(self.in_channels, 64, withFeatureMap=self.withSkipConnections)
         self.down2 = segnetDown2(64, 128, withFeatureMap=self.withSkipConnections)
-        self.down3 = segnetDown3(128, 256, withFeatureMap=self.withSkipC·onnections)
+        self.down3 = segnetDown3(128, 256, withFeatureMap=self.withSkipConnections)
         self.down4 = segnetDown3(256, 512, withFeatureMap=self.withSkipConnections)
         self.down5 = segnetDown3(512, 512, withFeatureMap=self.withSkipConnections)
 
@@ -19,7 +19,7 @@ class SegNet(nn.Module):
         self.up4 = segnetUp3(512, 256, withSkipConnections=self.withSkipConnections)
         self.up3 = segnetUp3(256, 128, withSkipConnections=self.withSkipConnections)
         self.up2 = segnetUp2(128, 64, withSkipConnections=self.withSkipConnections)
-        self.up1 = segnetUp2(64, out_channels, withSkipConnections=self.withSkipConnections)
+        self.up1 = segnetUp2(64, output_channels, last_layer=True, withSkipConnections=self.withSkipConnections)
 
         if pretrained:
             vgg16 = models.vgg16(pretrained=True)
@@ -41,20 +41,6 @@ class SegNet(nn.Module):
         up3 = self.up3(up4, indices_3, unpool_shape3, SkipFeatureMap=FM3)
         up2 = self.up2(up3, indices_2, unpool_shape2, SkipFeatureMap=FM2)
         up1 = self.up1(up2, indices_1, unpool_shape1, SkipFeatureMap=FM1)
-
-        # # DEBUG: print sizes
-        # print('down1:', down1.size())
-        # print('down2:', down2.size())
-        # print('down3:', down3.size())
-        # print('down4:', down4.size())
-        # print('down5:', down5.size())
-        #
-        # print('up5:', up5.size())
-        # print('up4:', up4.size())
-        # print('up3:', up3.size())
-        # print('up2:', up2.size())
-        # print('up1:', up1.size())
-
         return up1
 
     def init_vgg16_params(self, vgg16):
@@ -95,7 +81,7 @@ class SegNet(nn.Module):
 if __name__ == '__main__':
     import torch
 
-    net = SegNet(withSkipConnections=True, out_channels=8).cuda()
+    net = SegNet(withSkipConnections=True, output_channels=8).cuda()
     x = torch.rand(2, 3, 640, 480).cuda()
     y = net(x)
     print(y.shape)

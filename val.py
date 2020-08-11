@@ -3,7 +3,6 @@ Main program
 May the Force be with you.
 Jiahui @ March,2019
 """
-import open3d as o3d  # Open3D and Pytorch has conflict when not compiling from source
 from torch.utils.data import DataLoader
 import torch
 # from loaders import get_dataset
@@ -24,7 +23,7 @@ dataloader_dict = dict()
 
 val_dataset = HandDataset(root=cfg.DATASET_ROOT, train=cfg.TEST_ON_TRAIN,
                           limit=cfg.DATA_LIMIT, img_size=cfg.IMAGE_SIZE,
-                          frame_load_str=["color00", "nox00"])
+                          frame_load_str=["color00", cfg.TARGETS])
 
 val_dataloader = DataLoader(val_dataset, batch_size=1,
                             shuffle=False,
@@ -36,7 +35,7 @@ model = model_NOCS(cfg)
 
 # register dataset, models, logger to trainer
 objective = L2MaskLoss()
-device = torch.device("cuda:1")
+device = torch.device(cfg.GPU)
 validater = Validater(cfg, model, val_dataloader, objective, device)
 
 # start
