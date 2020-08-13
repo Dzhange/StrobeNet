@@ -36,120 +36,107 @@ import argparse
 import re
 import implicit_waterproofing as iw
 
+ERROR = -1
+
 class DataFilter:
 
     def __init__(self,inputDir,outputDir):
         self.inputDir = inputDir
         self.outputDir = outputDir
         self.SampleNum = 100000
+
     def filter(self):
         
         if not os.path.exists(self.outputDir):
             os.mkdir(self.outputDir)
 
-        for mode in ['train','val','unseen_val']:
-            CurOutDir = os.path.join(self.outputDir,mode)
-            if not os.path.exists(CurOutDir):
-                os.mkdir(CurOutDir)    
-            
-            self.mode = mode
+        for mode in ['train', 'val']:
+            cur_out_dir = os.path.join(self.outputDir,mode)
+            if not os.path.exists(cur_out_dir):
+                os.mkdir(cur_out_dir)
 
-            AllColorImgs = glob.glob(os.path.join(self.inputDir,mode,'**/frame_*_view_*_color00.*'))
-            
-            AllFrames = [self.findFrameNum(p) for p in AllColorImgs ]
-            AllFrames = list(dict.fromkeys(AllFrames))
-            AllFrames.sort()
+            self.mode = mode
+            all_color_imgs = glob.glob(os.path.join(self.inputDir, mode, '**/frame_*_view_*_color00.*'))
+            all_frames = [self.findFrameNum(p) for p in all_color_imgs ]
+            all_frames = list(dict.fromkeys(all_frames))
+            all_frames.sort()
             # AllFrames = ["00000000"]
-        
+
             p = Pool(mp.cpu_count() >> 1)
-            p.map(self.processFrame, AllFrames)
-                            
-    def processFrame(self,Frame):
-        OutDir = os.path.join(self.outputDir,self.mode,str(int(Frame) // 100).zfill(4))
-        if not os.path.exists(OutDir):
+            p.map(self.processFrame, all_frames)
+
+    def processFrame(self, Frame):
+        out_dir = os.path.join(self.outputDir, self.mode, str(int(Frame) // 100).zfill(4))
+        if not os.path.exists(out_dir):
             try:
-                os.mkdir(OutDir)
+                os.mkdir(out_dir)
             except:
                 print("subdir already exists")
 
-        self.normalizeNOCS(Frame)
-        for sigma in [0.01,0.1]:
-            self.boudarySampling(Frame,sigma)
-        self.copyImgs(Frame)
+        success = self.normalizeNOCS(Frame)
+        if success == ERROR:
+            return
 
-    def copyImgs(self,Frame):
-        
-        InDir = os.path.join(self.inputDir,self.mode,str(int(Frame) // 100).zfill(4))
-        OutDir = os.path.join(self.outputDir,self.mode,str(int(Frame) // 100).zfill(4))
-        ViewNum = 10
-        for view in range(ViewNum):
-            FrameView = "frame_" + Frame + "_view_" + str(view).zfill(2)
-            Suffixs = ['_color00.png','_color01.png','_nox00.png','_nox01.png',\
-                        '_pnnocs00.png','_pnnocs01.png',
-                        '_normals00.png','_normals01.png','_uv00.png','_uv01.png']
-            for fix in Suffixs:
-                f_name = FrameView + fix
-                old_f = os.path.join(InDir,f_name)
-                new_f = os.path.join(OutDir,f_name)
-                if os.path.exists(old_f) and not os.path.exists(new_f):
-                    shutil.copy(old_f,new_f)
+        for sigma in [0.01, 0.1]:
+            self.boudarySampling(Frame, sigma)
+        self.copyImgs(Frame)
+        return
 
 
     def normalizeNOCS(self, Frame):
-        
-        InDir = os.path.join(self.inputDir,self.mode,str(int(Frame) // 100).zfill(4))
-        OutDir = os.path.join(self.outputDir,self.mode,str(int(Frame) // 100).zfill(4))
 
-        OriginMeshName = os.path.join(InDir,"frame_" + Frame + "_NOCS_mesh.obj")
-        TargetMeshName = os.path.join(OutDir,"frame_" + Frame + "_isosurf_scaled.off")
-        TransformName = os.path.join(OutDir,"frame_" + Frame + "_transform.npz")
-        if os.path.exists(TargetMeshName):
+        in_dir = os.path.join(self.inputDir, self.mode, str(int(Frame) // 100).zfill(4))
+        out_dir = os.path.join(self.outputDir, self.mode, str(int(Frame) // 100).zfill(4))
+
+        orig_mesh_path = os.path.join(in_dir, "frame_" + Frame + "_NOCS_pn_mesh.obj")
+        target_mesh_path = os.path.join(out_dir, "frame_" + Frame + "_isosurf_scaled.off")
+        transform_path = os.path.join(out_dir, "frame_" + Frame + "_transform.npz")
+        if os.path.exists(target_mesh_path):
             if args.write_over:
-                print('overwrite ', TargetMeshName)
+                print('overwrite ', target_mesh_path)
             else:
-                print('File {} exists. Done.'.format(TargetMeshName))
+                print('File {} exists. Done.'.format(target_mesh_path))
                 return
-
         translation = 0
         scale = 1
-
         try:
-            mesh = trimesh.load(OriginMeshName, process=False)
+            mesh = trimesh.load(orig_mesh_path, process=False)
             total_size = (mesh.bounds[1] - mesh.bounds[0]).max()
             centers = (mesh.bounds[1] + mesh.bounds[0]) /2
-            
+
             translation = -centers
             scale = 1/total_size
 
             mesh.apply_translation(-centers)
             mesh.apply_scale(1/total_size)
-            mesh.export(TargetMeshName)
-            
-            np.savez(TransformName, translation=translation,scale=scale)
-            print('Finished {}'.format(OriginMeshName))
+            mesh.export(target_mesh_path)
+
+            np.savez(transform_path, translation=translation, scale=scale)
+            print('Finished {}'.format(orig_mesh_path))
         except Exception as e:
-            print('Error {} with {}'.format(e,OriginMeshName))
+            print('Error normalize_NOCS {} with {}'.format(e, orig_mesh_path))            
+            return -1
 
-        return 
-    
-    def boudarySampling(self,Frame,sigma):
+        return 0
 
-        # Dir = os.path.dirname(ImgPath)
-        # InDir = os.path.join(self.inputDir,self.mode,str(int(Frame) // 100).zfill(4))
-        OutDir = os.path.join(self.outputDir,self.mode,str(int(Frame) // 100).zfill(4))
+    def boudarySampling(self, Frame, sigma):    
+        out_dir = os.path.join(self.outputDir, self.mode, str(int(Frame) // 100).zfill(4))
+        mesh_path = os.path.join(out_dir, "frame_" + Frame + "_isosurf_scaled.off")
+        while not os.path.exists(mesh_path):
+            print("waiting for ", mesh_path)
+            continue
 
-        MeshName = os.path.join(OutDir,"frame_" + Frame + "_isosurf_scaled.off")
         try:
-            OutFile = os.path.join(OutDir,"frame_" + Frame + '_boundary_{}_samples.npz'.format(sigma))
+            out_file = os.path.join(out_dir, "frame_" + Frame + '_boundary_{}_samples.npz'.format(sigma))
 
-            if os.path.exists(OutFile):
+            if os.path.exists(out_file):
                 if args.write_over:
-                    print('overwrite ', OutFile)
+                    print('overwrite ', out_file)
                 else:
-                    print('File {} exists. Done.'.format(OutFile))
+                    print('File {} exists. Done.'.format(out_file))
                     return
 
-            mesh = trimesh.load(MeshName)
+            mesh = trimesh.load(mesh_path)
             points = mesh.sample(self.SampleNum)
 
             boundary_points = points + sigma * np.random.randn(self.SampleNum, 3)
@@ -160,10 +147,27 @@ class DataFilter:
 
             occupancies = iw.implicit_waterproofing(mesh, boundary_points)[0]
 
-            np.savez(OutFile, points=boundary_points, occupancies=occupancies, grid_coords=grid_coords)
-            print('Finished {}'.format(MeshName))
+            np.savez(out_file, points=boundary_points, occupancies=occupancies, grid_coords=grid_coords)
+            print('Finished {}'.format(mesh_path))
         except:
-            print('Error with {}: {}'.format(MeshName, traceback.format_exc()))
+            print('Error with {}: {}'.format(mesh_path, traceback.format_exc()))
+
+    def copyImgs(self, Frame):
+        
+        in_dir = os.path.join(self.inputDir, self.mode, str(int(Frame) // 100).zfill(4))
+        out_dir = os.path.join(self.outputDir, self.mode, str(int(Frame) // 100).zfill(4))
+        view_num = 10
+        for view in range(view_num):
+            frame_view = "frame_" + Frame + "_view_" + str(view).zfill(2)
+            suffixs = ['_color00.png','_color01.png','_nox00.png','_nox01.png',\
+                        '_pnnocs00.png','_pnnocs01.png',
+                        '_normals00.png','_normals01.png','_uv00.png','_uv01.png']
+            for fix in suffixs:
+                f_name = frame_view + fix
+                old_f = os.path.join(in_dir, f_name)
+                new_f = os.path.join(out_dir, f_name)
+                if os.path.exists(old_f) and not os.path.exists(new_f):
+                    shutil.copy(old_f, new_f)
 
     @staticmethod
     def findFrameNum(path):
@@ -174,9 +178,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='filter data for nrnet'
     )    
-    parser.add_argument('--write-over',default=False,type=bool,help="Overwrite previous results if set to True")
-    parser.add_argument('-o', '--output-dir',default='/ZG/meshedNOCS/IF_hand_dataset' ,help='Provide the output directory where the processed Model')
-    parser.add_argument('-i', '--input-dir',default='/ZG/meshedNOCS/hand_rig_dataset_v3/', help='the root of dataset as input for nocs')
+    parser.add_argument('--write-over', default=False, type=bool, help="Overwrite previous results if set to True")
+    parser.add_argument('-o', '--output-dir', default='/ZG/meshedNOCS/IF_hand_dataset' ,help='Provide the output directory where the processed Model')
+    parser.add_argument('-i', '--input-dir', default='/ZG/meshedNOCS/hand_rig_dataset_v3/', help='the root of dataset as input for nocs')
     args = parser.parse_args()
 
     df = DataFilter(inputDir=args.input_dir,outputDir=args.output_dir) 

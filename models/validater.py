@@ -26,10 +26,11 @@ class Validater:
 
 
     def validate(self):
-        if self.config.TASK == "nocs":
+        if self.config.TASK in ["nocs", "pretrain"]:
             self.validate_nocs()
         elif self.config.TASK == "occupancy":
             self.validate_occ()
+        
 
     def validate_nocs(self):
         self.model.setup_checkpoint(self.device)
@@ -106,7 +107,7 @@ class Validater:
 
             print(export_pred_path)
             mesh.export(export_pred_path)
-            
+
             shutil.copyfile(target['mesh'][0], export_gt_path)
 
     @staticmethod

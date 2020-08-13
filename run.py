@@ -11,8 +11,9 @@ from loaders.HandDatasetLBS import HandDatasetLBS
 from loaders.HandOccDataset import HandOccDataset
 
 # from inout.logger import get_logger
-from models.ModelNOCS import model_NOCS
-from models.Model_IFNOCS import model_IFNOCS
+from models.nocs import ModelNOCS
+from models.nr_nocs import ModelIFNOCS
+
 from models.loss import L2MaskLoss, LBSLoss, MixLoss, L2MaskLoss_wtFeature
 # from core.coach import Coach
 from models.trainer import Trainer
@@ -29,7 +30,7 @@ dataloader_dict = dict()
 task = cfg.TASK
 
 Dataset = HandDataset
-Model = model_NOCS(cfg)
+Model = ModelNOCS(cfg)
 
 if task == "lbs":
     Dataset = HandDatasetLBS
@@ -37,11 +38,13 @@ if task == "lbs":
 if task == "occupancy":
     Dataset = HandOccDataset
     objective = MixLoss()
-    Model = model_IFNOCS(cfg)
+    Model = ModelIFNOCS(cfg)
 if task == "pretrain":
     objective = L2MaskLoss_wtFeature()
 if task == "nocs":
     objective = L2MaskLoss()
+if task == "joints":
+    pass 
 
 for mode in cfg.MODES:
 

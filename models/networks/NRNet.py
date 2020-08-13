@@ -113,19 +113,20 @@ class NRNet(nn.Module):
         out_mask = Sigmoid(out_mask)
         threshold = 0.75
         pred_nocs = output[:, :-1, :, :].clone().requires_grad_(True)
+        
         valid = out_mask > threshold
-        masked_nocs = torch.where(torch.unsqueeze(valid,1), pred_nocs,torch.zeros(pred_nocs.size(), device=pred_nocs.device))
+        masked_nocs = torch.where(torch.unsqueeze(valid, 1), pred_nocs, torch.zeros(pred_nocs.size(), device=pred_nocs.device))
 
         # get upsampeld feature
-        upsampled_feature = F.interpolate(feature,size=img_size)
+        upsampled_feature = F.interpolate(feature, size=img_size)
         
         all_occupancies = []
         for i in range(batch_size):
 
-            Img = masked_nocs[i,:].cpu().detach().numpy()
-            valid_idx = np.where( np.all(Img > np.zeros((3,1,1)), axis=0)) # Only white BG
-            Idx = valid_idx
-            
+            img = masked_nocs[i, :].cpu().detach().numpy()
+            valid_idx = np.where(np.all(img > np.zeros((3, 1, 1)), axis=0)) # Only white BG
+            index = valid_idx
+
             num_valid = valid_idx[0].shape[0]
             if num_valid == 0:
                 # No valid point at all. This will cut off the gradient flow
@@ -140,20 +141,20 @@ class NRNet(nn.Module):
                 random_index = np.random.choice(num_valid, self.SampleNum, replace=True)
                 # for current use we choose uniform sample
                 sampled_idx = (valid_idx[0][random_index], valid_idx[1][random_index])
-                Idx = sampled_idx
+                index = sampled_idx
 
-            pointcloud = masked_nocs[i, :, Idx[0], Idx[1]]
+            pointcloud = masked_nocs[i, :, index[0], index[1]]
             translation = transform['translation'][i].view(3, 1).float()
 
             pointcloud = pointcloud + translation
             pointcloud = pointcloud * transform['scale'][i]
 
-            Min, _ = pointcloud.min(dim=1)
-            pointcloud -= Min.unsqueeze(1)
+            pc_lower_bound, _ = pointcloud.min(dim=1)
+            pointcloud -= pc_lower_bound.unsqueeze(1)
 
             if 1:
                 # Feature solution
-                feature_cloud = upsampled_feature[i, :, Idx[0], Idx[1]]
+                feature_cloud = upsampled_feature[i, :, index[0], index[1]]
                 voxelized_feature = self.discretize(pointcloud, feature_cloud, self.resolution)
                 all_occupancies.append(voxelized_feature)
                 # print(voxelized_feature.shape)
@@ -161,8 +162,8 @@ class NRNet(nn.Module):
                 # occupancy solution
                 c, n = pointcloud.shape
                 pointcloud = pointcloud.view(1, n, c)
-                Voxels = pc2vox(pointcloud, self.resolution)
-                all_occupancies.append(Voxels)
+                voxel = pc2vox(pointcloud, self.resolution)
+                all_occupancies.append(voxel)
         
         # AllOccupancies = torch.Tensor(np.array(AllOccupancies)).to(device=PointCloud.device,dtype=torch.float32)
         # print(len(AllOccupancies))
@@ -176,20 +177,17 @@ class NRNet(nn.Module):
         feature_dim = FeatureCloud.shape[0]
         point_num = PointCloud.shape[1]
 
-        out_features = torch.zeros(feature_dim,Res,Res,Res)
-        occupancies = torch.zeros(Res,Res,Res)
-
         voxels = torch.floor(PointCloud*Res)
-        index = voxels[0,:]*Res**2 + voxels[1,:]*Res + voxels[2,:]
+        index = voxels[0, :]*Res**2 + voxels[1, :]*Res + voxels[2, :]
         index = index.unsqueeze(0).to(dtype=torch.long)
 
         #TODO: replace the mean operation to pointnet
         # print(FeatureCloud.shape)
         # print(Index.shape)
-        voxel_feature = torch_scatter.scatter(src=FeatureCloud,index=index)
+        voxel_feature = torch_scatter.scatter(src=FeatureCloud, index=index)
         # VoxFeature = torch_scatter.segment_coo(src=FeatureCloud,index=Index,reduce='mean')
         pad_size = (0, Res**3 - voxel_feature.size(1))
-        voxel_feature = F.pad(voxel_feature, pad_size, 'constant',0)
+        voxel_feature = F.pad(voxel_feature, pad_size, 'constant', 0)
         voxel_feature = voxel_feature.view(feature_dim, Res, Res, Res)
         # print(VoxFeature.shape)
         # exit()
@@ -197,12 +195,12 @@ class NRNet(nn.Module):
         return voxel_feature
 
     def showGradient(self):
-        for name, parms in self.named_parameters():	
+        for name, parms in self.named_parameters():
             if parms.grad is not None:
                 v = parms.grad.sum()
             else:
                 v = None
-            print('-->name:', name, '-->grad_requirs:',parms.requires_grad, \
+            print('-->name:', name, '-->grad_requirs:', parms.requires_grad, \
         	 ' -->grad_value:',v)
 
     def visualize(self,FeatureVoxel,NOCS):        

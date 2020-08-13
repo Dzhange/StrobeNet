@@ -103,7 +103,218 @@ class L2MaskLoss(LPMaskLoss):
 
 ############################# Loss for vote network ###################################
 
+
+class MixLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.l2_mask_loss = L2MaskLoss()
+        self.OccLoss = nn.functional.binary_cross_entropy_with_logits
+
+    def forward(self, output, target):
+        pred_nocs = output[0]
+
+        nocs_loss = self.l2_mask_loss(pred_nocs, target['NOCS'])
+
+        recon = output[1]
+        # print(type(recon), recon.shape)
+        occ = target['occupancies'].to(device=recon.device)
+
+        occ_loss = self.OccLoss(recon, occ, reduction='none')# out = (B,num_points) by componentwise comparing vecots of size num_samples :)                
+
+        num_sample = occ_loss.shape[1]
+        occ_loss = occ_loss.sum(-1).mean() / num_sample
+
+        return occ_loss + nocs_loss
+
+class L2MaskLoss_wtFeature(nn.Module):
+    Thresh = 0.7 # PARAM
+    def __init__(self, Thresh=0.7, MaskWeight=0.7, ImWeight=0.3, P=2): # PARAM
+        super().__init__()
+        self.P = P
+        self.MaskLoss = nn.BCELoss(reduction='mean')
+        self.Sigmoid = nn.Sigmoid()
+        self.Thresh = Thresh
+        self.MaskWeight = MaskWeight
+        self.ImWeight = ImWeight
+
+    def forward(self, output, target):
+        return self.computeLoss(output, target)
+
+    def computeLoss(self, output, target):
+        out_img = output        
+        num_channels = target.size(1) # use target size instead, we do not supervise feature channels
+        target_img = target
+        if num_channels%4 != 0:
+            raise RuntimeError('Empty or mismatched batch (should be multiple of 4). Check input size {}.'.format(out_img.size()))
+
+        batch_size = out_img.size(0)
+        total_loss = 0
+        den = 0
+        num_out_imgs = int(num_channels / 4)
+        for i in range(0, num_out_imgs):
+            Range = list(range(4*i, 4*(i+1)))
+            total_loss += self.computeMaskedLPLoss(out_img[:, Range, :, :], target_img[:, Range, :, :])
+            den += 1
+
+        total_loss /= float(den)
+
+        return total_loss
+
+    def computeMaskedLPLoss(self, output, target):
+        batch_size = target.size(0)
+        target_mask = target[:, -1, :, :]
+        out_mask = output[:, -1, :, :].clone().requires_grad_(True)
+        out_mask = self.Sigmoid(out_mask)
+
+        mask_loss = self.MaskLoss(out_mask, target_mask)
+
+        target_img = target[:, :-1, :, :].detach()
+        out_img = output[:, :-1, :, :].clone().requires_grad_(True)
+
+        diff = out_img - target_img
+        diff_norm = torch.norm(diff, p=self.P, dim=1)  # Same size as WxH
+        masked_diff_norm = torch.where(out_mask > self.Thresh, diff_norm,
+                                        torch.zeros(diff_norm.size(), device=diff_norm.device))
+        nocs_loss = 0
+        for i in range(0, batch_size):
+            num_non_zero = torch.nonzero(masked_diff_norm[i]).size(0)
+            if num_non_zero > 0:
+                nocs_loss += torch.sum(masked_diff_norm[i]) / num_non_zero
+            else:
+                nocs_loss += torch.mean(diff_norm[i])
+
+        # print("MaskLoss is {}".format(self.MaskWeight*mask_loss))
+        # print("IMGLoss is {}".format(self.ImWeight*(nocs_loss / batch_size)))
+        loss = (self.MaskWeight*mask_loss) + (self.ImWeight*(nocs_loss / batch_size))
+        return loss
+
 class LBSLoss(nn.Module):
+    """
+        calculate the loss for dense pose estimation
+        output structure:
+            [0:3]: nocs
+            [3]: mask            
+            [4:4+16*3]: joints position
+            [4+16*3:4+16*6]: joint direction
+            [4+16*6:4+16*7]: skinning weights
+            [4+16*7:20+16*8]: confidence
+
+        target structure:
+            maps = target['map']
+                maps[0:3]: nocs
+                maps[3]: mask
+                maps[4:4+16*1]: joints position
+                maps[4+16*1:4+16*4]: joint direction
+                maps[4+16*4:4+16*7]: skinning weights
+                            
+            pose = target['pose']
+                pose[0:3] location
+                pose[3:6] rotation
+    """
+
+    def __init__(self, bone_num=16):
+        super().__init__()
+        self.mask_loss = nn.BCELoss(reduction='mean')
+        self.sigmoid = nn.Sigmoid()
+        self.Thresh = 0.7
+        self.bone_num = bone_num
+
+    def forward(self, output, target):
+
+        n_batch = output.shape[0]
+        bone_num = self.bone_num
+
+        pred_nocs = output[:, 0:3, :, :]
+        out_mask = output[:, 3, :, :].clone().requires_grad_(True)
+        out_mask = self.sigmoid(out_mask)
+        
+        pred_joint_score = output[:, 4:4+bone_num*1, :, :]
+
+        pred_loc_map = output[:, 4+bone_num*1:4+bone_num*4, :, :]
+        pred_rot_map = output[:, 4+bone_num*4:4+bone_num*7, :, :]
+        pred_skin_weights = output[:, 4+bone_num*7:4+bone_num*8, :, :]
+
+        tar_maps = target['map']
+        tar_pose = target['pose']
+
+        target_nocs = tar_maps[:, 0:3, :, :]
+        target_mask = tar_maps[:, 3, :, :]
+        tar_loc_map = tar_maps[:, 4:4+bone_num*1, :, :]
+        tar_rot_map = tar_maps[:, 4+bone_num*1:4+bone_num*4, :, :]
+        tar_skin_weights = tar_maps[:, 4+bone_num*4:4+bone_num*7, :, :]
+
+        tar_loc = tar_pose[:, 0:3]
+        tar_rot = tar_pose[:, 3:6]
+
+        mask_loss = self.mask_loss(out_mask, target_mask)
+        nocs_loss = self.masked_nocs_loss(pred_nocs, target_nocs, out_mask)
+        skin_loss = self.masked_nocs_loss(pred_skin_weights, tar_skin_weights, out_mask)
+
+        loc_map_loss = self.masked_nocs_loss(pred_loc_map, tar_loc_map, out_mask)
+        rot_map_loss = self.masked_nocs_loss(pred_rot_map, tar_rot_map, out_mask)
+
+        joint_loc_loss = self.pose_nocs_loss(pred_loc_map,
+                                            pred_joint_score,
+                                            out_mask,
+                                            tar_loc)
+        
+        joint_rot_loss = self.pose_nocs_loss(pred_rot_map,
+                                            pred_joint_score,
+                                            out_mask,
+                                            tar_rot)
+
+        loss = mask_loss + nocs_loss\
+                + skin_loss + loc_map_loss + rot_map_loss\
+                + joint_loc_loss + joint_rot_loss
+
+        return loss
+
+
+    def masked_nocs_loss(self, out_nocs, tar_nocs, mask):
+
+        batch_size = out_nocs.shape[0]
+        diff = out_nocs - tar_nocs
+        diff_norm = torch.norm(diff, 2, dim=1)
+        masked_diff_norm = torch.where(mask > self.Thresh, diff_norm,
+                                        torch.zeros(diff_norm.size(), device=diff_norm.device))
+        nocs_loss = 0
+        for i in range(0, batch_size):
+            num_non_zero = torch.nonzero(masked_diff_norm[i]).size(0)
+            if num_non_zero > 0:
+                nocs_loss += torch.sum(masked_diff_norm[i]) / num_non_zero
+            else:
+                nocs_loss += torch.mean(diff_norm[i])
+
+        return nocs_loss
+
+
+    def pose_nocs_loss(self, pred_joint_map, pred_joint_score, out_mask, tar_joints):
+        
+        n_batch = pred_joint_map.shape[0]
+        bone_num = self.bone_num
+
+        # get final prediction: score map summarize
+        pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, output.shape[2],
+                                                output.shape[3])  # B,bone_num,3,R,R
+
+        pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
+
+        # print(self.sigmoid(pred_joint_score).shape)
+        # print(out_mask.unsqueeze(1).shape)
+        pred_joint_score = self.sigmoid(pred_joint_score) * out_mask.unsqueeze(1)
+
+        pred_score_map = pred_joint_score / (torch.sum(pred_joint_score.reshape(n_batch, bone_num, -1),
+                                                    dim=2, keepdim=True).unsqueeze(3) + 1e-5)
+
+        pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
+        pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
+        joint_diff = torch.sum((pred_joint - tar_joints) ** 2, dim=2)  # B,22
+        
+        joint_loc_loss = joint_diff.sum() / (n_batch * pred_joint_map.shape[1])
+
+        return joint_loc_loss
+
+class Discarded_LBSLoss(nn.Module):
     Thresh = 0.7 # PARAM
     def __init__(self, Thresh=0.7, MaskWeight=0.7, ImWeight=0.3, P=2): # PARAM
         super().__init__()
@@ -159,7 +370,10 @@ class LBSLoss(nn.Module):
                 nocs_loss += torch.mean(diff_norm[i])
         return  nocs_loss 
 
-    def computePoseLoss(self, output, target, target_kine, mask):
+
+    # def computePoseLoss()
+
+    def DISCARDED_computePoseLoss(self, output, target, target_kine, mask):
         
         # we have 16 bones
         # so starting from Channel 4(012 rgb, 3 mask)
@@ -221,89 +435,3 @@ class LBSLoss(nn.Module):
         # lbs_loss = (skin_loss + pose_loss / bone_num + joint_loss / bone_num) / batch_size
         lbs_loss = (skin_loss) / batch_size
         return lbs_loss
-
-
-
-class MixLoss(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.l2_mask_loss = L2MaskLoss()
-        self.OccLoss = nn.functional.binary_cross_entropy_with_logits
-
-    def forward(self, output, target):
-        pred_nocs = output[0]
-
-        nocs_loss = self.l2_mask_loss(pred_nocs, target['NOCS'])
-
-        recon = output[1]
-        # print(type(recon), recon.shape)
-        occ = target['occupancies'].to(device=recon.device)
-
-        occ_loss = self.OccLoss(recon, occ, reduction='none')# out = (B,num_points) by componentwise comparing vecots of size num_samples :)                
-
-        num_sample = occ_loss.shape[1]
-        occ_loss = occ_loss.sum(-1).mean() / num_sample
-
-        return occ_loss + nocs_loss
-
-class L2MaskLoss_wtFeature(nn.Module):
-    Thresh = 0.7 # PARAM
-    def __init__(self, Thresh=0.7, MaskWeight=0.7, ImWeight=0.3, P=2): # PARAM
-        super().__init__()
-        self.P = P
-        self.MaskLoss = nn.BCELoss(reduction='mean')
-        self.Sigmoid = nn.Sigmoid()
-        self.Thresh = Thresh
-        self.MaskWeight = MaskWeight
-        self.ImWeight = ImWeight
-
-    def forward(self, output, target):
-        return self.computeLoss(output, target)
-
-    def computeLoss(self, output, target):
-        out_img = output        
-        num_channels = target.size(1) # use target size instead, we do not supervise feature channels
-        target_img = target
-        if num_channels%4 != 0:
-            raise RuntimeError('Empty or mismatched batch (should be multiple of 4). Check input size {}.'.format(out_img.size()))
-
-        BatchSize = out_img.size(0)
-        total_loss = 0
-        Den = 0
-        num_out_imgs = int(num_channels / 4)
-        for i in range(0, num_out_imgs):
-            Range = list(range(4*i, 4*(i+1)))
-            total_loss += self.computeMaskedLPLoss(out_img[:, Range, :, :], target_img[:, Range, :, :])
-            Den += 1
-
-        total_loss /= float(Den)
-
-        return total_loss
-
-    def computeMaskedLPLoss(self, output, target):
-        batch_size = target.size(0)
-        target_mask = target[:, -1, :, :]
-        out_mask = output[:, -1, :, :].clone().requires_grad_(True)
-        out_mask = self.Sigmoid(out_mask)
-
-        mask_loss = self.MaskLoss(out_mask, target_mask)
-
-        target_img = target[:, :-1, :, :].detach()
-        out_img = output[:, :-1, :, :].clone().requires_grad_(True)
-
-        diff = out_img - target_img
-        diff_norm = torch.norm(diff, p=self.P, dim=1)  # Same size as WxH
-        masked_diff_norm = torch.where(out_mask > self.Thresh, diff_norm,
-                                        torch.zeros(diff_norm.size(), device=diff_norm.device))
-        nocs_loss = 0
-        for i in range(0, batch_size):
-            num_non_zero = torch.nonzero(masked_diff_norm[i]).size(0)
-            if num_non_zero > 0:
-                nocs_loss += torch.sum(masked_diff_norm[i]) / num_non_zero
-            else:
-                nocs_loss += torch.mean(diff_norm[i])
-
-        # print("MaskLoss is {}".format(self.MaskWeight*mask_loss))
-        # print("IMGLoss is {}".format(self.ImWeight*(nocs_loss / batch_size)))
-        loss = (self.MaskWeight*mask_loss) + (self.ImWeight*(nocs_loss / batch_size))
-        return loss
