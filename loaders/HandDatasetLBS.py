@@ -4,6 +4,7 @@ Loader for HandRigDataSet
 import os, sys, argparse, zipfile, glob, random, pickle, math
 from itertools import groupby
 import re
+import time
 import numpy as np
 import torch
 import torch.utils.data
@@ -18,36 +19,38 @@ class HandDatasetLBS(torch.utils.data.Dataset):
     Most codes copied from HandRigDatasetV3 from Srinath
     """
     def __init__(self, root, train=True, transform=None,
-                 img_size=(320, 240), limit=10, frame_load_str=None, required='color00'):        
+                 img_size=(320, 240), limit=10, frame_load_str=None, required='color00', rel=False):
         self.num_cameras = 10
         self.file_name = 'hand_rig_dataset_v3.zip'
         self.frame_load_str = ['color00', 'color01', 'normals00', 'normals01',\
                         'nox00', 'nox01', 'pnnocs00', 'pnnocs01',\
                         'uv00', 'uv01'] if frame_load_str is None else frame_load_str
 
-        self.init(root, train, transform, img_size, limit, self.frame_load_str, required)
+        self.init(root, train, transform, img_size, limit, self.frame_load_str, required, rel=rel)
         self.load_data()
 
     def init(self, root, train=True, transform=None,
-             img_size=(320, 240), limit=100, frame_load_str=None, required='VertexColors'):
+             img_size=(320, 240), limit=100, frame_load_str=None, required='VertexColors', rel=False):
         self.dataset_dir = root
         self.is_train_data = train
         self.transform = transform
         self.img_size = img_size
         self.required = required
         self.frame_load_str = frame_load_str
+        self.rel = rel # use relative pose or the global pose?
+
         if limit <= 0.0 or limit > 100.0:
             raise RuntimeError('Data limit percent has to be >0% and <=100%')
         self.data_limit = limit
         if self.required not in self.frame_load_str:
             raise RuntimeError('frame_load_str should contain {}.'.format(self.required))
-        
+
         ######### Add BoneWeights #########
         self.bone_num = 16
         for i in range(self.bone_num):
             self.frame_load_str.append("BoneWeight00bone_" + str(i))            
             # self.frame_load_str.append("BoneWeight01bone_" + str(i))
-            
+
         if os.path.exists(self.dataset_dir) == False:
             print("Dataset {} doesn't exist".format(self.dataset_dir))
             exit()
@@ -56,10 +59,15 @@ class HandDatasetLBS(torch.utils.data.Dataset):
         return len(self.frame_files[self.frame_load_str[0]])
 
     def __getitem__(self, idx):
-        RGB, load_tup = self.load_images(idx)
-        load_imgs = torch.cat(load_tup[0], 0)
-        # print(RGB,RGB.shape)
-        return RGB, (load_imgs, load_tup[1])
+        RGB, target_imgs, pose = self.load_images(idx)
+        load_imgs = torch.cat(target_imgs, 0)
+        # print(load_imgs.shape)
+        # mask = load_imgs[3]
+        # skin_w = load_imgs[4:20]
+        # masked = torch.where(mask > 0.7, skin_w, torch.zeros(skin_w.size(), device=skin_w.device))
+        # print(masked.sum(dim=0).max())
+        return RGB, load_imgs, pose
+
 
     def load_data(self):
         """
@@ -123,18 +131,20 @@ class HandDatasetLBS(torch.utils.data.Dataset):
         dir = os.path.dirname(typical_path)
         file_name = os.path.basename(typical_path)
         idx_of_frame = find_frame_num(file_name)
-        rel_pose_path = os.path.join(dir, "frame_" + idx_of_frame + '_hpose_rel.txt')
-        
+        if self.rel == True:
+            rel_pose_path = os.path.join(dir, "frame_" + idx_of_frame + '_hpose_rel.txt')
+        else:
+            rel_pose_path = os.path.join(dir, "frame_" + idx_of_frame + '_hpose_glob.txt')
+
         pose = torch.Tensor(np.loadtxt(rel_pose_path))
-        
+
         frame = {}
         for k in self.frame_files:            
             if "BoneWeight" in k:
                 frame[k] = imread_gray_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor).unsqueeze(0)
             else:
                 frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)
-            
-            if k == "nox00":                 
+            if k == "nox00":
                 frame[k] = torch.cat((frame[k], createMask(frame[k])), 0).type(torch.FloatTensor)
             # if self.transform is not None:
             #     frame[k] = self.transform(frame[k])
@@ -143,7 +153,7 @@ class HandDatasetLBS(torch.utils.data.Dataset):
 
         grouped_frame_str = [list(i) for j, i in groupby(self.frame_load_str,\
                                 lambda a: ''.join([i for i in a if not i.isdigit()]))]
-
+        
         load_tuple = ()
         # Concatenate any peeled outputs
         for group in grouped_frame_str:
@@ -152,16 +162,56 @@ class HandDatasetLBS(torch.utils.data.Dataset):
                 if 'color00' in frame_str: # Append manually
                     continue
                 concated = concated + (frame[frame_str],)
-            if len(concated) > 0:
+            if len(concated) > 0:                
                 load_tuple = load_tuple + (torch.cat(concated, 0), )
+
+        # faster!
+        img_shape = load_tuple[0].shape
+        joint_map = torch.Tensor(pose.shape[0]*6, img_shape[1],img_shape[2])
         
-        return frame['color00'], (load_tuple, pose)
+        cnt = 0
+        for i in range(pose.shape[0]):            
+            for j in range(3):
+                # print(i, j)
+                joint_map[cnt] = joint_map[cnt].fill_(pose[i,j])
+                cnt += 1
+
+        for i in range(pose.shape[0]):
+            for j in range(3, 6):
+                # print(i, j)
+                joint_map[cnt] = joint_map[cnt].fill_(pose[i,j])
+                cnt += 1
+
+        load_tuple = load_tuple + (joint_map, )
+
+        return frame['color00'], load_tuple, pose
+
+
+
+
+# def check_map(self, tar_joint_map, out_mask, tar_joints):
+    
+#     n_batch = tar_joint_map.shape[0]
+#     bone_num = 16
+    
+#     tar_joint_map = tar_joint_map.reshape(n_batch, bone_num, 3, tar_joint_map.shape[2],
+#                                             tar_joint_map.shape[3])  # B,bone_num,3,R,R
+
+#     tar_joint_map = tar_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
+
+#     pred_joint = tar_joint_map.reshape(n_batch, bone_num, 3, -1).mean(dim=3)  # B,22,3
+
+#     # print(pred_joint.shape, tar_joints.shape)
+#     joint_diff = torch.sum((pred_joint - tar_joints) ** 2, dim=2)  # B,22
+#     joint_loc_loss = joint_diff.sum() / (n_batch * tar_joint_map.shape[1])
+
+#     return joint_loc_loss
 
 if __name__ == '__main__':
     import argparse
     Parser = argparse.ArgumentParser()
     Parser.add_argument('-d', '--data-dir', help='Specify the location of the directory to download and store HandRigDatasetV2', required=True)
-    
+
     Args, _ = Parser.parse_known_args()
 
     Data = HandDatasetLBS(root=Args.data_dir, train=True, frame_load_str=["color00", "nox00"])
@@ -171,13 +221,6 @@ if __name__ == '__main__':
     # LossUnitTest = GenericImageDataset.L2MaskLoss(0.7)
     DataLoader = torch.utils.data.DataLoader(Data, batch_size=4, shuffle=True, num_workers=0)
     loss = LBSLoss()
-    for i, (Data, Targets) in enumerate(DataLoader, 0):  # Get each batch
-        # DataTD = ptUtils.sendToDevice(Targets, 'cpu')
-        # print('Data size:', Data.size())
-        print(Targets[1].shape)
-        # print('Targets size:', len(Targets))
-        # Loss = LossUnitTest(Targets[0], Targets)
-        l = loss(Targets[0], Targets)
-        print(l)
-        # print('Loss:', Loss.item())
-        # Loss.backward()
+    for i, Data in enumerate(DataLoader, 0):  # Get each batch
+        target_imgs = Data[1]
+        # print(target_imgs.shape)

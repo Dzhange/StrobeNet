@@ -8,6 +8,7 @@ But I would use several utils from Srinath(checkpoints)
 """
 import traceback
 import torch
+import torch.nn as nn
 from utils.DataUtils import *
 from loaders.HandDataset import *
 import gc
@@ -31,12 +32,13 @@ class Trainer:
         cur_epoch = 0
 
         all_tic = getCurrentEpochTime()
-        while cur_epoch < self.config.EPOCH_TOTAL:
+        while cur_epoch < self.config.EPOCH_TOTAL:            
             try:
                 epoch_losses = [] # For all batches in an epoch
                 tic = getCurrentEpochTime()
                 # for data in self.train_data_loader:
-                for i, data in enumerate(self.train_data_loader, 0):  # Get each batch
+                for i, data in enumerate(self.train_data_loader, 0):  # Get each batch          
+                    # break                      
                     ################### START WEIGHT UPDATE ################################
                     self.model.optimizer.zero_grad()
                     net_input, target = self.model.preprocess(data, self.device)
@@ -95,10 +97,15 @@ class Trainer:
         Do validation, only to record loss, don't save any results
         """    
         self.model.net.eval()         #switch to evaluation mode
+        if self.config.TASK == "occupancy":            
+            for child in self.model.net.IFNet.children():                        
+                if type(child) == nn.BatchNorm3d:
+                    child.track_running_stats = False
+
         val_losses = []
         tic = getCurrentEpochTime()
         # print('Val length:', len(ValDataLoader))
-        for i, data in enumerate(self.val_data_loader, 0):  # Get each batch
+        for i, data in enumerate(self.train_data_loader, 0):  # Get each batch
             
             net_input, target = self.model.preprocess(data, self.device)
             output = self.model.net(net_input)

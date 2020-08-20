@@ -56,7 +56,7 @@ class HandOccDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
 
         required_path = self.frame_files[self.required][idx]
-
+        # print("path is ", required_path)
         RGB, load_tup = self.load_images(idx)
         load_imgs = torch.cat(load_tup, 0)
 
@@ -132,8 +132,9 @@ class HandOccDataset(torch.utils.data.Dataset):
             dataset_length = math.ceil((self.data_limit / 100) * total_size)
             print('[ INFO ]: Loading {} / {} items.'.format(dataset_length, total_size))
 
-        for k in self.frame_files:
-            self.frame_files[k] = self.frame_files[k][:dataset_length]
+            # dataset_length = 1
+            for k in self.frame_files:
+                self.frame_files[k] = self.frame_files[k][:dataset_length]
 
     def load_images(self, idx):
         """

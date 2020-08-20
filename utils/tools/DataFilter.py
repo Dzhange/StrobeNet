@@ -40,7 +40,7 @@ ERROR = -1
 
 class DataFilter:
 
-    def __init__(self,inputDir,outputDir):
+    def __init__(self, inputDir, outputDir):
         self.inputDir = inputDir
         self.outputDir = outputDir
         self.SampleNum = 100000
@@ -82,7 +82,6 @@ class DataFilter:
         self.copyImgs(Frame)
         return
 
-
     def normalizeNOCS(self, Frame):
 
         in_dir = os.path.join(self.inputDir, self.mode, str(int(Frame) // 100).zfill(4))
@@ -114,18 +113,17 @@ class DataFilter:
             np.savez(transform_path, translation=translation, scale=scale)
             print('Finished {}'.format(orig_mesh_path))
         except Exception as e:
-            print('Error normalize_NOCS {} with {}'.format(e, orig_mesh_path))            
+            print('Error normalize_NOCS {} with {}'.format(e, orig_mesh_path))
             return -1
 
         return 0
 
-    def boudarySampling(self, Frame, sigma):    
+    def boudarySampling(self, Frame, sigma):
         out_dir = os.path.join(self.outputDir, self.mode, str(int(Frame) // 100).zfill(4))
         mesh_path = os.path.join(out_dir, "frame_" + Frame + "_isosurf_scaled.off")
         while not os.path.exists(mesh_path):
             print("waiting for ", mesh_path)
             continue
-
         try:
             out_file = os.path.join(out_dir, "frame_" + Frame + '_boundary_{}_samples.npz'.format(sigma))
 

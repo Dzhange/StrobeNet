@@ -132,8 +132,8 @@ class ModelIFNOCS(object):
         if latest_checkpoint_dict is not None:
             # Make sure experiment names match
             self.net.SegNet.load_state_dict(latest_checkpoint_dict['ModelStateDict'])            
-            if train_device is not 'cpu':
-                for state in self.optimizer.state.values():
-                    for k, v in state.items():
-                        if isinstance(v, torch.Tensor):
-                            state[k] = v.to(train_device)
+            # if train_device is not 'cpu':
+            #     for state in self.optimizer.state.values():
+            #         for k, v in state.items():
+            #             if isinstance(v, torch.Tensor):
+            #                 state[k] = v.to(train_device)

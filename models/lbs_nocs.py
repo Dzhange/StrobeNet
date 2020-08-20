@@ -8,16 +8,13 @@ from models.networks.SegNet import SegNet as old_SegNet
 from models.networks.say4n_SegNet import SegNet as new_SegNet
 from utils.DataUtils import *
 
-class ModelNOCS(object):
+class ModelLBSNOCS(object):
 
     def __init__(self, config):
         self.config = config
         self.lr = config.LR # set learning rate
-        # self.net = new_SegNet(input_channels=3, output_channels=config.OUT_CHANNELS)
-        if config.TASK == "pretrain":
-            self.net = old_SegNet(output_channels=config.OUT_CHANNELS + config.FEATURE_CHANNELS) # 3 + 1 + 16 * 1 = 116
-        else:
-            self.net = old_SegNet(output_channels=config.OUT_CHANNELS)
+        # self.net = new_SegNet(input_channels=3, output_channels=config.OUT_CHANNELS)                
+        self.net = old_SegNet(output_channels=config.OUT_CHANNELS)
         self.loss_history = []
         self.val_loss_history = []
         self.start_epoch = 0
@@ -72,19 +69,41 @@ class ModelNOCS(object):
         # print('[ INFO ]: Checkpoint saved.')
         print(print_str) # Checkpoint saved. 50 + 3 characters [>]
 
-    def preprocess(self, data, device):
-        data_todevice = []
+    @staticmethod
+    def preprocess(data, device):
+        """
+        put data onto the right device
+        """
+        data_to_device = []
         for item in data:
             tuple_or_tensor = item
             tuple_or_tensor_td = item
-            if not isinstance(tuple_or_tensor_td, (tuple, list)):
-                tuple_or_tensor_td = tuple_or_tensor.to(device)
-            else:
+            if isinstance(tuple_or_tensor_td, (tuple, list)):
                 for ctr in range(len(tuple_or_tensor)):
                     if isinstance(tuple_or_tensor[ctr], torch.Tensor):
                         tuple_or_tensor_td[ctr] = tuple_or_tensor[ctr].to(device)
                     else:
                         tuple_or_tensor_td[ctr] = tuple_or_tensor[ctr]
+                data_to_device.append(tuple_or_tensor_td)
+            elif isinstance(tuple_or_tensor_td, (dict)):
+                dict_td = {}
+                keys = item.keys()
+                for key in keys:
+                    if isinstance(item[key], torch.Tensor):
+                        dict_td[key] = item[key].to(device)
+                data_to_device.append(dict_td)
+            elif isinstance(tuple_or_tensor, torch.Tensor):
+                tuple_or_tensor_td = tuple_or_tensor.to(device)
+                data_to_device.append(tuple_or_tensor_td)
+            else:
+                # for gt mesh
+                continue
+        
+        inputs = {}
+        inputs = data_to_device[0]
+        
+        targets = {}
+        targets['maps'] = data_to_device[1]
+        targets['pose'] = data_to_device[2]
 
-            data_todevice.append(tuple_or_tensor_td)
-        return data_todevice
+        return inputs, targets

@@ -18,7 +18,7 @@ class Validater:
         self.device = device
         self.val_dataloader = val_dataloader                
 
-        self.num_test_sample = 30
+        self.num_test_sample = 30000
         self.model.net.to(device)
         self.output_dir = os.path.join(self.model.expt_dir_path, "ValResults")
         if os.path.exists(self.output_dir) == False:
@@ -28,6 +28,8 @@ class Validater:
     def validate(self):
         if self.config.TASK in ["nocs", "pretrain"]:
             self.validate_nocs()
+        if self.config.TASK == "lbs":
+            self.validate_lbs()
         elif self.config.TASK == "occupancy":
             self.validate_occ()
         
@@ -49,6 +51,73 @@ class Validater:
             self.save_img(net_input, output, target, i)            
         print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
 
+    def validate_lbs(self):
+        self.model.setup_checkpoint(self.device)
+        self.model.net.eval()
+
+        epoch_losses = []
+        for i, data in enumerate(self.val_dataloader, 0):  # Get each batch        
+            if i >= self.num_test_sample:
+                break
+            net_input, target = self.model.preprocess(data, self.device)
+            output = self.model.net(net_input)
+            loss = self.objective(output, target)
+            epoch_losses.append(loss.item())
+            print("validating on the {}th data, loss is {}".format(i, loss))
+            print("average validation loss is ", np.mean(np.asarray(epoch_losses)))            
+            self.save_img(net_input, output[:, 0:4, :, :], target['maps'][:, 0:4, :, :], i)
+            self.save_mask(output, target['maps'], i)
+        print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
+
+    def validate_occ(self):
+        self.model.setup_checkpoint(self.device)
+        self.model.net.eval()
+        if self.config.TASK == "occupancy":            
+            for child in self.model.net.IFNet.children():                        
+                if type(child) == nn.BatchNorm3d:
+                    child.track_running_stats = False
+                    
+        output_dir = self.output_dir
+        resolution = 128
+        test_net = self.model.net
+
+        num_samples = min(self.num_test_sample, len(self.val_dataloader))
+        print('Testing on ' + str(num_samples) + ' samples')
+
+        if os.path.exists(output_dir) == False:
+            os.makedirs(output_dir)
+
+        grid_coords = test_net.initGrids(resolution)
+        batch_points = 100000
+        grid_points_split = torch.split(grid_coords, batch_points, dim=1)
+        for i, data in enumerate(self.val_dataloader, 0):  # Get each batch
+            if i > (num_samples-1): break                 
+            logits_list = []
+            target = None
+            net_input, target = self.model.preprocess(data, self.device)
+            output = self.model.net(net_input)
+            loss = self.objective(output, target)
+            print(loss)
+            # logits = output[1].squeeze(0).detach().cpu()
+            for points in grid_points_split:
+                with torch.no_grad():
+                    net_input, target = self.model.preprocess(data, self.device)
+                    # print(data)
+                    net_input['grid_coords'] = points.to(self.device)
+                    output = test_net(net_input)
+                    self.save_img(net_input['RGB'], output[0], target['NOCS'], i)
+                    logits_list.append(output[1].squeeze(0).detach().cpu())
+
+            logits = torch.cat(logits_list, dim=0).numpy()
+            print(logits.shape)
+            mesh = self.mesh_from_logits(logits, resolution)
+            export_pred_path = os.path.join(output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
+            export_gt_path = os.path.join(output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
+
+            print(export_pred_path)
+            mesh.export(export_pred_path)
+
+            shutil.copyfile(target['mesh'][0], export_gt_path)
 
     def save_img(self, net_input, output, target, i):
         input_img, gt_out_tuple_rgb, gt_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(target, 'cpu'))
@@ -71,44 +140,28 @@ class Validater:
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_03predmask.png').format(str(i).zfill(3), target_str),
                         pred_mask)
 
+    def save_mask(self, output, target, i):        
+        bone_num = 16
+        mask = target[:, 3, :, :]
+        print(mask.max())
+        sigmoid = torch.nn.Sigmoid()
+        zero_map = torch.zeros(mask.size(), device=mask.device)    
+        pred_bw_index =  4+bone_num*7
+        tar_bw_index =  4
+        for b_id in range(16):
+            pred_bw = sigmoid(output[:, pred_bw_index + b_id, :, :])*255
+            pred_bw = torch.where(mask > 0.7, pred_bw, zero_map)
+            pred_bw = pred_bw.squeeze().cpu().detach().numpy()
+
+            tar_bw = target[:, tar_bw_index + b_id, :, :]*255
+            tar_bw = torch.where(mask > 0.7, tar_bw, zero_map)
+            tar_bw = tar_bw.squeeze().cpu().detach().numpy()
+            # print(tar_bw.shape)
+
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_BW{}_00gt.png').format(str(i).zfill(3), b_id), tar_bw)
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_BW{}_01pred.png').format(str(i).zfill(3), b_id), pred_bw)
     
-    def validate_occ(self):
-        output_dir = self.output_dir
-        resolution = 128
-        test_net = self.model.net
-
-        num_samples = min(self.num_test_sample, len(self.val_dataloader))
-        print('Testing on ' + str(num_samples) + ' samples')
-
-        if os.path.exists(output_dir) == False:
-            os.makedirs(output_dir)
-
-        grid_coords = test_net.initGrids(resolution)
-        batch_points = 100000
-        grid_points_split = torch.split(grid_coords, batch_points, dim=1)
-        for i, data in enumerate(self.val_dataloader, 0):  # Get each batch
-            if i > (num_samples-1): break                 
-            logits_list = []
-            target = None
-            for points in grid_points_split:
-                with torch.no_grad():
-                    net_input, target = self.model.preprocess(data, self.device)
-                    # print(data)
-                    net_input['grid_coords'] = points.to(self.device)
-                    output = test_net(net_input)
-                    self.save_img(net_input['RGB'], output[0], target['NOCS'], i)
-                    logits_list.append(output[1].squeeze(0).detach().cpu())
-
-            logits = torch.cat(logits_list, dim=0).numpy()
-
-            mesh = self.mesh_from_logits(logits, resolution)
-            export_pred_path = os.path.join(output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
-            export_gt_path = os.path.join(output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
-
-            print(export_pred_path)
-            mesh.export(export_pred_path)
-
-            shutil.copyfile(target['mesh'][0], export_gt_path)
+    
 
     @staticmethod
     def mesh_from_logits(logits, resolution):

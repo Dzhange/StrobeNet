@@ -43,13 +43,13 @@ class SVR(nn.Module):
 
         self.maxpool = nn.MaxPool3d(2)
 
-        self.conv_in_bn = nn.BatchNorm3d(16)
-        self.conv0_1_bn = nn.BatchNorm3d(32)
-        self.conv1_1_bn = nn.BatchNorm3d(64)
-        self.conv2_1_bn = nn.BatchNorm3d(128)
-        self.conv3_1_bn = nn.BatchNorm3d(128)
-        self.conv4_1_bn = nn.BatchNorm3d(128)
-
+        track_stats = True
+        self.conv_in_bn = nn.BatchNorm3d(16, track_running_stats=track_stats)
+        self.conv0_1_bn = nn.BatchNorm3d(32, track_running_stats=track_stats)
+        self.conv1_1_bn = nn.BatchNorm3d(64, track_running_stats=track_stats)
+        self.conv2_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)
+        self.conv3_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)
+        self.conv4_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)        
 
         displacment = 0.0722
         displacments = []

@@ -1,0 +1,35 @@
+##################################################################################################
+# IF+NOCS
+# Using the intermediate feature of SegNet
+# pretrained weights from full dataset
+
+# disabled tracking running stats
+
+DATASET_ROOT: '/workspace/Data/IF_PN_Aug13'
+OUTPUT_DIR: '/workspace/nrnocs_dev/output/'
+
+MODES: ['train','val']
+
+BATCHSIZE: 1
+DATALOADER_WORKERS: 2
+EPOCH_TOTAL: 100
+
+LR: 1e-4
+
+SAVE_FREQ: 1
+DATA_LIMIT: 1
+IMAGE_SIZE: (320,240)
+MODEL_INIT_PATH: ['log/hand_nocsreg_epoch_31.model']
+TARGETS: "pnnocs00"
+TASK: "occupancy"
+
+NRNET_TYPE: "out_feature"
+NRNET_PRETRAIN: True
+NRNET_PRETRAIN_PATH: "/workspace/nrnocs_dev/output/NRNet_out_pretrain_100k"
+OUT_CHANNELS: 4
+FEATURE_CHANNELS: 64
+
+TEST_ON_TRAIN: True
+EXPT_NAME: "out_bn1"
+
+GPU: 2

@@ -1,5 +1,6 @@
+import numpy as np
 import torch
-from models.loss import JointLoss
+from models.loss import LBSLoss
 
 
 def test():        
@@ -16,11 +17,28 @@ def test():
         'map':target_map,
         'pose':target_joint
         }
-    loss = JointLoss()
+    loss = LBSLoss()
     l = loss(output, target)
     print(l)
 
-test()
+
+def pose2maps():
+
+    pose = np.loadtxt("/workspace/Data/8_7_cut_BW/train/0000/frame_00000000_hpose_rel.txt")
+    pose = torch.Tensor(pose)
+    
+    joint_map = ()
+    for i in range(pose.shape[0]):
+        for j in range(6):
+            cur_map = torch.Tensor(*(320,240)).unsqueeze(0)
+            print(cur_map.shape)
+            joint_map = joint_map + (cur_map.fill_(pose[i,j]),)
+    maps = torch.cat(joint_map, 0)
+    print(maps.shape)
+pose2maps()
+# test()
+
+
 
 
 
