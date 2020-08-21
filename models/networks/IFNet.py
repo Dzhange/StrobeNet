@@ -43,13 +43,16 @@ class SVR(nn.Module):
 
         self.maxpool = nn.MaxPool3d(2)
 
-        track_stats = True
-        self.conv_in_bn = nn.BatchNorm3d(16, track_running_stats=track_stats)
-        self.conv0_1_bn = nn.BatchNorm3d(32, track_running_stats=track_stats)
-        self.conv1_1_bn = nn.BatchNorm3d(64, track_running_stats=track_stats)
-        self.conv2_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)
-        self.conv3_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)
-        self.conv4_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)        
+        ## try not using bn
+        self.use_bn = False 
+        if self.use_bn:
+            track_stats = True
+            self.conv_in_bn = nn.BatchNorm3d(16, track_running_stats=track_stats)
+            self.conv0_1_bn = nn.BatchNorm3d(32, track_running_stats=track_stats)
+            self.conv1_1_bn = nn.BatchNorm3d(64, track_running_stats=track_stats)
+            self.conv2_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)
+            self.conv3_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)
+            self.conv4_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)        
 
         displacment = 0.0722
         displacments = []
@@ -77,31 +80,36 @@ class SVR(nn.Module):
 
         net = self.actvn(self.conv_0(net))
         net = self.actvn(self.conv_0_1(net))
-        net = self.conv0_1_bn(net)
+        if self.use_bn:
+            net = self.conv0_1_bn(net)
         feature_2 = F.grid_sample(net, p, padding_mode='border')
         net = self.maxpool(net) #out 64
 
         net = self.actvn(self.conv_1(net))
         net = self.actvn(self.conv_1_1(net))
-        net = self.conv1_1_bn(net)
+        if self.use_bn:
+            net = self.conv1_1_bn(net)
         feature_3 = F.grid_sample(net, p, padding_mode='border')
         net = self.maxpool(net)
 
         net = self.actvn(self.conv_2(net))
         net = self.actvn(self.conv_2_1(net))
-        net = self.conv2_1_bn(net)
+        if self.use_bn:
+            net = self.conv2_1_bn(net)
         feature_4 = F.grid_sample(net, p, padding_mode='border')
         net = self.maxpool(net)
 
         net = self.actvn(self.conv_3(net))
         net = self.actvn(self.conv_3_1(net))
-        net = self.conv3_1_bn(net)
+        if self.use_bn:
+            net = self.conv3_1_bn(net)
         feature_5 = F.grid_sample(net, p, padding_mode='border')
         net = self.maxpool(net)
 
         net = self.actvn(self.conv_4(net))
         net = self.actvn(self.conv_4_1(net))
-        net = self.conv4_1_bn(net)
+        if self.use_bn:
+            net = self.conv4_1_bn(net)
         feature_6 = F.grid_sample(net, p, padding_mode='border')
 
         # here every channel corresponse to one feature.
