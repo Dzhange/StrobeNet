@@ -10,9 +10,9 @@ from loaders.HandDataset import HandDataset
 from loaders.HandDatasetLBS import HandDatasetLBS
 from loaders.HandOccDataset import HandOccDataset
 # from inout.logger import get_logger
-from models.nocs import ModelNOCS
-from models.nr_nocs import ModelIFNOCS
-from models.lbs_nocs import ModelLBSNOCS
+from models.NOCS import ModelNOCS
+from models.Baseline import ModelIFNOCS
+from models.LBS import ModelLBSNOCS
 
 from models.loss import L2MaskLoss, LBSLoss, MixLoss, L2MaskLoss_wtFeature
 # from core.coach import Coach

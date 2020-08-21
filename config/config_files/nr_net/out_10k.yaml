@@ -29,7 +29,6 @@ OUT_CHANNELS: 4
 FEATURE_CHANNELS: 64
 
 # TEST_ON_TRAIN: True
-# EXPT_NAME: "out_1p_random"  # loss = nocs_loss + occ_loss
-EXPT_NAME: "out_hp_19" # loss = nocs_loss + 9 * nocs_loss
+EXPT_NAME: "nrnet_22" # loss = nocs_loss + 10 * nocs_loss
 
 GPU: 2

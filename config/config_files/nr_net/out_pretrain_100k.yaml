@@ -9,11 +9,11 @@ MODES: ['train','val']
 
 BATCHSIZE: 2
 DATALOADER_WORKERS: 2
-EPOCH_TOTAL: 10
+EPOCH_TOTAL: 20
 
-LR: 1e-3
+LR: 1e-4
 
-SAVE_FREQ: 5
+SAVE_FREQ: 1
 DATA_LIMIT: 100
 IMAGE_SIZE: (320,240)
 MODEL_INIT_PATH: ['log/hand_nocsreg_epoch_31.model']
@@ -21,11 +21,9 @@ TARGETS: "pnnocs00"
 TASK: "pretrain"
 
 NRNET_TYPE: "out_feature"
-# NRNET_PRETRAIN: True
-# NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/pnnocs/old_seg_100k"
 OUT_CHANNELS: 4
 FEATURE_CHANNELS: 64
 
 EXPT_NAME: NRNet_out_pretrain_100k
 
-GPU: 2
+GPU: 7

@@ -74,7 +74,8 @@ class SVR(nn.Module):
         feature_0 = F.grid_sample(x, p, padding_mode='border')
 
         net = self.actvn(self.conv_in(x))
-        net = self.conv_in_bn(net)
+        if self.use_bn:            
+            net = self.conv_in_bn(net)
         feature_1 = F.grid_sample(net, p, padding_mode='border')
         net = self.maxpool(net) #out 128
 

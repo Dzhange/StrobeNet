@@ -147,8 +147,7 @@ class ModelIFNOCS(object):
             #             if isinstance(v, torch.Tensor):
             #                 state[k] = v.to(train_device)
 
-
-    def validate_occ(self, val_dataloader, device):
+    def validate(self, val_dataloader, device):
 
         self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
         if os.path.exists(self.output_dir) == False:
