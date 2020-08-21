@@ -15,8 +15,8 @@ EPOCH_TOTAL: 100
 
 LR: 1e-4
 
-SAVE_FREQ: 10
-DATA_LIMIT: 1
+SAVE_FREQ: 1
+DATA_LIMIT: 100
 IMAGE_SIZE: (320,240)
 MODEL_INIT_PATH: ['log/hand_nocsreg_epoch_31.model']
 TARGETS: "nox00"
@@ -25,6 +25,5 @@ OUT_CHANNELS: 132
 
 TEST_ON_TRAIN: True
 
-EXPT_NAME: "lbs_joint_20" # accidentaly mixed skin loss and loc loss
-# EXPT_NAME: "joint_loc_20"
+EXPT_NAME: "skin_20_10k"
 GPU: 3

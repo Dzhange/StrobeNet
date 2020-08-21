@@ -8,6 +8,7 @@ from utils.DataUtils import *
 from loaders.HandDataset import *
 import trimesh, mcubes
 import shutil
+import torch.nn as nn
 
 class Validater:
 
@@ -18,12 +19,11 @@ class Validater:
         self.device = device
         self.val_dataloader = val_dataloader                
 
-        self.num_test_sample = 30000
+        self.num_test_sample = 30
         self.model.net.to(device)
         self.output_dir = os.path.join(self.model.expt_dir_path, "ValResults")
         if os.path.exists(self.output_dir) == False:
             os.makedirs(self.output_dir)
-
 
     def validate(self):
         if self.config.TASK in ["nocs", "pretrain"]:
@@ -31,8 +31,7 @@ class Validater:
         if self.config.TASK == "lbs":
             self.validate_lbs()
         elif self.config.TASK == "occupancy":
-            self.validate_occ()
-        
+            self.validate_occ()   
 
     def validate_nocs(self):
         self.model.setup_checkpoint(self.device)
@@ -66,12 +65,14 @@ class Validater:
             print("validating on the {}th data, loss is {}".format(i, loss))
             print("average validation loss is ", np.mean(np.asarray(epoch_losses)))            
             self.save_img(net_input, output[:, 0:4, :, :], target['maps'][:, 0:4, :, :], i)
-            self.save_mask(output, target['maps'], i)
+            # self.save_mask(output, ta`rget['maps'], i)
+            self.save_joint_location(output, target, i)
         print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
 
     def validate_occ(self):
         self.model.setup_checkpoint(self.device)
         self.model.net.eval()
+
         if self.config.TASK == "occupancy":            
             for child in self.model.net.IFNet.children():                        
                 if type(child) == nn.BatchNorm3d:
@@ -113,11 +114,15 @@ class Validater:
             mesh = self.mesh_from_logits(logits, resolution)
             export_pred_path = os.path.join(output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
             export_gt_path = os.path.join(output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
+            export_trans_path = os.path.join(output_dir, "frame_{}_trans.npz".format(str(i).zfill(3)))
 
             print(export_pred_path)
             mesh.export(export_pred_path)
 
             shutil.copyfile(target['mesh'][0], export_gt_path)
+
+            trans_path = target['mesh'][0].replace("isosurf_scaled.off", "transform.npz")
+            shutil.copyfile(trans_path, export_trans_path)
 
     def save_img(self, net_input, output, target, i):
         input_img, gt_out_tuple_rgb, gt_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(target, 'cpu'))
@@ -161,7 +166,60 @@ class Validater:
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_BW{}_00gt.png').format(str(i).zfill(3), b_id), tar_bw)
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_BW{}_01pred.png').format(str(i).zfill(3), b_id), pred_bw)
     
-    
+    def save_joint_location(self, output, target, i, use_score=False):
+        """
+        input: 
+            predicted joint map
+            joint score
+            target joints
+        
+            get the predicted joint position from 
+        """
+        bone_num = 16
+        n_batch = output.shape[0]
+        pred_joint_map = output[:, 4+bone_num*1:4+bone_num*4, :, :]
+        
+         # get final prediction: score map summarize
+        pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
+                                                pred_joint_map.shape[3])  # B,bone_num,3,R,R
+        
+
+        out_mask = target['maps'][:, 3, :, :]
+
+        pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
+                        
+        if use_score:
+            joint_loc_scores = output[:, 4:4+bone_num*1, :, :]
+            pred_joint_score = self.sigmoid(pred_joint_score) * out_mask.unsqueeze(1)                          
+            pred_score_map = pred_joint_score / (torch.sum(pred_joint_score.reshape(n_batch, bone_num, -1),
+                                                    dim=2, keepdim=True).unsqueeze(3) + 1e-5)
+
+            pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
+            pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
+
+        else:
+            pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
+            pred_joint /= out_mask.nonzero().shape[0]
+        
+        pred_joint = pred_joint[0] # retrive the first one from batch
+
+        pred_path = os.path.join(self.output_dir, 'frame_{}_pred_loc.xyz').format(str(i).zfill(3))
+
+        # f = open(pred_path, "a")
+        # for i in range(pred_joint.shape[0]):
+        #     p = pred_joint[i]
+        #     f.write("{} {} {}\n".format(p[0], p[1], p[2]))
+        # f.close()
+
+        gt_joint = target['pose'][0, :, 0:3]
+        gt_path = os.path.join(self.output_dir, 'frame_{}_gt_loc.xyz').format(str(i).zfill(3))
+        print(gt_joint.shape)
+        fgt = open(gt_path, "a")
+        for i in range(gt_joint.shape[0]):
+            p = gt_joint[i]
+            fgt.write("{} {} {}\n".format(p[0], p[1], p[2]))
+        fgt.close()
+        
 
     @staticmethod
     def mesh_from_logits(logits, resolution):

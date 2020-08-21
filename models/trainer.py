@@ -106,7 +106,6 @@ class Trainer:
         tic = getCurrentEpochTime()
         # print('Val length:', len(ValDataLoader))
         for i, data in enumerate(self.train_data_loader, 0):  # Get each batch
-            
             net_input, target = self.model.preprocess(data, self.device)
             output = self.model.net(net_input)
             loss = self.objective(output, target)
@@ -121,5 +120,8 @@ class Trainer:
             sys.stdout.flush()
         sys.stdout.write('\n')
         self.model.net.train()     #switch back to train mode
-        
+        if self.config.TASK == "occupancy":            
+            for child in self.model.net.IFNet.children():                        
+                if type(child) == nn.BatchNorm3d:
+                    child.track_running_stats = True
         return val_losses

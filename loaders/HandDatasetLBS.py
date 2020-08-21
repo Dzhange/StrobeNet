@@ -127,14 +127,14 @@ class HandDatasetLBS(torch.utils.data.Dataset):
         actual implementation of __getitem__
         """
         typical_path = self.frame_files['color00'][idx]
-        # print('Typical is ',TypicalPath)
+        print('Typical is ',typical_path)
         dir = os.path.dirname(typical_path)
         file_name = os.path.basename(typical_path)
         idx_of_frame = find_frame_num(file_name)
         if self.rel == True:
             rel_pose_path = os.path.join(dir, "frame_" + idx_of_frame + '_hpose_rel.txt')
         else:
-            rel_pose_path = os.path.join(dir, "frame_" + idx_of_frame + '_hpose_glob.txt')
+            rel_pose_path = os.path.join(dir, "frame_" + idx_of_frame + '_hpose_rel.txt')
 
         pose = torch.Tensor(np.loadtxt(rel_pose_path))
 
