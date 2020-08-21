@@ -6,19 +6,27 @@ import glob
 import torch
 from models.networks.SegNet import SegNet as old_SegNet
 from models.networks.say4n_SegNet import SegNet as new_SegNet
+from models.loss import L2MaskLoss
 from utils.DataUtils import *
 
-class ModelLBSNOCS(object):
+class ModelNOCS(object):
 
     def __init__(self, config):
         self.config = config
         self.lr = config.LR # set learning rate
-        # self.net = new_SegNet(input_channels=3, output_channels=config.OUT_CHANNELS)                
-        self.net = old_SegNet(output_channels=config.OUT_CHANNELS)
+        # self.net = new_SegNet(input_channels=3, output_channels=config.OUT_CHANNELS)
+        if config.TASK == "pretrain":
+            self.net = old_SegNet(output_channels=config.OUT_CHANNELS + config.FEATURE_CHANNELS) # 3 + 1 + 16 * 1 = 116
+        else:
+            self.net = old_SegNet(output_channels=config.OUT_CHANNELS)
+
+        self.objective = L2MaskLoss()
+
         self.loss_history = []
         self.val_loss_history = []
         self.start_epoch = 0
-        self.expt_dir_path = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME)
+        self.expt_dir_path = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME)        
+
         if os.path.exists(self.expt_dir_path) == False:
             os.makedirs(self.expt_dir_path)
         self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr,
@@ -69,41 +77,61 @@ class ModelLBSNOCS(object):
         # print('[ INFO ]: Checkpoint saved.')
         print(print_str) # Checkpoint saved. 50 + 3 characters [>]
 
-    @staticmethod
-    def preprocess(data, device):
-        """
-        put data onto the right device
-        """
-        data_to_device = []
+    def preprocess(self, data, device):
+        data_todevice = []
         for item in data:
             tuple_or_tensor = item
             tuple_or_tensor_td = item
-            if isinstance(tuple_or_tensor_td, (tuple, list)):
+            if not isinstance(tuple_or_tensor_td, (tuple, list)):
+                tuple_or_tensor_td = tuple_or_tensor.to(device)
+            else:
                 for ctr in range(len(tuple_or_tensor)):
                     if isinstance(tuple_or_tensor[ctr], torch.Tensor):
                         tuple_or_tensor_td[ctr] = tuple_or_tensor[ctr].to(device)
                     else:
                         tuple_or_tensor_td[ctr] = tuple_or_tensor[ctr]
-                data_to_device.append(tuple_or_tensor_td)
-            elif isinstance(tuple_or_tensor_td, (dict)):
-                dict_td = {}
-                keys = item.keys()
-                for key in keys:
-                    if isinstance(item[key], torch.Tensor):
-                        dict_td[key] = item[key].to(device)
-                data_to_device.append(dict_td)
-            elif isinstance(tuple_or_tensor, torch.Tensor):
-                tuple_or_tensor_td = tuple_or_tensor.to(device)
-                data_to_device.append(tuple_or_tensor_td)
-            else:
-                # for gt mesh
-                continue
-        
-        inputs = {}
-        inputs = data_to_device[0]
-        
-        targets = {}
-        targets['maps'] = data_to_device[1]
-        targets['pose'] = data_to_device[2]
 
-        return inputs, targets
+            data_todevice.append(tuple_or_tensor_td)
+        return data_todevice
+
+    def validate(self, val_dataloader, device):
+        
+        self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
+        if os.path.exists(self.output_dir) == False:
+            os.makedirs(self.output_dir)
+
+        self.setup_checkpoint(device)
+        self.net.eval()
+
+
+        num_test_sample = 30
+        epoch_losses = []
+        for i, data in enumerate(val_dataloader, 0):  # Get each batch        
+            if i >= num_test_sample:
+                break
+            net_input, target = self.preprocess(data, device)
+            output = self.net(net_input)
+            loss = self.objective(output, target)
+            epoch_losses.append(loss.item())
+            
+            print("validating on the {}th data, loss is {}".format(i, loss))
+            print("average validation loss is ",np.mean(np.asarray(epoch_losses)))            
+            self.save_img(net_input, output, target, i)            
+        print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
+
+    def save_img(self, net_input, output, target, i):
+        input_img, gt_out_tuple_rgb, gt_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(target, 'cpu'))
+        _, pred_out_tuple_rgb, pred_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(output.detach(), 'cpu'), isMaskNOX=True)
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_color00.png').format(str(i).zfill(3)),  cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB))
+
+        out_target_str = [self.config.TARGETS]
+
+        for target_str, gt, pred, gt_mask, pred_mask in zip(out_target_str, gt_out_tuple_rgb, pred_out_tuple_rgb, gt_out_tuple_mask, pred_out_tuple_mask):
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_00gt.png').format(str(i).zfill(3), target_str),
+                        cv2.cvtColor(gt, cv2.COLOR_BGR2RGB))
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_01pred.png').format(str(i).zfill(3), target_str),
+                        cv2.cvtColor(pred, cv2.COLOR_BGR2RGB))
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_02gtmask.png').format(str(i).zfill(3), target_str),
+                        gt_mask)
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_03predmask.png').format(str(i).zfill(3), target_str),
+                        pred_mask)

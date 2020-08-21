@@ -17,7 +17,7 @@ class Validater:
         self.model = model
         self.objective = objective
         self.device = device
-        self.val_dataloader = val_dataloader                
+        self.val_dataloader = val_dataloader
 
         self.num_test_sample = 30
         self.model.net.to(device)
@@ -31,7 +31,7 @@ class Validater:
         if self.config.TASK == "lbs":
             self.validate_lbs()
         elif self.config.TASK == "occupancy":
-            self.validate_occ()   
+            self.validate_occ()
 
     def validate_nocs(self):
         self.model.setup_checkpoint(self.device)
@@ -181,28 +181,21 @@ class Validater:
         
          # get final prediction: score map summarize
         pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
-                                                pred_joint_map.shape[3])  # B,bone_num,3,R,R
-        
-
+                                                pred_joint_map.shape[3])  # B,bone_num,3,R,R    
         out_mask = target['maps'][:, 3, :, :]
-
-        pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
-                        
+        pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)                        
         if use_score:
             joint_loc_scores = output[:, 4:4+bone_num*1, :, :]
-            pred_joint_score = self.sigmoid(pred_joint_score) * out_mask.unsqueeze(1)                          
+            pred_joint_score = sigmoid(pred_joint_score) * out_mask.unsqueeze(1)                          
             pred_score_map = pred_joint_score / (torch.sum(pred_joint_score.reshape(n_batch, bone_num, -1),
                                                     dim=2, keepdim=True).unsqueeze(3) + 1e-5)
-
             pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
             pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
-
         else:
             pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
             pred_joint /= out_mask.nonzero().shape[0]
         
         pred_joint = pred_joint[0] # retrive the first one from batch
-
         pred_path = os.path.join(self.output_dir, 'frame_{}_pred_loc.xyz').format(str(i).zfill(3))
 
         # f = open(pred_path, "a")
@@ -220,7 +213,6 @@ class Validater:
             fgt.write("{} {} {}\n".format(p[0], p[1], p[2]))
         fgt.close()
         
-
     @staticmethod
     def mesh_from_logits(logits, resolution):
         logits = np.reshape(logits, (resolution,) * 3)
