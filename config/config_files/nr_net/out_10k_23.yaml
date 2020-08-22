@@ -11,7 +11,7 @@ MODES: ['train','val']
 
 BATCHSIZE: 1
 DATALOADER_WORKERS: 2
-EPOCH_TOTAL: 100
+EPOCH_TOTAL: 5
 
 LR: 1e-4
 
@@ -24,11 +24,16 @@ TASK: "occupancy"
 
 NRNET_TYPE: "out_feature"
 NRNET_PRETRAIN: True
-NRNET_PRETRAIN_PATH: "/workspace/nrnocs_dev/output/NRNet_out_pretrain_100k"
+NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/pnnocs/out_feat_100k"
 OUT_CHANNELS: 4
 FEATURE_CHANNELS: 64
 
+UPDATE_SEG: True
 # TEST_ON_TRAIN: True
-EXPT_NAME: "nrnet_22" # loss = nocs_loss + 10 * nocs_loss
+# NR22:
+# loss = nocs_loss + 10 * nocs_loss
+# no batchnorm for the if-nets
+# no freeze the segnet
+EXPT_NAME: "NR23" 
 
-GPU: 2
+GPU: 3

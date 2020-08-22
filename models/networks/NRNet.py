@@ -41,14 +41,14 @@ class NRNet(nn.Module):
         self.initGrids(self.resolution)
         self.Sample = False
         self.SampleNum = 3000 # necessary?
-        self.FreezeSegNet = False
+        self.UpdateSegNet = config.UPDATE_SEG
 
         self.Vis = False
         self.use_pretrained = False
         # Freeze the SegNet part due to the bug
-        if self.FreezeSegNet:
-            for param in self.SegNetNR.parameters():
-                param.requires_grad = False
+        # if self.FreezeSegNet:
+        for param in self.SegNet.parameters():
+            param.requires_grad = self.UpdateSegNet
 
     def initGrids(self, resolution):
         bb_min = -0.5

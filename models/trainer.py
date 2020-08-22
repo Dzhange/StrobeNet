@@ -67,7 +67,7 @@ class Trainer:
                                                     getTimeDur(ETA-total_elapsed))
 
                     sys.stdout.write(progress_str.ljust(150))
-                    sys.stdout.flush()    
+                    sys.stdout.flush()
                 sys.stdout.write('\n')
                 gc.collect()
                 self.model.loss_history.append(np.mean(np.asarray(epoch_losses)))
@@ -95,17 +95,17 @@ class Trainer:
     def validate(self):
         """
         Do validation, only to record loss, don't save any results
-        """    
+        """
         self.model.net.eval()         #switch to evaluation mode
-        if self.config.TASK == "occupancy":            
-            for child in self.model.net.IFNet.children():                        
+        if self.config.TASK == "occupancy":
+            for child in self.model.net.IFNet.children():
                 if type(child) == nn.BatchNorm3d:
                     child.track_running_stats = False
 
         val_losses = []
         tic = getCurrentEpochTime()
         # print('Val length:', len(ValDataLoader))
-        for i, data in enumerate(self.train_data_loader, 0):  # Get each batch
+        for i, data in enumerate(self.val_data_loader, 0):  # Get each batch
             net_input, target = self.model.preprocess(data, self.device)
             output = self.model.net(net_input)
             loss = self.objective(output, target)
@@ -119,9 +119,11 @@ class Trainer:
                              .format('+' * done, '-' * (50 - done), np.mean(np.asarray(val_losses)), getTimeDur(elapsed)))
             sys.stdout.flush()
         sys.stdout.write('\n')
+        
         self.model.net.train()     #switch back to train mode
-        if self.config.TASK == "occupancy":            
-            for child in self.model.net.IFNet.children():                        
+        if self.config.TASK == "occupancy":
+            for child in self.model.net.IFNet.children():
                 if type(child) == nn.BatchNorm3d:
                     child.track_running_stats = True
+        
         return val_losses

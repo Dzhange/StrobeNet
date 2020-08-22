@@ -70,4 +70,7 @@ def get_default_cfg():
     cfg.NRNET_TYPE = "out_feature" # inter_feature
     cfg.NRNET_PRETRAIN = False
     cfg.NRNET_PRETRAIN_PATH = "./"
+
+    cfg.UPDATE_SEG = True
+
     return cfg
