@@ -72,5 +72,6 @@ def get_default_cfg():
     cfg.NRNET_PRETRAIN_PATH = "./"
 
     cfg.UPDATE_SEG = True
+    cfg.IF_BN = False
 
     return cfg

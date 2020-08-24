@@ -2,6 +2,7 @@
 # IF+NOCS
 # Using the intermediate feature of SegNet
 # pretrained weights from full dataset
+# pretrained as pre-deletion
 
 # DATASET_ROOT: '/workspace/Data/8_7_cut_BW_IF'
 DATASET_ROOT: '/workspace/Data/IF_PN_Aug13'
@@ -11,32 +12,30 @@ MODES: ['train','val']
 
 BATCHSIZE: 1
 DATALOADER_WORKERS: 2
-EPOCH_TOTAL: 5
+EPOCH_TOTAL: 20
 
 LR: 1e-4
 
 SAVE_FREQ: 1
 DATA_LIMIT: 100
 IMAGE_SIZE: (320,240)
-MODEL_INIT_PATH: ['log/hand_nocsreg_epoch_31.model']
 TARGETS: "pnnocs00"
 TASK: "occupancy"
 
 NRNET_TYPE: "out_feature"
 NRNET_PRETRAIN: True
-NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/pnnocs/out_feat_100k"
+NRNET_PRETRAIN_PATH: "/workspace/nrnocs_dev/output/out_pretrain_100k_origin"
 OUT_CHANNELS: 4
 FEATURE_CHANNELS: 64
 
-# UPDATE_SEG: False
 UPDATE_SEG: True
-
 # TEST_ON_TRAIN: True
-# NR22:
-# loss = nocs_loss + 10 * nocs_loss
-# no batchnorm for the if-net
-# freeze the segnet for 5 epochs
-# then continue training
-EXPT_NAME: "NR22" 
+IF_BN: True
 
-GPU: 2
+# NR24:
+# loss = nocs_loss + 10 * nocs_loss
+# HAVE batchnorm for the if-nets
+# no freeze the segnet
+EXPT_NAME: "NR25" 
+
+GPU: 4

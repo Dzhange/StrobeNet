@@ -44,7 +44,7 @@ class SVR(nn.Module):
         self.maxpool = nn.MaxPool3d(2)
 
         ## try not using bn
-        self.use_bn = False 
+        self.use_bn = self.config.IF_BN
         if self.use_bn:
             track_stats = True
             self.conv_in_bn = nn.BatchNorm3d(16, track_running_stats=track_stats)
@@ -52,7 +52,7 @@ class SVR(nn.Module):
             self.conv1_1_bn = nn.BatchNorm3d(64, track_running_stats=track_stats)
             self.conv2_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)
             self.conv3_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)
-            self.conv4_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)        
+            self.conv4_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)
 
         displacment = 0.0722
         displacments = []
@@ -74,7 +74,7 @@ class SVR(nn.Module):
         feature_0 = F.grid_sample(x, p, padding_mode='border')
 
         net = self.actvn(self.conv_in(x))
-        if self.use_bn:            
+        if self.use_bn:
             net = self.conv_in_bn(net)
         feature_1 = F.grid_sample(net, p, padding_mode='border')
         net = self.maxpool(net) #out 128

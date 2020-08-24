@@ -1,0 +1,7 @@
+<!DOCTYPE FilterScript>
+<FilterScript>
+ <filter name="Invert Faces Orientation">
+  <Param description="Force Flip" name="forceFlip" value="true" type="RichBool" tooltip="If selected, the normals will always be flipped; otherwise, the filter tries to set them outside"/>
+  <Param description="Flip only selected faces" name="onlySelected" value="false" type="RichBool" tooltip="If selected, only selected faces will be affected"/>
+ </filter>
+</FilterScript>
