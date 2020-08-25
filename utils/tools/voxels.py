@@ -3,6 +3,12 @@ import numpy as np
 import trimesh
 from scipy import ndimage
 from skimage.measure import block_reduce
+
+import os, sys
+FileDirPath = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(FileDirPath)
+
+
 from libvoxelize.voxelize import voxelize_mesh_
 from libmesh.inside_mesh import check_mesh_contains
 

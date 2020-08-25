@@ -19,7 +19,7 @@ class Validater:
         self.device = device
         self.val_dataloader = val_dataloader
 
-        self.num_test_sample = 30
+        self.num_test_sample = 3000
         self.model.net.to(device)
         self.output_dir = os.path.join(self.model.expt_dir_path, "ValResults")
         if os.path.exists(self.output_dir) == False:

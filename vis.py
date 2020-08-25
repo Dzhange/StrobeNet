@@ -95,7 +95,7 @@ class DataVisualizer(object):
             # nocs_color = nocs #just color nocs with nocs
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(nocs)
-            pcd.color = o3d.utility.Vector3dVector(nocs)
+            pcd.colors = o3d.utility.Vector3dVector(nocs)
             ctr = vis.get_view_control()
             for j, front in enumerate(fronts):                
                 vis.add_geometry(pcd)
@@ -126,4 +126,3 @@ if __name__ == "__main__":
         dv.filter()
     else:
         dv.visualize()
-
