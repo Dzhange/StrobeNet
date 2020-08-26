@@ -147,7 +147,7 @@ class L2MaskLoss_wtFeature(nn.Module):
         return self.computeLoss(output, target)
 
     def computeLoss(self, output, target):
-        out_img = output        
+        out_img = output
         num_channels = target.size(1) # use target size instead, we do not supervise feature channels
         target_img = target
         if num_channels%4 != 0:

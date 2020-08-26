@@ -47,10 +47,10 @@ class HandDatasetLBS(torch.utils.data.Dataset):
 
         ######### Add BoneWeights #########
         self.bone_num = 16
+        self.as_seg = True #change boneweight into segmentation map
         for i in range(self.bone_num):
-            self.frame_load_str.append("BoneWeight00bone_" + str(i))            
+            self.frame_load_str.append("BoneWeight00bone_" + str(i))
             # self.frame_load_str.append("BoneWeight01bone_" + str(i))
-
         if os.path.exists(self.dataset_dir) == False:
             print("Dataset {} doesn't exist".format(self.dataset_dir))
             exit()
@@ -68,6 +68,16 @@ class HandDatasetLBS(torch.utils.data.Dataset):
         # print(masked.sum(dim=0).max())
         return RGB, load_imgs, pose
 
+    def bw2seg(self, bw):        
+        _, max_idx = bw.max(dim=0, keepdim=True)        
+        all_one = torch.ones(1, bw.shape[1], bw.shape[2])
+        all_zero = torch.zeros(1, bw.shape[1], bw.shape[2])
+        cated = ()
+        for i in range(self.bone_num):
+            cur_seg = torch.where(max_idx == i, all_one, all_zero)
+            cated = cated + (cur_seg, )
+
+        return torch.cat(cated, 0)
 
     def load_data(self):
         """
@@ -138,10 +148,13 @@ class HandDatasetLBS(torch.utils.data.Dataset):
 
         pose = torch.Tensor(np.loadtxt(rel_pose_path))
 
+        
+
         frame = {}
-        for k in self.frame_files:            
+        for k in self.frame_files:
             if "BoneWeight" in k:
-                frame[k] = imread_gray_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor).unsqueeze(0)
+                frame[k] = imread_gray_torch(self.frame_files[k][idx], Size=self.img_size)\
+                    .type(torch.FloatTensor).unsqueeze(0) # 1,W,H                
             else:
                 frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)
             if k == "nox00":
@@ -153,24 +166,29 @@ class HandDatasetLBS(torch.utils.data.Dataset):
 
         grouped_frame_str = [list(i) for j, i in groupby(self.frame_load_str,\
                                 lambda a: ''.join([i for i in a if not i.isdigit()]))]
-        
+
         load_tuple = ()
         # Concatenate any peeled outputs
-        for group in grouped_frame_str:
+        for group in grouped_frame_str:            
             concated = ()
             for frame_str in group:
                 if 'color00' in frame_str: # Append manually
                     continue
                 concated = concated + (frame[frame_str],)
-            if len(concated) > 0:                
-                load_tuple = load_tuple + (torch.cat(concated, 0), )
+            if len(concated) > 0:
+                if self.as_seg and "BoneWeight" in group[0]: # for boneweight
+                    cated_bw = torch.cat(concated, 0)
+                    seg_map = self.bw2seg(cated_bw)
+                    load_tuple = load_tuple + (seg_map, )
+                else:
+                    load_tuple = load_tuple + (torch.cat(concated, 0), )
 
         # faster!
         img_shape = load_tuple[0].shape
         joint_map = torch.Tensor(pose.shape[0]*6, img_shape[1],img_shape[2])
-        
+
         cnt = 0
-        for i in range(pose.shape[0]):            
+        for i in range(pose.shape[0]):
             for j in range(3):
                 # print(i, j)
                 joint_map[cnt] = joint_map[cnt].fill_(pose[i,j])
@@ -186,26 +204,17 @@ class HandDatasetLBS(torch.utils.data.Dataset):
 
         return frame['color00'], load_tuple, pose
 
-
-
-
-# def check_map(self, tar_joint_map, out_mask, tar_joints):
-    
-#     n_batch = tar_joint_map.shape[0]
-#     bone_num = 16
-    
-#     tar_joint_map = tar_joint_map.reshape(n_batch, bone_num, 3, tar_joint_map.shape[2],
-#                                             tar_joint_map.shape[3])  # B,bone_num,3,R,R
-
-#     tar_joint_map = tar_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
-
-#     pred_joint = tar_joint_map.reshape(n_batch, bone_num, 3, -1).mean(dim=3)  # B,22,3
-
-#     # print(pred_joint.shape, tar_joints.shape)
-#     joint_diff = torch.sum((pred_joint - tar_joints) ** 2, dim=2)  # B,22
-#     joint_loc_loss = joint_diff.sum() / (n_batch * tar_joint_map.shape[1])
-
-#     return joint_loc_loss
+    # def check_map(self, tar_joint_map, out_mask, tar_joints):        
+    #     n_batch = tar_joint_map.shape[0]
+    #     bone_num = 16
+    #     tar_joint_map = tar_joint_map.reshape(n_batch, bone_num, 3, tar_joint_map.shape[2],
+    #                                             tar_joint_map.shape[3])  # B,bone_num,3,R,R
+    #     tar_joint_map = tar_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
+    #     pred_joint = tar_joint_map.reshape(n_batch, bone_num, 3, -1).mean(dim=3)  # B,22,3
+    #     # print(pred_joint.shape, tar_joints.shape)
+    #     joint_diff = torch.sum((pred_joint - tar_joints) ** 2, dim=2)  # B,22
+    #     joint_loc_loss = joint_diff.sum() / (n_batch * tar_joint_map.shape[1])
+    #     return joint_loc_loss
 
 if __name__ == '__main__':
     import argparse

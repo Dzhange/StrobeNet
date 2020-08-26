@@ -95,14 +95,12 @@ class ModelNOCS(object):
         return data_todevice
 
     def validate(self, val_dataloader, device):
-        
+
         self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
         if os.path.exists(self.output_dir) == False:
             os.makedirs(self.output_dir)
-
         self.setup_checkpoint(device)
         self.net.eval()
-
 
         num_test_sample = 30
         epoch_losses = []
@@ -113,7 +111,7 @@ class ModelNOCS(object):
             output = self.net(net_input)
             loss = self.objective(output, target)
             epoch_losses.append(loss.item())
-            
+
             print("validating on the {}th data, loss is {}".format(i, loss))
             print("average validation loss is ",np.mean(np.asarray(epoch_losses)))            
             self.save_img(net_input, output, target, i)            

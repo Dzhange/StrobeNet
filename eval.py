@@ -24,9 +24,11 @@ class evaluator():
         assert len(self.gt_occ_paths) == len(self.pred_occ_paths)
         self.data_num = len(self.gt_occ_paths)
 
-    def eval(self):        
-        for i in range(self.data_num):
-            print(i)
+    def eval(self):
+
+        p2s_dis = []
+        chamfer_dis = []
+        for i in range(self.data_num):            
             gt_path = self.gt_occ_paths[i]
             pred_path = self.pred_occ_paths[i]
 
@@ -34,9 +36,17 @@ class evaluator():
             pred_mesh = trimesh.load(pred_path, process=False)
 
             p2s = self.p2s_dis(gt_mesh, pred_mesh)
-            print(p2s)
+            # print(p2s)
+            p2s_dis.append(p2s)
+            
             chamfer = self.chamfer_dis(gt_mesh, pred_mesh)
-            print(chamfer)
+            chamfer_dis.append(chamfer)
+            # print(chamfer)
+                                
+            done = int(30 * (i+1) / self.data_num)
+            sys.stdout.write(('\r[{}>{}] p2s dis - {:.8f} chamfer dis - {:.8f}')
+                             .format('+' * done, '-' * (30 - done), np.mean(np.asarray(p2s_dis)), np.mean(np.asarray(chamfer_dis))))
+            sys.stdout.flush()
 
     def p2s_dis(self, gt, pred):
         # Completeness: how far are the points of the target point cloud

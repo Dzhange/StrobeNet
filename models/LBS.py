@@ -113,13 +113,12 @@ class ModelLBSNOCS(object):
 
         return inputs, targets
 
-
     def validate(self, val_dataloader, device):
 
         self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
         if os.path.exists(self.output_dir) == False:
             os.makedirs(self.output_dir)
-        
+
         self.setup_checkpoint(device)
         self.net.eval()
 
@@ -162,9 +161,9 @@ class ModelLBSNOCS(object):
         mask = target[:, 3, :, :]
         print(mask.max())
         sigmoid = torch.nn.Sigmoid()
-        zero_map = torch.zeros(mask.size(), device=mask.device)    
-        pred_bw_index =  4+bone_num*7
-        tar_bw_index =  4
+        zero_map = torch.zeros(mask.size(), device=mask.device)
+        pred_bw_index = 4+bone_num*7
+        tar_bw_index = 4
         for b_id in range(16):
             pred_bw = sigmoid(output[:, pred_bw_index + b_id, :, :])*255
             pred_bw = torch.where(mask > 0.7, pred_bw, zero_map)
@@ -184,20 +183,19 @@ class ModelLBSNOCS(object):
             predicted joint map
             joint score
             target joints
-        
+
             get the predicted joint position from prediction
         """
         bone_num = 16
         n_batch = output.shape[0]
         pred_joint_map = output[:, 4+bone_num*1:4+bone_num*4, :, :]
-        
+
          # get final prediction: score map summarize
         pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
                                                 pred_joint_map.shape[3])  # B,bone_num,3,R,R
-        
         out_mask = target['maps'][:, 3, :, :]
         pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
-                        
+
         if use_score:
             sigmoid = nn.Sigmoid()
             joint_loc_scores = output[:, 4:4+bone_num*1, :, :]        
@@ -210,7 +208,7 @@ class ModelLBSNOCS(object):
         else:
             pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
             pred_joint /= out_mask.nonzero().shape[0]
-        
+
         pred_joint = pred_joint[0] # retrive the first one from batch
         pred_path = os.path.join(self.output_dir, 'frame_{}_pred_loc.xyz').format(str(i).zfill(3))
 
@@ -222,7 +220,7 @@ class ModelLBSNOCS(object):
 
         gt_joint = target['pose'][0, :, 0:3]
         gt_path = os.path.join(self.output_dir, 'frame_{}_gt_loc.xyz').format(str(i).zfill(3))
-        print(gt_joint.shape)
+        # print(gt_joint.shape)
         fgt = open(gt_path, "a")
         for i in range(gt_joint.shape[0]):
             p = gt_joint[i]
