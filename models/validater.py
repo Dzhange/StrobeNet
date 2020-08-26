@@ -26,16 +26,19 @@ class Validater:
             os.makedirs(self.output_dir)
 
     def validate(self):
-        if self.config.TASK in ["nocs", "pretrain"]:
-            self.validate_nocs()
-        if self.config.TASK == "lbs":
-            self.validate_lbs()
-        elif self.config.TASK == "occupancy":
-            self.validate_occ()
+        # if self.config.TASK in ["nocs", "pretrain"]:
+            # self.validate_nocs()
+        # if self.config.TASK == "lbs":
+            # self.validate_lbs()
+        # if self.config.TASK == "occupancy":
+            # self.validate_occ()
+        # else:
+        self.model.validate(self.val_dataloader, self.objective, self.device)
+
 
     def validate_nocs(self):
         self.model.setup_checkpoint(self.device)
-        self.model.net.eval()        
+        self.model.net.eval()
         
         epoch_losses = []
         for i, data in enumerate(self.val_dataloader, 0):  # Get each batch        

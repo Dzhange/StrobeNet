@@ -147,7 +147,7 @@ class ModelIFNOCS(object):
             #             if isinstance(v, torch.Tensor):
             #                 state[k] = v.to(train_device)
 
-    def validate(self, val_dataloader, device):
+    def validate(self, val_dataloader, objective, device):
 
         self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
         if os.path.exists(self.output_dir) == False:
@@ -178,7 +178,7 @@ class ModelIFNOCS(object):
             # first pass generate loss
             net_input, target = self.preprocess(data, device)
             output = self.net(net_input)
-            loss = self.objective(output, target)
+            loss = objective(output, target)
             
             logits_list = []
             for points in grid_points_split:

@@ -13,8 +13,8 @@ from loaders.HandOccDataset import HandOccDataset
 from models.NOCS import ModelNOCS
 from models.Baseline import ModelIFNOCS
 from models.LBS import ModelLBSNOCS
-
-from models.loss import L2MaskLoss, LBSLoss, MixLoss, L2MaskLoss_wtFeature
+from models.SegLBS import ModelSegLBS
+from models.loss import *
 # from core.coach import Coach
 from models.validater import Validater
 from config import get_cfg
@@ -32,6 +32,10 @@ if task == "lbs":
     Dataset = HandDatasetLBS
     objective = LBSLoss()
     Model = ModelLBSNOCS(cfg)
+if task == "lbs_seg":
+    Dataset = HandDatasetLBS
+    objective = LBSSegLoss()
+    Model = ModelSegLBS(cfg)
 if task == "occupancy":
     Dataset = HandOccDataset
     objective = MixLoss()

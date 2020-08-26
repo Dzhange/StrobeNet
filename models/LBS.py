@@ -19,6 +19,7 @@ class ModelLBSNOCS(object):
         # self.net = new_SegNet(input_channels=3, output_channels=config.OUT_CHANNELS)        
         self.net = old_SegNet(output_channels=config.OUT_CHANNELS)
         self.objective = LBSLoss()
+        # self.objective = LBSLoss()
 
         self.loss_history = []
         self.val_loss_history = []
@@ -113,7 +114,7 @@ class ModelLBSNOCS(object):
 
         return inputs, targets
 
-    def validate(self, val_dataloader, device):
+    def validate(self, val_dataloader, objective, device):
 
         self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
         if os.path.exists(self.output_dir) == False:
@@ -130,7 +131,7 @@ class ModelLBSNOCS(object):
 
             net_input, target = self.preprocess(data, device)
             output = self.net(net_input)
-            loss = self.objective(output, target)
+            loss = objective(output, target)
             epoch_losses.append(loss.item())
             print("validating on the {}th data, loss is {}".format(i, loss))
             print("average validation loss is ", np.mean(np.asarray(epoch_losses)))            
@@ -156,15 +157,16 @@ class ModelLBSNOCS(object):
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_03predmask.png').format(str(i).zfill(3), target_str),
                         pred_mask)
 
-    def save_mask(self, output, target, i):        
+    def save_mask(self, output, target, i):
         bone_num = 16
         mask = target[:, 3, :, :]
         print(mask.max())
         sigmoid = torch.nn.Sigmoid()
         zero_map = torch.zeros(mask.size(), device=mask.device)
-        pred_bw_index = 4+bone_num*7
-        tar_bw_index = 4
-        for b_id in range(16):
+        pred_bw_index = 4+bone_num*6
+        tar_bw_index = 4+bone_num*6
+
+        for b_id in range(bone_num):
             pred_bw = sigmoid(output[:, pred_bw_index + b_id, :, :])*255
             pred_bw = torch.where(mask > 0.7, pred_bw, zero_map)
             pred_bw = pred_bw.squeeze().cpu().detach().numpy()
@@ -172,7 +174,7 @@ class ModelLBSNOCS(object):
             tar_bw = target[:, tar_bw_index + b_id, :, :]*255
             tar_bw = torch.where(mask > 0.7, tar_bw, zero_map)
             tar_bw = tar_bw.squeeze().cpu().detach().numpy()
-            # print(tar_bw.shape)
+            
 
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_BW{}_00gt.png').format(str(i).zfill(3), b_id), tar_bw)
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_BW{}_01pred.png').format(str(i).zfill(3), b_id), pred_bw)

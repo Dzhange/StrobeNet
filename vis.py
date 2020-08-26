@@ -3,6 +3,7 @@ import cv2
 import argparse
 import numpy as np
 import open3d as o3d
+import trimesh
 
 class DataVisualizer(object):
 
@@ -12,8 +13,7 @@ class DataVisualizer(object):
         self.input_dir = args.input_dir
         self.output_dir = os.path.join(self.input_dir,'vis')
         if os.path.exists(self.output_dir) == False:
-            os.mkdir(self.output_dir)            
-        self.mlx_path = "./utils/meshlab_scripts/inverse_face.mlx"        
+            os.mkdir(self.output_dir)
         self.load()
     
     def visualize(self):
@@ -55,10 +55,9 @@ class DataVisualizer(object):
         basically just reverse the index of the isosurf mesh
         """        
         for path in self.gt_occ_paths:
-            input_file = path
-            cmd = 'xvfb-run -a -s "-screen 0 800x600x24" meshlabserver -i {} -o {}'\
-                .format(input_file, input_file)
-            os.system(cmd)
+            mesh = trimesh.load(mesh)
+            trimesh.repair.fix_inversion(mesh)
+            mesh.export(path)            
 
     def render_mesh(self, paths, name):
         """
@@ -123,6 +122,5 @@ if __name__ == "__main__":
     dv = DataVisualizer(args)
 
     if args.flip == True:
-        dv.filter()
-    else:
-        dv.visualize()
+        dv.filter()    
+    dv.visualize()

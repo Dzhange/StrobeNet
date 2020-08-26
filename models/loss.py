@@ -1,3 +1,4 @@
+import torch.nn.functional as F
 import torch.nn as nn
 import torch
 
@@ -116,15 +117,10 @@ class MixLoss(nn.Module):
 
     def forward(self, output, target):
         pred_nocs = output[0]
-
         nocs_loss = self.l2_mask_loss(pred_nocs, target['NOCS'])
-
         recon = output[1]
-        # print(type(recon), recon.shape)
         occ = target['occupancies'].to(device=recon.device)
-
         occ_loss = self.OccLoss(recon, occ, reduction='none')# out = (B,num_points) by componentwise comparing vecots of size num_samples :)                
-
         num_sample = occ_loss.shape[1]
         occ_loss = occ_loss.sum(-1).mean() / num_sample
 
@@ -199,7 +195,7 @@ class LBSLoss(nn.Module):
         calculate the loss for dense pose estimation
         output structure:
             [0:3]: nocs
-            [3]: mask            
+            [3]: mask
             [4:4+16*3]: joints position
             [4+16*3:4+16*6]: joint direction
             [4+16*6:4+16*7]: skinning weights
@@ -208,12 +204,12 @@ class LBSLoss(nn.Module):
         target structure:
             maps = target['map']
                 maps[0:3]: nocs
-                maps[3]: mask 
-                maps[4:4+16*1]: skinning weights
-                maps[4+16*1:4+16*4]: joints position
-                maps[4+16*4:4+16*7]: joint direction
-                
-                            
+                maps[3]: mask
+                maps[4:4+16*3]: joints position
+                maps[4+16*3:4+16*6]: joint direction
+                maps[4+16*6:4+16*7]: skinning weights
+
+
             pose = target['pose']
                 pose[0:3] location
                 pose[3:6] rotation
@@ -227,87 +223,50 @@ class LBSLoss(nn.Module):
         self.bone_num = bone_num
 
     def forward(self, output, target):
-
-        n_batch = output.shape[0]
         bone_num = self.bone_num
         loss = torch.Tensor([0]).to(device=output.device)
 
         pred_nocs = output[:, 0:3, :, :].clone().requires_grad_(True)
         out_mask = output[:, 3, :, :].clone().requires_grad_(True)
         out_mask = self.sigmoid(out_mask)
-
-        pred_joint_score = output[:, 4:4+bone_num*1, :, :].clone().requires_grad_(True)
-
-        pred_loc_map = output[:, 4+bone_num*1:4+bone_num*4, :, :].clone().requires_grad_(True)
-        pred_rot_map = output[:, 4+bone_num*4:4+bone_num*7, :, :].clone().requires_grad_(True)
-        pred_skin_weights = output[:, 4+bone_num*7:4+bone_num*8, :, :].clone().requires_grad_(True)
+        pred_loc_map = output[:, 4:4+bone_num*3, :, :].clone().requires_grad_(True)
+        pred_rot_map = output[:, 4+bone_num*3:4+bone_num*6, :, :].clone().requires_grad_(True)
+        pred_skin_weights = output[:, 4+bone_num*6:4+bone_num*7, :, :].clone().requires_grad_(True)
+        pred_joint_score = output[:, 4+bone_num*7:4+bone_num*8, :, :].clone().requires_grad_(True)
 
         tar_maps = target['maps']
-        tar_pose = target['pose']
-
         target_nocs = tar_maps[:, 0:3, :, :]
         target_mask = tar_maps[:, 3, :, :]
-
-        tar_skin_weights = tar_maps[:, 4:4+bone_num*1, :, :]
-        
-        tar_loc_map = tar_maps[:, 4+bone_num*1:4+bone_num*4, :, :]
-        tar_rot_map = tar_maps[:, 4+bone_num*4:4+bone_num*7, :, :]
-        
+        tar_loc_map = tar_maps[:, 4:4+bone_num*3, :, :]
+        tar_rot_map = tar_maps[:, 4+bone_num*3:4+bone_num*6, :, :]
+        tar_skin_weights = tar_maps[:, 4+bone_num*6:4+bone_num*7, :, :]
+        tar_pose = target['pose']
         tar_loc = tar_pose[:, :, 0:3]
         tar_rot = tar_pose[:, :, 3:6]
-        # print(tar_pose.shape)
 
         mask_loss = self.mask_loss(out_mask, target_mask)
-        # loss = mask_loss * 0.7 * 0.5
-
         nocs_loss = self.masked_l2_loss(pred_nocs, target_nocs, target_mask)
-        # loss += nocs_loss * 0.3 * 0.5
-
-        skin_loss = self.masked_l2_loss(self.sigmoid(pred_skin_weights), tar_skin_weights, target_mask)
-        # print(skin_loss)
-        loss += skin_loss
-        
+        skin_loss = self.masked_l2_loss(self.sigmoid(pred_skin_weights), tar_skin_weights, target_mask)                
         skin_sum = pred_skin_weights.sum(dim=1)
         skin_bound_loss = torch.max(torch.zeros(1).to(device=skin_sum.device), skin_sum-1).mean()
-        # loss += skin_bound_loss * 0.5
-
-        # print("begin loc mp")
         loc_map_loss = self.masked_l2_loss(pred_loc_map, tar_loc_map, target_mask)
-        # loss += loc_map_loss
-        # print("end loc mp")
-        # print(loss)
         rot_map_loss = self.masked_l2_loss(pred_rot_map, tar_rot_map, target_mask)
         
         joint_loc_loss = self.pose_nocs_loss(pred_loc_map,
                                             pred_joint_score,
                                             target_mask,
                                             tar_loc)
-        
-        # err = self.check_map(tar_loc_map,                                 
-        #                     target_mask,
-        #                     tar_loc)
-        # print(err)
-        # loss += joint_loc_loss * 0.25
-
         joint_rot_loss = self.pose_nocs_loss(pred_rot_map,
                                             pred_joint_score,
                                             target_mask,
                                             tar_rot)
-
-
-        # print(mask_loss, nocs_loss, skin_loss + loc_map_loss, rot_map_loss, joint_loc_loss, joint_rot_loss)
-        # loss = mask_loss + nocs_loss\
-        #         + skin_loss + loc_map_loss + rot_map_loss\
-        #         + joint_loc_loss + joint_rot_loss
-
-
+        loss += skin_loss
         return loss
-
 
     def masked_l2_loss(self, out, tar, mask):
 
         batch_size = out.shape[0]
-        
+
         out = out.clone().requires_grad_(True)
         diff = out - tar
         diff_norm = torch.norm(diff, 2, dim=1)
@@ -323,9 +282,8 @@ class LBSLoss(nn.Module):
 
         return l2_loss
 
-
     def pose_nocs_loss(self, pred_joint_map, pred_joint_score, out_mask, tar_joints):
-        
+
         n_batch = pred_joint_map.shape[0]
         bone_num = self.bone_num
 
@@ -345,37 +303,77 @@ class LBSLoss(nn.Module):
         pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
         pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
         joint_diff = torch.sum((pred_joint - tar_joints) ** 2, dim=2)  # B,22
-        
+
         joint_loc_loss = joint_diff.sum() / (n_batch * pred_joint_map.shape[1])
 
         return joint_loc_loss
 
-
     # def check_map(self, tar_joint_map, out_mask, tar_joints):
-        
     #     n_batch = tar_joint_map.shape[0]
     #     bone_num = self.bone_num
-        
     #     # for i in range(16):
     #         # for j in range(3):
-
     #             # print(tar_joint_map[0,i*3+j,0,0], tar_joints[0,i,j])                
-
     #     tar_joint_map = tar_joint_map.reshape(n_batch, bone_num, 3, tar_joint_map.shape[2],
     #                                             tar_joint_map.shape[3])  # B,bone_num,3,R,R
-
-        
     #     tar_joint_map = tar_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
-
-
     #     pred_joint = tar_joint_map.reshape(n_batch, bone_num, 3, -1).mean(dim=3)  # B,22,3
-
     #     # print(pred_joint.shape, tar_joints.shape)
     #     joint_diff = torch.sum((pred_joint - tar_joints) ** 2, dim=2)  # B,22
-        
     #     joint_loc_loss = joint_diff.sum() / (n_batch * tar_joint_map.shape[1])
-
     #     return joint_loc_loss
+
+class LBSSegLoss(LBSLoss):
+
+    def __init__(self, bone_num=16):
+        super().__init__(bone_num)
+        self.seg_loss = torch.nn.CrossEntropyLoss()
+
+    def forward(self, output, target):
+        bone_num = self.bone_num
+        loss = torch.Tensor([0]).to(device=output.device)
+
+        pred_nocs = output[:, 0:3, :, :].clone().requires_grad_(True)
+        out_mask = output[:, 3, :, :].clone().requires_grad_(True)
+        out_mask = self.sigmoid(out_mask)
+        pred_loc_map = output[:, 4:4+bone_num*3, :, :].clone().requires_grad_(True)
+        pred_rot_map = output[:, 4+bone_num*3:4+bone_num*6, :, :].clone().requires_grad_(True)
+        pred_skin_seg = output[:, 4+bone_num*6:4+bone_num*7, :, :].clone().requires_grad_(True)
+        pred_joint_score = output[:, 4+bone_num*7:4+bone_num*8, :, :].clone().requires_grad_(True)
+
+        tar_maps = target['maps']
+        target_nocs = tar_maps[:, 0:3, :, :]
+        target_mask = tar_maps[:, 3, :, :]
+        tar_loc_map = tar_maps[:, 4:4+bone_num*3, :, :]
+        tar_rot_map = tar_maps[:, 4+bone_num*3:4+bone_num*6, :, :]
+        tar_skin_seg = tar_maps[:, 4+bone_num*6:4+bone_num*6+1, :, :] ## as Seg
+        tar_pose = target['pose']
+        tar_loc = tar_pose[:, :, 0:3]
+        tar_rot = tar_pose[:, :, 3:6]
+
+        mask_loss = self.mask_loss(out_mask, target_mask)
+        nocs_loss = self.masked_l2_loss(pred_nocs, target_nocs, target_mask)
+        # skin_loss = self.masked_l2_loss(self.sigmoid(pred_skin_weights), tar_skin_weights, target_mask)
+        skin_loss = self.seg_loss(pred_skin_seg, tar_skin_seg.squeeze(1).long().detach())
+        
+        # input = pred_skin_seg.transpose(1, 2).transpose(2, 3).contiguous().view(-1, bone_num)
+        # skin_loss = self.seg_loss(input, tar_skin_seg.long().squeeze(1).view(-1))
+        
+        loc_map_loss = self.masked_l2_loss(pred_loc_map, tar_loc_map, target_mask)
+        rot_map_loss = self.masked_l2_loss(pred_rot_map, tar_rot_map, target_mask)
+        
+        joint_loc_loss = self.pose_nocs_loss(pred_loc_map,
+                                            pred_joint_score,
+                                            target_mask,
+                                            tar_loc)
+        joint_rot_loss = self.pose_nocs_loss(pred_rot_map,
+                                            pred_joint_score,
+                                            target_mask,
+                                            tar_rot)
+        loss += skin_loss
+        return loss
+
+
 
 class Discarded_LBSLoss(nn.Module):
     Thresh = 0.7 # PARAM
