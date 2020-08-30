@@ -25,9 +25,9 @@ OUT_CHANNELS: 132
 
 TEST_ON_TRAIN: True
 
-LOC_LOSS: True
+# LOC_LOSS: True
 LOC_MAP_LOSS: True
 
-EXPT_NAME: "lbs_joint_20" # accidentaly mixed skin loss and loc loss
-# EXPT_NAME: "joint_loc_20"
+EXPT_NAME: "joint_28" #
+
 GPU: 3

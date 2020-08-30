@@ -2,7 +2,7 @@
 This model is the FIRST stage of out proposed LBS pipeline
 Here we predict the skinning weights, the pose and the confident score
 """
-import os
+import os, shutil
 import glob
 import torch
 import torch.nn as nn
@@ -10,6 +10,7 @@ from models.networks.SegNet import SegNet as old_SegNet
 from models.networks.say4n_SegNet import SegNet as new_SegNet
 from models.loss import LBSLoss
 from utils.DataUtils import *
+import time
 
 class ModelLBSNOCS(object):
 
@@ -18,9 +19,9 @@ class ModelLBSNOCS(object):
         self.lr = config.LR # set learning rate
         # self.net = new_SegNet(input_channels=3, output_channels=config.OUT_CHANNELS)        
         self.net = old_SegNet(output_channels=config.OUT_CHANNELS)
-        self.objective = LBSLoss()
         # self.objective = LBSLoss()
-
+        # self.objective = LBSLoss()
+        self.bone_num = 16
         self.loss_history = []
         self.val_loss_history = []
         self.start_epoch = 0
@@ -83,8 +84,8 @@ class ModelLBSNOCS(object):
         data_to_device = []
         for item in data:
             tuple_or_tensor = item
-            tuple_or_tensor_td = item
-            if isinstance(tuple_or_tensor_td, (tuple, list)):
+            tuple_or_tensor_td = item            
+            if isinstance(tuple_or_tensor_td, list):
                 for ctr in range(len(tuple_or_tensor)):
                     if isinstance(tuple_or_tensor[ctr], torch.Tensor):
                         tuple_or_tensor_td[ctr] = tuple_or_tensor[ctr].to(device)
@@ -111,6 +112,7 @@ class ModelLBSNOCS(object):
         targets = {}
         targets['maps'] = data_to_device[1]
         targets['pose'] = data_to_device[2]
+        targets['mesh'] = data[3]
 
         return inputs, targets
 
@@ -123,12 +125,11 @@ class ModelLBSNOCS(object):
         self.setup_checkpoint(device)
         self.net.eval()
 
-        num_test_sample = 30
+        num_test_sample = 300
 
         epoch_losses = []
         for i, data in enumerate(val_dataloader, 0):  # Get each batch
             if i >= num_test_sample: break
-
             net_input, target = self.preprocess(data, device)
             output = self.net(net_input)
             loss = objective(output, target)
@@ -136,8 +137,13 @@ class ModelLBSNOCS(object):
             print("validating on the {}th data, loss is {}".format(i, loss))
             print("average validation loss is ", np.mean(np.asarray(epoch_losses)))            
             self.save_img(net_input, output[:, 0:4, :, :], target['maps'][:, 0:4, :, :], i)
-            self.save_mask(output, target['maps'], i)
-            self.save_joint_location(output, target, i)
+            if self.config.SKIN_LOSS or self.config.TASK == "lbs_seg":
+                self.save_mask(output, target['maps'], i)
+            if self.config.LOC_LOSS or self.config.LOC_MAP_LOSS:
+                self.save_joint_location(output, target, i, self.config.LOC_LOSS)
+                self.visualize_joint_prediction(output, target, i)
+                gt_path = os.path.join(self.output_dir, 'frame_{}_gt.obj').format(str(i).zfill(3))
+                shutil.copyfile(target['mesh'][0], gt_path)
         print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
     
     def save_img(self, net_input, output, target, i):
@@ -158,7 +164,7 @@ class ModelLBSNOCS(object):
                         pred_mask)
 
     def save_mask(self, output, target, i):
-        bone_num = 16
+        bone_num = self.bone_num
         mask = target[:, 3, :, :]
         print(mask.max())
         sigmoid = torch.nn.Sigmoid()
@@ -188,43 +194,85 @@ class ModelLBSNOCS(object):
 
             get the predicted joint position from prediction
         """
-        bone_num = 16
+        bone_num = self.bone_num
         n_batch = output.shape[0]
-        pred_joint_map = output[:, 4+bone_num*1:4+bone_num*4, :, :]
-
-         # get final prediction: score map summarize
+        pred_joint_map = output[:, 4:4+bone_num*3, :, :]
+         
+        # get final prediction: score map summarize
         pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
                                                 pred_joint_map.shape[3])  # B,bone_num,3,R,R
         out_mask = target['maps'][:, 3, :, :]
         pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
 
+        # gt
+        gt_joint = target['pose'][0, :, 0:3]
+        gt_path = os.path.join(self.output_dir, 'frame_{}_gt_loc.xyz').format(str(i).zfill(3))        
+        self.write(gt_path, gt_joint)
+        
         if use_score:
+            # # Vote results
             sigmoid = nn.Sigmoid()
-            joint_loc_scores = output[:, 4:4+bone_num*1, :, :]        
-            pred_joint_score = sigmoid(pred_joint_score) * out_mask.unsqueeze(1)                          
+            pred_joint_score = output[:, 4+bone_num*7:4+bone_num*8, :, :]
+            pred_joint_score = sigmoid(pred_joint_score) * out_mask.unsqueeze(1)
             pred_score_map = pred_joint_score / (torch.sum(pred_joint_score.reshape(n_batch, bone_num, -1),
                                                     dim=2, keepdim=True).unsqueeze(3) + 1e-5)
 
             pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
             pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
+
+            pred_joint = pred_joint[0] # retrive the first one from batch
+            pred_path = os.path.join(self.output_dir, 'frame_{}_pred_loc.xyz').format(str(i).zfill(3))
+            self.write(pred_path, pred_joint)
         else:
-            pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
-            pred_joint /= out_mask.nonzero().shape[0]
+            # Mean results
+            mean_pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
+            mean_pred_joint /= out_mask.nonzero().shape[0]
+            mean_pred_joint = mean_pred_joint[0]
+            mean_pred_path = os.path.join(self.output_dir, 'frame_{}_mean_pred_loc.xyz').format(str(i).zfill(3))
+            self.write(mean_pred_path, mean_pred_joint)
 
-        pred_joint = pred_joint[0] # retrive the first one from batch
-        pred_path = os.path.join(self.output_dir, 'frame_{}_pred_loc.xyz').format(str(i).zfill(3))
+        # tell difference
+        if use_score:
+            joint_diff = torch.sum((pred_joint - gt_joint) ** 2, dim=1)  # B,22
+            joint_loc_loss = joint_diff.sum() / (n_batch * bone_num)
+            print("vote diff is {:5f}".format(joint_loc_loss))
+        else:
+            mean_joint_diff = torch.sum((mean_pred_joint - gt_joint) ** 2, dim=1)  # B,22
+            mean_joint_loc_loss = mean_joint_diff.sum() / (n_batch * bone_num)            
+            print("mean diff is {:5f}".format(mean_joint_loc_loss))
 
-        f = open(pred_path, "a")
-        for i in range(pred_joint.shape[0]):
-            p = pred_joint[i]
+    def visualize_joint_prediction(self, output, target, frame_id):
+        """
+        save the inter results of joint predication as RGB image
+        """
+        bone_num = self.bone_num
+        mask = target['maps'][:, 3, :, :].cpu().detach()
+        pred_joint_map = output[:, 4:4+bone_num*3, :, :].cpu().detach()
+        gt_joint_map = target['maps'][:, 4:4+bone_num*3, :, :].cpu().detach()
+        
+        zero_map = torch.zeros(3, pred_joint_map.shape[2], pred_joint_map.shape[3])
+        
+        for i in range(bone_num):
+            cur_pred = pred_joint_map[0, i*3:i*3+3, :, :]
+            gt = gt_joint_map[0, i*3:i*3+3, :, :]
+            
+            masked_map = torch.where(mask > 0.7, cur_pred, zero_map)
+            joint_map = torch2np(masked_map) * 255
+
+            gt = torch.where(mask > 0.7, gt, zero_map)
+            gt = torch2np(gt) * 255            
+            
+            diff = np.abs(gt-joint_map)
+            comb = np.concatenate((gt, joint_map, diff), axis=1)
+            
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_pred_joint_{}.png').format(str(frame_id).zfill(3), i),
+                        cv2.cvtColor(comb, cv2.COLOR_BGR2RGB))
+
+
+
+    def write(self, path, joint):
+        f = open(path, "a")
+        for i in range(joint.shape[0]):
+            p = joint[i]
             f.write("{} {} {}\n".format(p[0], p[1], p[2]))
         f.close()
-
-        gt_joint = target['pose'][0, :, 0:3]
-        gt_path = os.path.join(self.output_dir, 'frame_{}_gt_loc.xyz').format(str(i).zfill(3))
-        # print(gt_joint.shape)
-        fgt = open(gt_path, "a")
-        for i in range(gt_joint.shape[0]):
-            p = gt_joint[i]
-            fgt.write("{} {} {}\n".format(p[0], p[1], p[2]))
-        fgt.close()

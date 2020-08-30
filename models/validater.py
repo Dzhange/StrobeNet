@@ -76,7 +76,7 @@ class Validater:
         self.model.setup_checkpoint(self.device)
         self.model.net.eval()
 
-        if self.config.TASK == "occupancy":            
+        if self.config.TASK == "occupancy":
             for child in self.model.net.IFNet.children():                        
                 if type(child) == nn.BatchNorm3d:
                     child.track_running_stats = False

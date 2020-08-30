@@ -30,11 +30,11 @@ task = cfg.TASK
 
 if task == "lbs":
     Dataset = HandDatasetLBS
-    objective = LBSLoss()
+    objective = LBSLoss(cfg)
     Model = ModelLBSNOCS(cfg)
 if task == "lbs_seg":
     Dataset = HandDatasetLBS
-    objective = LBSSegLoss()
+    objective = LBSSegLoss(cfg)
     Model = ModelSegLBS(cfg)
 if task == "occupancy":
     Dataset = HandOccDataset

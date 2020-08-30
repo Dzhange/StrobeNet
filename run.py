@@ -30,7 +30,6 @@ dataloader_dict = dict()
 # lbs = cfg.LBS
 task = cfg.TASK
 
-
 def get_loaders(Dataset):
     for mode in cfg.MODES:
         phase_dataset = Dataset(root=cfg.DATASET_ROOT,
@@ -48,11 +47,11 @@ Model = ModelNOCS(cfg)
 
 if task == "lbs":
     Dataset = HandDatasetLBS
-    objective = LBSLoss()
+    objective = LBSLoss(cfg)
     Model = ModelLBSNOCS(cfg)
 if task == "lbs_seg":
     Dataset = HandDatasetLBS # set as seg = true
-    objective = LBSSegLoss()
+    objective = LBSSegLoss(cfg)
     Model = ModelSegLBS(cfg)
 if task == "occupancy":
     Dataset = HandOccDataset

@@ -41,7 +41,7 @@ class HandDatasetLBS(torch.utils.data.Dataset):
 
         if limit <= 0.0 or limit > 100.0:
             raise RuntimeError('Data limit percent has to be >0% and <=100%')
-        self.data_limit = limit
+        self.data_limit = limit 
         if self.required not in self.frame_load_str:
             raise RuntimeError('frame_load_str should contain {}.'.format(self.required))
 
@@ -63,17 +63,17 @@ class HandDatasetLBS(torch.utils.data.Dataset):
         return len(self.frame_files[self.frame_load_str[0]])
 
     def __getitem__(self, idx):
-        RGB, target_imgs, pose = self.load_images(idx)
+        RGB, target_imgs, pose, mesh_path = self.load_images(idx)
         load_imgs = torch.cat(target_imgs, 0)
         # print(load_imgs.shape)
         # mask = load_imgs[3]
         # skin_w = load_imgs[4:20]
         # masked = torch.where(mask > 0.7, skin_w, torch.zeros(skin_w.size(), device=skin_w.device))
         # print(masked.sum(dim=0).max())
-        return RGB, load_imgs, pose
+        return RGB, load_imgs, pose, mesh_path
 
-    def bw2seg(self, bw):        
-        _, max_idx = bw.max(dim=0, keepdim=True)        
+    def bw2seg(self, bw):
+        _, max_idx = bw.max(dim=0, keepdim=True)
         all_one = torch.ones(1, bw.shape[1], bw.shape[2])
         all_zero = torch.zeros(1, bw.shape[1], bw.shape[2])
         cated = ()
@@ -204,7 +204,10 @@ class HandDatasetLBS(torch.utils.data.Dataset):
         load_tuple = load_tuple + (joint_map, )
         # print(len(load_tuple))
         load_tuple = (load_tuple[0], load_tuple[2], load_tuple[1])
-        return frame['color00'], load_tuple, pose
+
+        mesh_path = os.path.join(dir, "frame_" + idx_of_frame + '_NOCS_mesh.obj')
+
+        return frame['color00'], load_tuple, pose, mesh_path
 
     # def check_map(self, tar_joint_map, out_mask, tar_joints):
     #     n_batch = tar_joint_map.shape[0]
@@ -231,7 +234,7 @@ if __name__ == '__main__':
     # exit()
     # LossUnitTest = GenericImageDataset.L2MaskLoss(0.7)
     DataLoader = torch.utils.data.DataLoader(Data, batch_size=4, shuffle=True, num_workers=0)
-    loss = LBSLoss()
+    # loss = LBSLoss()
     for i, Data in enumerate(DataLoader, 0):  # Get each batch
-        target_imgs = Data[1]
+        target_img = Data[1]
         # print(target_imgs.shape)

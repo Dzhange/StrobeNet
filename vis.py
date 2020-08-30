@@ -27,6 +27,8 @@ class DataVisualizer(object):
         self.render_nocs(self.gt_nocs_paths, "gt_nocs")
         self.render_nocs(self.pred_nocs_paths, "pred_nocs")
 
+        self.cat()
+
     def load(self):
         """
         load necessary files
@@ -50,14 +52,22 @@ class DataVisualizer(object):
             os.path.join(self.input_dir, "*" + self.pred_nocs_postfix)
         )
 
+        assert len(self.gt_nocs_paths)\
+                == len(self.pred_nocs_paths)\
+                == len(self.gt_occ_paths)\
+                == len(self.pred_occ_paths)
+
+        self.data_num = len(self.pred_occ_paths)
+        
+
     def filter(self):
         """
         basically just reverse the index of the isosurf mesh
         """        
         for path in self.gt_occ_paths:
-            mesh = trimesh.load(mesh)
+            mesh = trimesh.load(path)
             trimesh.repair.fix_inversion(mesh)
-            mesh.export(path)            
+            mesh.export(path)
 
     def render_mesh(self, paths, name):
         """
@@ -106,6 +116,39 @@ class DataVisualizer(object):
                 vis.capture_screen_image(output_path)
                 vis.remove_geometry(pcd)
 
+    def cat(self):
+        # BigImg = ()
+        for i in range(self.data_num):
+            # each frame of one type of data forms one row            
+            row_to_cat = ()
+            for data in ['nocs', 'occ']:
+                for view in range(3):
+                    for mode in ['gt', 'pred']:                    
+                        file_name = "{}_{}_{}_{}.png".format(mode, data, i, view)
+                        path = os.path.join(self.output_dir, file_name)
+                        img = cv2.imread(path)
+                        row_to_cat = row_to_cat + (img, )
+            color = cv2.imread(
+                os.path.join(
+                    self.input_dir,
+                    "frame_{}_color00.png".format(str(i).zfill(3))
+                )
+            )            
+            height = 400
+            width = int(color.shape[1] * (height / color.shape[0]))
+            color = cv2.resize(color, (width,height))            
+            row_to_cat = (color,) + row_to_cat                    
+            frame = np.concatenate(row_to_cat, axis=1)
+            cv2.imwrite(
+                os.path.join(
+                    self.output_dir,
+                    "sums",
+                    "frame_{}_all.png".format(i)
+                ),
+                frame
+            )            
+
+
     def nocs2pc(self, path):
         nocs_map = cv2.imread(path)
         nocs_map = cv2.cvtColor(nocs_map, cv2.COLOR_BGR2RGB)
@@ -115,12 +158,13 @@ class DataVisualizer(object):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--flip', help='if set to true, the fliper would flip the face orientation for the gt mesh using meshlab', required=True, default=False)
+    parser.add_argument('-f', '--flip', help='if set to true, the fliper would flip the face orientation for the gt mesh using meshlab', type=bool, default=False)
     parser.add_argument('-i', '--input-dir', help='Specify the location of the directory of data to visualize', required=True)
     args, _ = parser.parse_known_args()
 
     dv = DataVisualizer(args)
 
     if args.flip == True:
-        dv.filter()    
-    dv.visualize()
+        dv.filter()
+    # dv.visualize()
+    dv.cat()

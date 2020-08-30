@@ -74,4 +74,9 @@ def get_default_cfg():
     cfg.UPDATE_SEG = True
     cfg.IF_BN = False
 
+    ## Loss for LBS
+    cfg.SKIN_LOSS = False
+    cfg.LOC_LOSS = False
+    cfg.LOC_MAP_LOSS = False
+
     return cfg
