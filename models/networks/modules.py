@@ -147,21 +147,34 @@ class conv2DGroupNormRelu(nn.Module):
 
 
 class deconv2DBatchNormRelu(nn.Module):
-    def __init__(self, in_channels, n_filters, k_size, stride, padding, bias=True):
+    def __init__(self, in_channels, n_filters, k_size, stride, padding, bias=True, is_batchnorm=True):
         super(deconv2DBatchNormRelu, self).__init__()
 
-        self.dcbr_unit = nn.Sequential(
-            nn.ConvTranspose2d(
-                int(in_channels),
-                int(n_filters),
-                kernel_size=k_size,
-                padding=padding,
-                stride=stride,
-                bias=bias,
-            ),
-            nn.BatchNorm2d(int(n_filters)),
-            nn.ReLU(inplace=True),
-        )
+        if is_batchnorm:
+            self.dcbr_unit = nn.Sequential(
+                nn.ConvTranspose2d(
+                    int(in_channels),
+                    int(n_filters),
+                    kernel_size=k_size,
+                    padding=padding,
+                    stride=stride,
+                    bias=bias,
+                ),
+                nn.BatchNorm2d(int(n_filters)),
+                nn.ReLU(inplace=True),
+            )
+        else:
+            self.dcbr_unit = nn.Sequential(
+                nn.ConvTranspose2d(
+                    int(in_channels),
+                    int(n_filters),
+                    kernel_size=k_size,
+                    padding=padding,
+                    stride=stride,
+                    bias=bias,
+                ),
+                nn.ReLU(inplace=True),
+            )
 
     def forward(self, inputs):
         outputs = self.dcbr_unit(inputs)
@@ -169,10 +182,10 @@ class deconv2DBatchNormRelu(nn.Module):
 
 
 class segnetDown2(nn.Module):
-    def __init__(self, in_size, out_size, withFeatureMap=False):
+    def __init__(self, in_size, out_size, withFeatureMap=False, bn=True):
         super(segnetDown2, self).__init__()
-        self.conv1 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
-        self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
+        self.conv1 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1, is_batchnorm=bn)
+        self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1, is_batchnorm=bn)
         self.maxpool_with_argmax = nn.MaxPool2d(2, 2, return_indices=True)
         self.withFeatureMap = withFeatureMap
 
@@ -188,11 +201,11 @@ class segnetDown2(nn.Module):
 
 
 class segnetDown3(nn.Module):
-    def __init__(self, in_size, out_size, withFeatureMap=False):
+    def __init__(self, in_size, out_size, withFeatureMap=False, bn=True):
         super(segnetDown3, self).__init__()
-        self.conv1 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
-        self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
-        self.conv3 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
+        self.conv1 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1, is_batchnorm=bn)
+        self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1, is_batchnorm=bn)
+        self.conv3 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1, is_batchnorm=bn)
         self.maxpool_with_argmax = nn.MaxPool2d(2, 2, return_indices=True)
         self.withFeatureMap = withFeatureMap
 
@@ -209,22 +222,22 @@ class segnetDown3(nn.Module):
 
 
 class segnetUp2(nn.Module):
-    def __init__(self, in_size, out_size, last_layer=False, withSkipConnections=False):
+    def __init__(self, in_size, out_size, last_layer=False, withSkipConnections=False, bn=True):
         super().__init__()
         self.withSkipConnections = withSkipConnections
         self.unpool = nn.MaxUnpool2d(2, 2)
         if self.withSkipConnections:
-            self.conv1 = deconv2DBatchNormRelu(2 * in_size, 2 * in_size, 3, 1, 1)
+            self.conv1 = deconv2DBatchNormRelu(2 * in_size, 2 * in_size, 3, 1, 1, is_batchnorm=bn)
             if last_layer:
                 self.conv2 = nn.ConvTranspose2d(in_channels=2 * in_size, out_channels=out_size, kernel_size=3, padding=1, stride=1)
             else:
-                self.conv2 = deconv2DBatchNormRelu(2 * in_size, out_size, 3, 1, 1)
+                self.conv2 = deconv2DBatchNormRelu(2 * in_size, out_size, 3, 1, 1, is_batchnorm=bn)
         else:
-            self.conv1 = deconv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
+            self.conv1 = deconv2DBatchNormRelu(in_size, in_size, 3, 1, 1, is_batchnorm=bn)
             if last_layer:
                 self.conv2 = nn.ConvTranspose2d(in_channels=in_size, out_channels=out_size, kernel_size=3, padding=1, stride=1)
             else:
-                self.conv2 = deconv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
+                self.conv2 = deconv2DBatchNormRelu(in_size, out_size, 3, 1, 1, is_batchnorm=bn)
 
     def forward(self, inputs, indices, output_shape, SkipFeatureMap=None):
         if self.withSkipConnections and SkipFeatureMap is None:
@@ -240,18 +253,18 @@ class segnetUp2(nn.Module):
 
 
 class segnetUp3(nn.Module):
-    def __init__(self, in_size, out_size, withSkipConnections=False):
+    def __init__(self, in_size, out_size, withSkipConnections=False, bn=True):
         super().__init__()
         self.withSkipConnections = withSkipConnections
         self.unpool = nn.MaxUnpool2d(2, 2)
         if self.withSkipConnections:
-            self.conv1 = deconv2DBatchNormRelu(2 * in_size, 2 * in_size, 3, 1, 1)
-            self.conv2 = deconv2DBatchNormRelu(2 * in_size, 2 * in_size, 3, 1, 1)
-            self.conv3 = deconv2DBatchNormRelu(2 * in_size, out_size, 3, 1, 1)
+            self.conv1 = deconv2DBatchNormRelu(2 * in_size, 2 * in_size, 3, 1, 1, is_batchnorm=bn)
+            self.conv2 = deconv2DBatchNormRelu(2 * in_size, 2 * in_size, 3, 1, 1, is_batchnorm=bn)
+            self.conv3 = deconv2DBatchNormRelu(2 * in_size, out_size, 3, 1, 1, is_batchnorm=bn)
         else:
-            self.conv1 = deconv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
-            self.conv2 = deconv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
-            self.conv3 = deconv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
+            self.conv1 = deconv2DBatchNormRelu(in_size, in_size, 3, 1, 1, is_batchnorm=bn)
+            self.conv2 = deconv2DBatchNormRelu(in_size, in_size, 3, 1, 1, is_batchnorm=bn)
+            self.conv3 = deconv2DBatchNormRelu(in_size, out_size, 3, 1, 1, is_batchnorm=bn)
 
     def forward(self, inputs, indices, output_shape, SkipFeatureMap=None):
         if self.withSkipConnections and SkipFeatureMap is None:

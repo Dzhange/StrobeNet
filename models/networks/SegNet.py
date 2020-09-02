@@ -4,22 +4,22 @@ from models.networks.modules import *
 
 class SegNet(nn.Module):
     def __init__(self, output_channels=8, input_channels=3,
-                 pretrained=True, withSkipConnections=True):
+                 pretrained=True, withSkipConnections=True, bn=True):
         super().__init__()
 
         self.in_channels = input_channels
         self.withSkipConnections = withSkipConnections
-        self.down1 = segnetDown2(self.in_channels, 64, withFeatureMap=self.withSkipConnections)
-        self.down2 = segnetDown2(64, 128, withFeatureMap=self.withSkipConnections)
-        self.down3 = segnetDown3(128, 256, withFeatureMap=self.withSkipConnections)
-        self.down4 = segnetDown3(256, 512, withFeatureMap=self.withSkipConnections)
-        self.down5 = segnetDown3(512, 512, withFeatureMap=self.withSkipConnections)
+        self.down1 = segnetDown2(self.in_channels, 64, withFeatureMap=self.withSkipConnections, bn=bn)
+        self.down2 = segnetDown2(64, 128, withFeatureMap=self.withSkipConnections, bn=bn)
+        self.down3 = segnetDown3(128, 256, withFeatureMap=self.withSkipConnections, bn=bn)
+        self.down4 = segnetDown3(256, 512, withFeatureMap=self.withSkipConnections, bn=bn)
+        self.down5 = segnetDown3(512, 512, withFeatureMap=self.withSkipConnections, bn=bn)
 
-        self.up5 = segnetUp3(512, 512, withSkipConnections=self.withSkipConnections)
-        self.up4 = segnetUp3(512, 256, withSkipConnections=self.withSkipConnections)
-        self.up3 = segnetUp3(256, 128, withSkipConnections=self.withSkipConnections)
-        self.up2 = segnetUp2(128, 64, withSkipConnections=self.withSkipConnections)
-        self.up1 = segnetUp2(64, output_channels, last_layer=True, withSkipConnections=self.withSkipConnections)
+        self.up5 = segnetUp3(512, 512, withSkipConnections=self.withSkipConnections, bn=bn)
+        self.up4 = segnetUp3(512, 256, withSkipConnections=self.withSkipConnections, bn=bn)
+        self.up3 = segnetUp3(256, 128, withSkipConnections=self.withSkipConnections, bn=bn)
+        self.up2 = segnetUp2(128, 64, withSkipConnections=self.withSkipConnections, bn=bn)
+        self.up1 = segnetUp2(64, output_channels, last_layer=True, withSkipConnections=self.withSkipConnections, bn=bn)
 
         if pretrained:
             vgg16 = models.vgg16(pretrained=True)

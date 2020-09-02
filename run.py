@@ -62,7 +62,7 @@ if task == "pretrain":
 if task == "nocs":
     objective = L2MaskLoss()
 if task == "joints":
-    pass 
+    pass
 
 get_loaders(Dataset)
 

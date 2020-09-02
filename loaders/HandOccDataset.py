@@ -34,7 +34,7 @@ class HandOccDataset(torch.utils.data.Dataset):
         self.required = required
         self.frame_load_str = frame_load_str
 
-        self.occ_load_str = ['boundary_0.1_samples','boundary_0.01_samples']
+        self.occ_load_str = ['boundary_0.1_samples', 'boundary_0.01_samples']
         self.sample_distribt = np.array([0.5, 0.5])
         self.num_sample_points = 50000
         self.num_samples = np.rint(self.sample_distribt * self.num_sample_points).astype(np.uint32)

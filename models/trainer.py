@@ -75,9 +75,9 @@ class Trainer:
                 val_losses = self.validate()
                 self.model.val_loss_history.append(np.mean(np.asarray(val_losses)))
                 ########################## SAVE CHECKPOINT ##############################
-                if cur_epoch % self.config.SAVE_FREQ == 0 and cur_epoch > 0:
+                if (cur_epoch + 1) % self.config.SAVE_FREQ == 0 and cur_epoch > 0:
                     
-                    print("[ INFO ]: Save checkpoint for epoch {}.".format(cur_epoch))                    
+                    print("[ INFO ]: Save checkpoint for epoch {}.".format(cur_epoch + 1))
                     self.model.save_checkpoint(cur_epoch, print_str='~'*3)                        
                 
                 cur_epoch += 1

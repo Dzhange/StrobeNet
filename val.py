@@ -45,7 +45,6 @@ if task == "pretrain":
 if task == "nocs":
     objective = L2MaskLoss()
 
-
 # prepare dataset
 # DatasetClass = get_dataset(cfg.DATASET)
 dataloader_dict = dict()

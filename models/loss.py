@@ -1,6 +1,8 @@
+import os
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
+# from utils.DataUtils import *
 
 class L2Loss(nn.Module):
     def __init__(self):
@@ -255,6 +257,17 @@ class LBSLoss(nn.Module):
         self.bone_num = bone_num
         self.l2_loss = JiahuiL2Loss()
 
+
+        self.expt_dir_path = os.path.join(self.cfg.OUTPUT_DIR, self.cfg.EXPT_NAME)
+        if os.path.exists(self.expt_dir_path) == False:
+            os.makedirs(self.expt_dir_path)
+
+        self.output_dir = os.path.join(self.expt_dir_path, "Check")
+        if os.path.exists(self.output_dir) == False:
+            os.makedirs(self.output_dir)
+        
+        self.frame_id = 0
+
     def forward(self, output, target):
         bone_num = self.bone_num
         loss = torch.Tensor([0]).to(device=output.device)
@@ -284,23 +297,31 @@ class LBSLoss(nn.Module):
         skin_bound_loss = torch.max(torch.zeros(1).to(device=skin_sum.device), skin_sum-1).mean()
         # loc_map_loss = self.masked_l2_loss(pred_loc_map, tar_loc_map, target_mask)
         loc_map_loss = self.l2_loss(pred_loc_map, tar_loc_map, target_mask)
-        rot_map_loss = self.masked_l2_loss(pred_rot_map, tar_rot_map, target_mask)
+        # rot_map_loss = self.masked_l2_loss(pred_rot_map, tar_rot_map, target_mask)
 
         joint_loc_loss = self.pose_nocs_loss(pred_loc_map,
                                             pred_joint_score,
                                             target_mask,
                                             tar_loc)
-        joint_rot_loss = self.pose_nocs_loss(pred_rot_map,
-                                            pred_joint_score,
-                                            target_mask,
-                                            tar_rot)
+        # joint_rot_loss = self.pose_nocs_loss(pred_rot_map,
+        #                                     pred_joint_score,
+        #                                     target_mask,
+        #                                     tar_rot)
+        
+        vis = 0
+        if vis:
+            self.vis_joint_loc(tar_loc_map, target_mask, self.frame_id)
+            self.frame_id += 1
+            if self.frame_id == 80:
+                import sys
+                sys.exit()
 
         if self.cfg.SKIN_LOSS:
             loss += skin_loss
         if self.cfg.LOC_MAP_LOSS:
             loss += loc_map_loss
         if self.cfg.LOC_LOSS:
-            loss += joint_loc_loss
+            loss += joint_loc_loss * 20
 
         return loss
 
@@ -331,30 +352,69 @@ class LBSLoss(nn.Module):
         # get final prediction: score map summarize
         pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
                                                 pred_joint_map.shape[3])  # B,bone_num,3,R,R
-
         pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
-
-        # print(self.sigmoid(pred_joint_score).shape)
-        # print(out_mask.unsqueeze(1).shape)
         pred_joint_score = self.sigmoid(pred_joint_score) * out_mask.unsqueeze(1)
-
         pred_score_map = pred_joint_score / (torch.sum(pred_joint_score.reshape(n_batch, bone_num, -1),
                                                     dim=2, keepdim=True).unsqueeze(3) + 1e-5)
 
         pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
         pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
         joint_diff = torch.sum((pred_joint - tar_joints) ** 2, dim=2)  # B,22
-
         joint_loc_loss = joint_diff.sum() / (n_batch * pred_joint_map.shape[1])
 
         return joint_loc_loss
+
+    def vis_joint_map(self, joint_map, mask, frame_id):
+        """
+        save the inter results of joint predication as RGB image
+        """
+        bone_num = self.bone_num
+        mask = mask.cpu().detach()
+
+        zero_map = torch.zeros(3, joint_map.shape[2], joint_map.shape[3])
+
+        to_cat = ()
+        for i in range(bone_num):
+            cur_bone = joint_map[0, i*3:i*3+3, :, :]
+            gt = gt_joint_map[0, i*3:i*3+3, :, :]
+
+            joint_map = torch.where(mask > 0.7, cur_bone, zero_map)
+            joint_map = torch2np(joint_map) * 255
+
+            to_cat = to_cat + (joint_map, )
+
+        big_img = np.concatenate(to_cat, axis=0)
+        cv2.imwrite(os.path.join(self.output_dir, 'check_{}_pred_joint.png').format(str(frame_id).zfill(3)),
+                        cv2.cvtColor(big_img, cv2.COLOR_BGR2RGB))
+
+    def vis_joint_loc(self, joint_map, mask, frame_id):
+        
+        n_batch = joint_map.shape[0]
+        bone_num = self.bone_num
+        joint_map = joint_map.reshape(n_batch, bone_num, 3, joint_map.shape[2],
+                                                joint_map.shape[3])  # B,bone_num,3,R,R
+        joint_map = joint_map * mask.unsqueeze(1).unsqueeze(1)
+
+        mean_gt_joint = joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
+        mean_gt_joint /= mask.nonzero().shape[0]
+        mean_gt_joint = mean_gt_joint[0]
+
+        mean_gt_path = os.path.join(self.output_dir, 'check_{}_gt_mean_loc.xyz').format(str(frame_id).zfill(3))
+        self.write(mean_gt_path, mean_gt_joint)
+
+    def write(self, path, joint):
+        f = open(path, "a")
+        for i in range(joint.shape[0]):
+            p = joint[i]
+            f.write("{} {} {}\n".format(p[0], p[1], p[2]))
+        f.close()
 
     # def check_map(self, tar_joint_map, out_mask, tar_joints):
     #     n_batch = tar_joint_map.shape[0]
     #     bone_num = self.bone_num
     #     # for i in range(16):
     #         # for j in range(3):
-    #             # print(tar_joint_map[0,i*3+j,0,0], tar_joints[0,i,j])                
+    #             # print(tar_joint_map[0,i*3+j,0,0], tar_joints[0,i,j])
     #     tar_joint_map = tar_joint_map.reshape(n_batch, bone_num, 3, tar_joint_map.shape[2],
     #                                             tar_joint_map.shape[3])  # B,bone_num,3,R,R
     #     tar_joint_map = tar_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
@@ -370,21 +430,21 @@ class LBSSegLoss(LBSLoss):
         super().__init__(cfg, bone_num)
         self.seg_loss = torch.nn.CrossEntropyLoss()
 
-    def forward(self, output, target):        
+    def forward(self, output, target):
         bone_num = self.bone_num
         loss = torch.Tensor([0]).to(device=output.device)
-        
+
         pred_skin_seg = output[:, 4+bone_num*6:4+bone_num*7, :, :].clone().requires_grad_(True)
-        
-        tar_maps = target['maps']        
-        target_mask = tar_maps[:, 3, :, :]        
+
+        tar_maps = target['maps']
+        target_mask = tar_maps[:, 3, :, :]
         tar_skin_seg = tar_maps[:, 4+bone_num*6:4+bone_num*6+1, :, :] ## as Seg
-        
+
         # skin_loss = self.masked_l2_loss(self.sigmoid(pred_skin_weights), tar_skin_weights, target_mask)
         # skin_loss = self.seg_loss(pred_skin_seg, tar_skin_seg.squeeze(1).long().detach())
         input = pred_skin_seg.transpose(1, 2).transpose(2, 3).contiguous().view(-1, bone_num)
         skin_loss = self.seg_loss(input, tar_skin_seg.long().squeeze(1).view(-1))
-    
+
         loss += skin_loss
 
         return loss

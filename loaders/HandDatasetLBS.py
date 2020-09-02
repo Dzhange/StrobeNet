@@ -41,16 +41,19 @@ class HandDatasetLBS(torch.utils.data.Dataset):
 
         if limit <= 0.0 or limit > 100.0:
             raise RuntimeError('Data limit percent has to be >0% and <=100%')
-        self.data_limit = limit 
+        self.data_limit = limit
         if self.required not in self.frame_load_str:
             raise RuntimeError('frame_load_str should contain {}.'.format(self.required))
 
         ######### Add BoneWeights #########
         self.bone_num = 16
-        
-        #change boneweight into segmentation map
-        # self.as_seg = True
-        self.as_seg = False
+
+        # change boneweight into segmentation map
+        self.as_seg = True
+        # self.as_seg = False
+
+        # self.shuffle_in_limit = True
+        self.shuffle_in_limit = False
 
         for i in range(self.bone_num):
             self.frame_load_str.append("BoneWeight00bone_" + str(i))
@@ -127,14 +130,32 @@ class HandDatasetLBS(torch.utils.data.Dataset):
             frame_files_lengths.append(len(cur_frame_files))
 
         if len(set(frame_files_lengths)) != 1:
-            raise RuntimeError('[ ERR ]: Data corrupted. Sizes do not match', frame_files_lengths)
+            raise RuntimeError('[ ERR ]: Data corrupted. Sizes do not match', frame_files_lengths)        
 
-        total_size = len(self)
-        dataset_length = math.ceil((self.data_limit / 100) * total_size)
-        print('[ INFO ]: Loading {} / {} items.'.format(dataset_length, total_size))
+        if self.shuffle_in_limit:
+            total_size = len(self)
+            dataset_length = math.ceil((self.data_limit / 100) * total_size)
+            # DatasetLength = 10
+            step = int(np.floor(100 / self.data_limit))
+            sample_index = []
+            cur_idx = 0
+            while True:
+                if len(sample_index) >= dataset_length or cur_idx >= total_size:
+                    break
+                sample_index.append(cur_idx)
+                cur_idx += step                                    
+            print('[ INFO ]: Loading {} / {} items.'.format(len(sample_index), total_size))
+                        
+            for K in self.frame_files:
+                self.frame_files[K] = [self.frame_files[K][i] for i in sample_index]
+                self.frame_files[K].sort()
+        else:                
+            total_size = len(self)
+            dataset_length = math.ceil((self.data_limit / 100) * total_size)
+            print('[ INFO ]: Loading {} / {} items.'.format(dataset_length, total_size))
 
-        for k in self.frame_files:
-            self.frame_files[k] = self.frame_files[k][:dataset_length]
+            for k in self.frame_files:
+                self.frame_files[k] = self.frame_files[k][:dataset_length]
 
     def load_images(self, idx):
         """
@@ -202,7 +223,6 @@ class HandDatasetLBS(torch.utils.data.Dataset):
                 cnt += 1
 
         load_tuple = load_tuple + (joint_map, )
-        # print(len(load_tuple))
         load_tuple = (load_tuple[0], load_tuple[2], load_tuple[1])
 
         mesh_path = os.path.join(dir, "frame_" + idx_of_frame + '_NOCS_mesh.obj')

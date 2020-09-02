@@ -76,7 +76,7 @@ class DataVisualizer(object):
         vis = o3d.visualization.Visualizer()
         vis.create_window(width=400,height=400,visible=False)
         #don't know why, but seems this direction needs a tiny distortion
-        fronts = [(0,0,1),(0,1.0,1e-6),(1.0,1e-6,0)]
+        fronts = [(0, 0, 1),(0, 1.0, 1e-6),(1.0, 1e-6, 0)]
         for i, path in enumerate(paths):
             mesh = o3d.io.read_triangle_mesh(path)
             mesh.compute_vertex_normals()

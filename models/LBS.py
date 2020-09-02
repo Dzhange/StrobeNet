@@ -6,6 +6,7 @@ import os, shutil
 import glob
 import torch
 import torch.nn as nn
+import trimesh
 from models.networks.SegNet import SegNet as old_SegNet
 from models.networks.say4n_SegNet import SegNet as new_SegNet
 from models.loss import LBSLoss
@@ -17,8 +18,8 @@ class ModelLBSNOCS(object):
     def __init__(self, config):
         self.config = config
         self.lr = config.LR # set learning rate
-        # self.net = new_SegNet(input_channels=3, output_channels=config.OUT_CHANNELS)        
-        self.net = old_SegNet(output_channels=config.OUT_CHANNELS)
+        # self.net = new_SegNet(input_channels=3, output_channels=config.OUT_CHANNELS)
+        self.net = old_SegNet(output_channels=config.OUT_CHANNELS, bn=False)
         # self.objective = LBSLoss()
         # self.objective = LBSLoss()
         self.bone_num = 16
@@ -125,7 +126,7 @@ class ModelLBSNOCS(object):
         self.setup_checkpoint(device)
         self.net.eval()
 
-        num_test_sample = 300
+        num_test_sample = 30
 
         epoch_losses = []
         for i, data in enumerate(val_dataloader, 0):  # Get each batch
@@ -143,7 +144,11 @@ class ModelLBSNOCS(object):
                 self.save_joint_location(output, target, i, self.config.LOC_LOSS)
                 self.visualize_joint_prediction(output, target, i)
                 gt_path = os.path.join(self.output_dir, 'frame_{}_gt.obj').format(str(i).zfill(3))
-                shutil.copyfile(target['mesh'][0], gt_path)
+                mesh = trimesh.load(target['mesh'][0])
+                trimesh.repair.fix_inversion(mesh)
+                mesh.export(gt_path)                
+                # shutil.copyfile(target['mesh'][0], gt_path)
+
         print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
     
     def save_img(self, net_input, output, target, i):
@@ -197,7 +202,6 @@ class ModelLBSNOCS(object):
         bone_num = self.bone_num
         n_batch = output.shape[0]
         pred_joint_map = output[:, 4:4+bone_num*3, :, :]
-         
         # get final prediction: score map summarize
         pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
                                                 pred_joint_map.shape[3])  # B,bone_num,3,R,R
@@ -205,10 +209,22 @@ class ModelLBSNOCS(object):
         pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
 
         # gt
-        gt_joint = target['pose'][0, :, 0:3]
-        gt_path = os.path.join(self.output_dir, 'frame_{}_gt_loc.xyz').format(str(i).zfill(3))        
+        gt_joint = target['pose'][0, :, 0:3]        
+        gt_path = os.path.join(self.output_dir, 'frame_{}_gt_loc.xyz').format(str(i).zfill(3))
         self.write(gt_path, gt_joint)
-        
+
+        # Mean results
+        gt_joint_map = target['maps'][:, 4:4+bone_num*3, :, :]
+        gt_joint_map = gt_joint_map.reshape(n_batch, bone_num, 3, gt_joint_map.shape[2],
+                                                gt_joint_map.shape[3])  # B,bone_num,3,R,R
+        gt_joint_map = gt_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
+
+        mean_gt_joint = gt_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
+        mean_gt_joint /= out_mask.nonzero().shape[0]
+        mean_gt_joint = mean_gt_joint[0]
+        mean_gt_path = os.path.join(self.output_dir, 'frame_{}_gt_mean_loc.xyz').format(str(i).zfill(3))
+        self.write(mean_gt_path, mean_gt_joint)
+
         if use_score:
             # # Vote results
             sigmoid = nn.Sigmoid()
@@ -238,7 +254,7 @@ class ModelLBSNOCS(object):
             print("vote diff is {:5f}".format(joint_loc_loss))
         else:
             mean_joint_diff = torch.sum((mean_pred_joint - gt_joint) ** 2, dim=1)  # B,22
-            mean_joint_loc_loss = mean_joint_diff.sum() / (n_batch * bone_num)            
+            mean_joint_loc_loss = mean_joint_diff.sum() / (n_batch * bone_num)
             print("mean diff is {:5f}".format(mean_joint_loc_loss))
 
     def visualize_joint_prediction(self, output, target, frame_id):
@@ -252,6 +268,7 @@ class ModelLBSNOCS(object):
         
         zero_map = torch.zeros(3, pred_joint_map.shape[2], pred_joint_map.shape[3])
         
+        to_cat = ()
         for i in range(bone_num):
             cur_pred = pred_joint_map[0, i*3:i*3+3, :, :]
             gt = gt_joint_map[0, i*3:i*3+3, :, :]
@@ -260,14 +277,16 @@ class ModelLBSNOCS(object):
             joint_map = torch2np(masked_map) * 255
 
             gt = torch.where(mask > 0.7, gt, zero_map)
-            gt = torch2np(gt) * 255            
+            gt = torch2np(gt) * 255
             
             diff = np.abs(gt-joint_map)
             comb = np.concatenate((gt, joint_map, diff), axis=1)
-            
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_pred_joint_{}.png').format(str(frame_id).zfill(3), i),
-                        cv2.cvtColor(comb, cv2.COLOR_BGR2RGB))
 
+            to_cat = to_cat + (comb, )
+        
+        big_img = np.concatenate(to_cat, axis=0)
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_pred_joint.png').format(str(frame_id).zfill(3)),
+                        cv2.cvtColor(big_img, cv2.COLOR_BGR2RGB))
 
 
     def write(self, path, joint):

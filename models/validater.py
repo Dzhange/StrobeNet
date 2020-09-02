@@ -68,7 +68,6 @@ class Validater:
             print("validating on the {}th data, loss is {}".format(i, loss))
             print("average validation loss is ", np.mean(np.asarray(epoch_losses)))            
             self.save_img(net_input, output[:, 0:4, :, :], target['maps'][:, 0:4, :, :], i)
-            # self.save_mask(output, ta`rget['maps'], i)
             self.save_joint_location(output, target, i)
         print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
 
