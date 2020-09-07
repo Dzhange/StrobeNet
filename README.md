@@ -6,5 +6,3 @@ To avoid previous strange bug, in this version I would try to keep the code simp
 # Update
 
 Now this code functions as the test for new features
-
-

@@ -126,7 +126,7 @@ class ModelLBSNOCS(object):
         self.setup_checkpoint(device)
         self.net.eval()
 
-        num_test_sample = 30
+        num_test_sample = 300
 
         epoch_losses = []
         for i, data in enumerate(val_dataloader, 0):  # Get each batch
@@ -146,7 +146,7 @@ class ModelLBSNOCS(object):
                 gt_path = os.path.join(self.output_dir, 'frame_{}_gt.obj').format(str(i).zfill(3))
                 mesh = trimesh.load(target['mesh'][0])
                 trimesh.repair.fix_inversion(mesh)
-                mesh.export(gt_path)                
+                mesh.export(gt_path)
                 # shutil.copyfile(target['mesh'][0], gt_path)
 
         print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
@@ -209,7 +209,7 @@ class ModelLBSNOCS(object):
         pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
 
         # gt
-        gt_joint = target['pose'][0, :, 0:3]        
+        gt_joint = target['pose'][0, :, 0:3]
         gt_path = os.path.join(self.output_dir, 'frame_{}_gt_loc.xyz').format(str(i).zfill(3))
         self.write(gt_path, gt_joint)
 
@@ -251,11 +251,11 @@ class ModelLBSNOCS(object):
         if use_score:
             joint_diff = torch.sum((pred_joint - gt_joint) ** 2, dim=1)  # B,22
             joint_loc_loss = joint_diff.sum() / (n_batch * bone_num)
-            print("vote diff is {:5f}".format(joint_loc_loss))
+            print("[ DIFF ] vote diff is {:5f}".format(joint_loc_loss))
         else:
             mean_joint_diff = torch.sum((mean_pred_joint - gt_joint) ** 2, dim=1)  # B,22
             mean_joint_loc_loss = mean_joint_diff.sum() / (n_batch * bone_num)
-            print("mean diff is {:5f}".format(mean_joint_loc_loss))
+            print("[ DIFF ] mean diff is {:5f}".format(mean_joint_loc_loss))
 
     def visualize_joint_prediction(self, output, target, frame_id):
         """

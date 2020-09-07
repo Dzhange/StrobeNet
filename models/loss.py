@@ -322,7 +322,9 @@ class LBSLoss(nn.Module):
             loss += loc_map_loss
         if self.cfg.LOC_LOSS:
             loss += joint_loc_loss * 20
-
+        
+        # print("[ DIFF ] map_loss is {:5f}; loc_loss is {:5f}".format(loc_map_loss, joint_loc_loss))
+        
         return loss
 
     def masked_l2_loss(self, out, tar, mask):
@@ -359,8 +361,13 @@ class LBSLoss(nn.Module):
 
         pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
         pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
+        
         joint_diff = torch.sum((pred_joint - tar_joints) ** 2, dim=2)  # B,22
         joint_loc_loss = joint_diff.sum() / (n_batch * pred_joint_map.shape[1])
+
+        # joint_diff = pred_joint - tar_joints
+        # diff_norm = torch.norm(joint_diff, p=2, dim=1)  # Same size as WxH
+        # joint_loc_loss = torch.mean(diff_norm)
 
         return joint_loc_loss
 

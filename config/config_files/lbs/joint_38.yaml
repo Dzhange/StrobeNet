@@ -15,15 +15,18 @@ EPOCH_TOTAL: 100
 
 LR: 1e-4
 
-SAVE_FREQ: 1
-DATA_LIMIT: 100
+SAVE_FREQ: 5
+DATA_LIMIT: 1
 IMAGE_SIZE: (320,240)
 MODEL_INIT_PATH: ['log/hand_nocsreg_epoch_31.model']
 TARGETS: "nox00"
-TASK: "lbs_seg"
+TASK: "lbs"
 OUT_CHANNELS: 132
 
 TEST_ON_TRAIN: True
 
-EXPT_NAME: "seg_31" # trainded on larger datset
-GPU: 3
+LOC_LOSS: True
+LOC_MAP_LOSS: True
+
+EXPT_NAME: "joint_38" #Try to fit another pose, offset 1000
+GPU: 2

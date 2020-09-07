@@ -39,6 +39,9 @@ class HandDatasetLBS(torch.utils.data.Dataset):
         self.frame_load_str = frame_load_str
         self.rel = rel # use relative pose or the global pose?
 
+        self.data_offset = 0
+        # self.data_offset = 2000
+
         if limit <= 0.0 or limit > 100.0:
             raise RuntimeError('Data limit percent has to be >0% and <=100%')
         self.data_limit = limit
@@ -97,14 +100,22 @@ class HandDatasetLBS(torch.utils.data.Dataset):
             file_path = os.path.join(self.dataset_dir, 'val/')
 
         # Load index for data 
-        camera_idx_str = '*'
+        # camera_idx_str = '*'
+        camera_idx_str = '00'
+        # camera_idx_str = ['00', '01', '02', '03']
+
         prepend_list = []
         for i in self.frame_load_str:
             if "Bone" not in i:
                 prepend_list.append(i)
         prepend_list.append("LBS")
+
         glob_prepend = '_'.join(prepend_list)
-        glob_cache = os.path.join(file_path, 'all_glob_' + glob_prepend + '.cache')
+        if camera_idx_str == '*':
+            glob_cache = os.path.join(file_path, 'all_glob_' + glob_prepend + '.cache')
+        else:            
+            glob_cache = os.path.join(file_path, 'glob_' + camera_idx_str + '_' + glob_prepend + '.cache')
+            
         if os.path.exists(glob_cache):
             # use pre-cached index
             print('[ INFO ]: Loading from glob cache:', glob_cache)
@@ -155,14 +166,18 @@ class HandDatasetLBS(torch.utils.data.Dataset):
             print('[ INFO ]: Loading {} / {} items.'.format(dataset_length, total_size))
 
             for k in self.frame_files:
-                self.frame_files[k] = self.frame_files[k][:dataset_length]
+                if self.data_limit > 10:
+                    self.frame_files[k] = self.frame_files[k][:dataset_length]
+                else:
+                    # offset only works for overfitting task
+                    self.frame_files[k] = self.frame_files[k][self.data_offset:self.data_offset+dataset_length]
 
     def load_images(self, idx):
         """
         actual implementation of __getitem__
         """
         typical_path = self.frame_files['color00'][idx]
-        # print('Typical is ',typical_path)
+
         dir = os.path.dirname(typical_path)
         file_name = os.path.basename(typical_path)
         idx_of_frame = find_frame_num(file_name)

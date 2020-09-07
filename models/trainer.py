@@ -38,12 +38,11 @@ class Trainer:
                 tic = getCurrentEpochTime()
                 # for data in self.train_data_loader:
                 for i, data in enumerate(self.train_data_loader, 0):  # Get each batch          
-                    # break                      
+                    # break
                     ################### START WEIGHT UPDATE ################################
                     self.model.optimizer.zero_grad()
                     net_input, target = self.model.preprocess(data, self.device)
                     output = self.model.net(net_input)
-                    
                     loss = self.objective(output, target)
                     loss.backward()
                     self.model.optimizer.step()
