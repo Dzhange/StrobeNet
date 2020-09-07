@@ -27,7 +27,6 @@ def caculate_align_mat(pVec_Arr):
     qTrans_Mat *= scale
     return qTrans_Mat
 
-
 def create_arrow_my(scale=1):
     """
     Create an arrow in for Open3D
@@ -47,9 +46,7 @@ def create_arrow_my(scale=1):
 def get_arrow_my(orig, vec):
     
     mesh_arrow = create_arrow_my(1)
-    # print(vec)
     rot_mat = caculate_align_mat(vec)
-    # print(rot_mat)
     mesh_arrow.rotate(rot_mat, center=[0,0,0])
     mesh_arrow.translate(orig)
     return mesh_arrow
@@ -68,21 +65,14 @@ def render(mesh_file, pose_file):
 
     joints = o3d.geometry.PointCloud(
         points=o3d.utility.Vector3dVector(location)
-        # points=o3d.utility.Vector3dVector(direction)        
     )
 
     bones = []
     # convert all joint directions into arrows for vis
-    for i in range(pose.shape[0]):
-        print(direction[i])
+    for i in range(pose.shape[0]):        
         bones.append(
             get_arrow_my(location[i], vec=direction[i])
         )
-    
-    # diff = np.array(bones[2].vertices) - np.array(bones[0].vertices)
-    diff= direction[2] - direction[1]
-    print(direction[1])
-
     output_dir = "./"
     if 1:
         vis = o3d.visualization.Visualizer()
@@ -109,11 +99,7 @@ def render(mesh_file, pose_file):
                                 "{}.png".format(j))
                 vis.capture_screen_image(output_path)
         else:
-            vis.run()
-        # vis.destroy_window()
-        # vis = o3d.visualization.Visualizer()
-        # vis.create_window(width=400,height=400,visible=True)
-        # vis.run()
+            vis.run()        
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='NOCSMapModule to visualize NOCS maps and camera poses.', fromfile_prefix_chars='@')
