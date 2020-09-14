@@ -3,6 +3,10 @@ import open3d as o3d
 import numpy as np
 import argparse
 
+
+show_frame = True
+cap = True
+
 def get_cross_prod_mat(pVec_Arr):
     # pVec_Arr shape (3)
     qCross_prod_mat = np.array([
@@ -44,7 +48,6 @@ def create_arrow_my(scale=1):
     return mesh_frame
 
 def get_arrow_my(orig, vec):
-    
     mesh_arrow = create_arrow_my(1)
     rot_mat = caculate_align_mat(vec)
     mesh_arrow.rotate(rot_mat, center=[0,0,0])
@@ -52,29 +55,40 @@ def get_arrow_my(orig, vec):
     return mesh_arrow
 
 def render(mesh_file, pose_file):
-
     mesh = o3d.io.read_triangle_mesh(mesh_file)
     mesh.compute_vertex_normals()
-    
+    print(mesh_file)
     frame = o3d.geometry.LineSet()
     frame = frame.create_from_triangle_mesh(mesh)
-    
+
     pose = np.loadtxt(pose_file)
     location = pose[:, 0:3]
     direction = pose[:, 3:6]
+    parents = pose[:, 6]
 
-    joints = o3d.geometry.PointCloud(
-        points=o3d.utility.Vector3dVector(location)
+    line = []
+    for i, p in enumerate(parents):
+        if p >= 0:
+            line.append([i,p])
+
+    skeleton = o3d.geometry.LineSet(
+        points=o3d.utility.Vector3dVector(location),
+        lines=o3d.utility.Vector2iVector(line)
     )
 
     bones = []
     # convert all joint directions into arrows for vis
     for i in range(pose.shape[0]):        
-        bones.append(
-            get_arrow_my(location[i], vec=direction[i])
+        scale = np.linalg.norm(direction[i])
+        vec = direction[i] / scale
+        
+        bones.append(            
+            get_arrow_my(location[i], vec=vec)
         )
-    output_dir = "./"
-    if 1:
+
+    output_dir = "./"    
+    debug = 0
+    if not debug:
         vis = o3d.visualization.Visualizer()
         # vis.create_window(width=400,height=400,visible=False)
         vis.create_window(width=400,height=400,visible=True)
@@ -82,12 +96,14 @@ def render(mesh_file, pose_file):
         fronts = [(0, 0, 1),(0, 1.0, 1e-6),(1.0, 1e-6, 0)]
         ctr = vis.get_view_control()
         
-        # vis.add_geometry(frame)
-        vis.add_geometry(joints)
-        for bone in bones:
-            vis.add_geometry(bone)
+        if show_frame:
+            vis.add_geometry(frame)
 
-        cap = 1
+        vis.add_geometry(skeleton)
+        # for bone in bones:
+            # vis.add_geometry(bone)
+
+        
         if cap:
             for j, front in enumerate(fronts):            
                 ctr.set_front(front)
@@ -104,11 +120,23 @@ def render(mesh_file, pose_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='NOCSMapModule to visualize NOCS maps and camera poses.', fromfile_prefix_chars='@')
     arg_group = parser.add_argument_group()    
-    arg_group.add_argument('--path', '-p', help='path to the pose file to be visualized', required=True, default=None)
+    arg_group.add_argument('--path', '-p', help='path to the pose file to be visualized', required=False, default=None)
 
     args, _ = parser.parse_known_args()
     
-    pose_file = args.path
-    mesh_file = args.path.replace('hpose_glob.txt', 'NOCS_mesh.obj')
+    # pose_file = args.path
+    
+    nocs = 0
+    # show_frame = False
+    cap = False
+
+    if nocs:
+        pose_file = "D:/GuibasLab/Data/pose/0000/frame_00000000_hpose_nocs.txt"
+        mesh_file = pose_file.replace('hpose_nocs.txt', 'NOCS_mesh.obj')
+    else:
+        pose_file = "D:/GuibasLab/Data/pose/0000/frame_00000000_hpose_glob.txt"
+        mesh_file = pose_file.replace('hpose_glob.txt', 'World_mesh.obj')
+
+    
 
     render(mesh_file, pose_file)
