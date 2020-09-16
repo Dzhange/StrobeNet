@@ -1,35 +1,31 @@
 import torch.nn as nn
 import torchvision.models as models
+import os, sys
+FileDirPath = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.join(FileDirPath, '..'))
+sys.path.append(os.path.join(FileDirPath, '../..'))
 from models.networks.modules import *
 
-class MultiHeadSegNet(nn.Module):
-    """
-    This is an updated, multi-functional version of SegNet    
-    """
-    
+class MHSegNet(nn.Module):
+    def __init__(self, nocs_channels=4+64, pose_channels=48+48+16+16, input_channels=3,
+                 pretrained=True, withSkipConnections=True, bn=True):
 
-    def __init__(self, input_channels=3, outputs=(4), 
-                 pretrained=True, withSkipConnections=True):
-        super().__init__()        
+        super().__init__()
         self.in_channels = input_channels
         self.withSkipConnections = withSkipConnections
+        self.down1 = segnetDown2(self.in_channels, 64, withFeatureMap=self.withSkipConnections, bn=bn)
+        self.down2 = segnetDown2(64, 128, withFeatureMap=self.withSkipConnections, bn=bn)
+        self.down3 = segnetDown3(128, 256, withFeatureMap=self.withSkipConnections, bn=bn)
+        self.down4 = segnetDown3(256, 512, withFeatureMap=self.withSkipConnections, bn=bn)
+        self.down5 = segnetDown3(512, 512, withFeatureMap=self.withSkipConnections, bn=bn)
 
-        self.down1 = segnetDown2(self.in_channels, 64, withFeatureMap=self.withSkipConnections)
-        self.down2 = segnetDown2(64, 128, withFeatureMap=self.withSkipConnections)
-        self.down3 = segnetDown3(128, 256, withFeatureMap=self.withSkipConnections)
-        self.down4 = segnetDown3(256, 512, withFeatureMap=self.withSkipConnections)
-        self.down5 = segnetDown3(512, 512, withFeatureMap=self.withSkipConnections)
+        self.up5 = segnetUp3(512, 512, withSkipConnections=self.withSkipConnections, bn=bn)
+        self.up4 = segnetUp3(512, 256, withSkipConnections=self.withSkipConnections, bn=bn)
+        self.up3 = segnetUp3(256, 128, withSkipConnections=self.withSkipConnections, bn=bn)
+        self.up2 = segnetUp2(128, 64, withSkipConnections=self.withSkipConnections, bn=bn)
 
-        self.up5 = segnetUp3(512, 512, withSkipConnections=self.withSkipConnections)
-        self.up4 = segnetUp3(512, 256, withSkipConnections=self.withSkipConnections)
-        self.up3 = segnetUp3(256, 128, withSkipConnections=self.withSkipConnections)
-        self.up2 = segnetUp2(128, 64, withSkipConnections=self.withSkipConnections)
-        
-        self.heads = []
-        for output_channels in outputs:        
-            self.heads.append(
-                segnetUp2(64, output_channels, last_layer=True, withSkipConnections=self.withSkipConnections)
-            )
+        self.nocs_head = segnetUp2(64, nocs_channels, last_layer=True, withSkipConnections=self.withSkipConnections, bn=bn)
+        self.pose_head = segnetUp2(64, pose_channels, last_layer=True, withSkipConnections=self.withSkipConnections, bn=bn)        
 
         if pretrained:
             vgg16 = models.vgg16(pretrained=True)
@@ -50,14 +46,12 @@ class MultiHeadSegNet(nn.Module):
         up4 = self.up4(up5, indices_4, unpool_shape4, SkipFeatureMap=FM4)
         up3 = self.up3(up4, indices_3, unpool_shape3, SkipFeatureMap=FM3)
         up2 = self.up2(up3, indices_2, unpool_shape2, SkipFeatureMap=FM2)
-        
-        outputs = []
-        for head in self.heads:
-            outputs.append(
-                head(up2, indices_1, unpool_shape1, SkipFeatureMap=FM1)
-            )
-        
-        return torch.cat(outputs)
+
+        nocs_output = self.nocs_head(up2, indices_1, unpool_shape1, SkipFeatureMap=FM1)
+        pose_output = self.pose_head(up2, indices_1, unpool_shape1, SkipFeatureMap=FM1)
+
+        output = torch.cat((nocs_output, pose_output), dim=1)
+        return output
 
     def init_vgg16_params(self, vgg16):
         blocks = [self.down1, self.down2, self.down3, self.down4, self.down5]
@@ -97,7 +91,7 @@ class MultiHeadSegNet(nn.Module):
 if __name__ == '__main__':
     import torch
 
-    net = SegNet(withSkipConnections=True, output_channels=8).cuda()
+    net = MHSegNet(withSkipConnections=True).cuda()
     x = torch.rand(2, 3, 640, 480).cuda()
     y = net(x)
     print(y.shape)

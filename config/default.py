@@ -78,5 +78,7 @@ def get_default_cfg():
     cfg.SKIN_LOSS = False
     cfg.LOC_LOSS = False
     cfg.LOC_MAP_LOSS = False
+    cfg.POSE_LOSS = False
+    cfg.POSE_MAP_LOSS = False
 
     return cfg

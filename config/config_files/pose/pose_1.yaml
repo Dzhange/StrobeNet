@@ -25,8 +25,8 @@ OUT_CHANNELS: 132 #4 + 48 + 48 + 16 + 16
 
 TEST_ON_TRAIN: True
 
-LOC_LOSS: True
-LOC_MAP_LOSS: True
+POSE_LOSS: True
+POSE_MAP_LOSS: True
 
-EXPT_NAME: "joint_44" # Try to fit 2 pose, offset 0, scale 10!
+EXPT_NAME: "pose_1"
 GPU: 2

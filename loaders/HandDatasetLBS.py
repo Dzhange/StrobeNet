@@ -37,7 +37,7 @@ class HandDatasetLBS(torch.utils.data.Dataset):
         self.img_size = img_size
         self.required = required
         self.frame_load_str = frame_load_str
-        self.rel = rel # use relative pose or the global pose?
+        # self.rel = rel # use relative pose or the global pose?
 
         self.data_offset = 0
         # self.data_offset = 2000
@@ -181,10 +181,12 @@ class HandDatasetLBS(torch.utils.data.Dataset):
         dir = os.path.dirname(typical_path)
         file_name = os.path.basename(typical_path)
         idx_of_frame = find_frame_num(file_name)
-        if self.rel == True:
-            rel_pose_path = os.path.join(dir, "frame_" + idx_of_frame + '_hpose_rel.txt')
-        else:
-            rel_pose_path = os.path.join(dir, "frame_" + idx_of_frame + '_hpose_rel.txt')
+        
+        # if self.rel == True:
+        rel_pose_path = os.path.join(dir, "frame_" + idx_of_frame + '_hpose_nocs.txt')
+        # else:
+        #     rel_pose_path = os.path.join(dir, "frame_" + idx_of_frame + '_hpose_world.txt')
+        
         pose = torch.Tensor(np.loadtxt(rel_pose_path))
 
         frame = {}

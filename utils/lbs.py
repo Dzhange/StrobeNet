@@ -122,45 +122,56 @@ def batch_rigid_transform(rot_mats, joints, parents, dtype=torch.float32):
     
     # transform_chain = [transforms_mat[:, 0]] #Add root transform
     
-    if 0:
-        transform_chain = [transforms_mat[:, 0]]
-        for i in range(1, parents.shape[0]):
-            # Subtract the joint location at the rest pose
-            # No need for rotation, since it's identity when at rest
-            curr_res = torch.matmul(transform_chain[parents[i]],
-                                    transforms_mat[:, i])
-            transform_chain.append(curr_res)
-    else:
-        bone_num = joints.shape[1]
-        got = np.array([0]*bone_num)
-        got[0] = 1
+    bone_num = joints.shape[1]
+    transform_chain = [0]*bone_num    
+    
+    # order for leapmotion hand
+    order = (0 ,1, 3, 2, 4, 13, 12, 5, 11, 10, 6, 9, 8, 7, 15, 14)
 
-        transform_chain = [0]*bone_num
-        transform_chain[0] = transforms_mat[:, 0]
-        
-        while got.sum() != bone_num:
-            for i in range(1,bone_num):                
-                # if parents isn't transformed                
-                if got[parents[i]] == 0:                    
-                    continue
-                # if parents has value
-                elif got[i] == 0 :
-                    # set current joint valid                    
-                    got[i] += 1                    
-                    curr_res = torch.matmul(transform_chain[parents[i]],
-                                    transforms_mat[:, i])
-                    transform_chain[i] = curr_res                    
-                else:
-                    continue
-        
-        ##debug 
-        if 0:
-            for i in range(bone_num):
-                print(i, "th ")
-                print(transforms_mat[:, i])
-                print(transform_chain[i])
+    transform_chain[0] = transforms_mat[:, 0]
+    assert len(order) == bone_num
+    for i in range(1, bone_num):
+        index = order[i]
+        curr_res = torch.matmul(transform_chain[parents[index]],
+                                transforms_mat[:, index])
+        transform_chain[index] = curr_res
+    
+    # if 0:
+    #     transform_chain = [transforms_mat[:, 0]]
+    #     for i in range(1, parents.shape[0]):
+    #         # Subtract the joint location at the rest pose
+    #         # No need for rotation, since it's identity when at rest
+    #         curr_res = torch.matmul(transform_chain[parents[i]],
+    #                                 transforms_mat[:, i])
+    #         transform_chain.append(curr_res)
+    # else:
+    #     bone_num = joints.shape[1]
+    #     got = np.array([0]*bone_num)
+    #     got[0] = 1
 
+    #     transform_chain = [0]*bone_num
+    #     transform_chain[0] = transforms_mat[:, 0]
 
+    #     while got.sum() != bone_num:
+    #         for i in range(1,bone_num):
+    #             # if parents isn't transformed                
+    #             if got[parents[i]] == 0:
+    #                 continue
+    #             # if parents has value
+    #             elif got[i] == 0:
+    #                 # set current joint valid                    
+    #                 got[i] += 1                    
+    #                 curr_res = torch.matmul(transform_chain[parents[i]],
+    #                                 transforms_mat[:, i])
+    #                 transform_chain[i] = curr_res                    
+    #             else:
+    #                 continue        
+    #     ##debug 
+    #     if 0:
+    #         for i in range(bone_num):
+    #             print(i, "th ")
+    #             print(transforms_mat[:, i])
+    #             print(transform_chain[i])
     
     transforms = torch.stack(transform_chain, dim=1)    
 

@@ -257,7 +257,6 @@ class LBSLoss(nn.Module):
         self.bone_num = bone_num
         self.l2_loss = JiahuiL2Loss()
 
-
         self.expt_dir_path = os.path.join(self.cfg.OUTPUT_DIR, self.cfg.EXPT_NAME)
         if os.path.exists(self.expt_dir_path) == False:
             os.makedirs(self.expt_dir_path)
@@ -297,16 +296,16 @@ class LBSLoss(nn.Module):
         skin_bound_loss = torch.max(torch.zeros(1).to(device=skin_sum.device), skin_sum-1).mean()
         # loc_map_loss = self.masked_l2_loss(pred_loc_map, tar_loc_map, target_mask)
         loc_map_loss = self.l2_loss(pred_loc_map, tar_loc_map, target_mask)
-        # rot_map_loss = self.masked_l2_loss(pred_rot_map, tar_rot_map, target_mask)
+        rot_map_loss = self.masked_l2_loss(pred_rot_map, tar_rot_map, target_mask)
 
         joint_loc_loss = self.pose_nocs_loss(pred_loc_map,
                                             pred_joint_score,
                                             target_mask,
                                             tar_loc)
-        # joint_rot_loss = self.pose_nocs_loss(pred_rot_map,
-        #                                     pred_joint_score,
-        #                                     target_mask,
-        #                                     tar_rot)
+        joint_rot_loss = self.pose_nocs_loss(pred_rot_map,
+                                            pred_joint_score,
+                                            target_mask,
+                                            tar_rot)
         
         vis = 0
         if vis:
@@ -322,7 +321,10 @@ class LBSLoss(nn.Module):
             loss += loc_map_loss
         if self.cfg.LOC_LOSS:
             loss += joint_loc_loss * 20
-        
+        if self.cfg.POSE_MAP_LOSS:
+            loss += rot_map_loss
+        if self.cfg.POSE_LOSS:
+            loss += joint_rot_loss * 20
         # print("[ DIFF ] map_loss is {:5f}; loc_loss is {:5f}".format(loc_map_loss, joint_loc_loss))
         
         return loss
@@ -455,8 +457,6 @@ class LBSSegLoss(LBSLoss):
         loss += skin_loss
 
         return loss
-
-
 
 class Discarded_LBSLoss(nn.Module):
     Thresh = 0.7 # PARAM
