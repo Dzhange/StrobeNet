@@ -126,8 +126,8 @@ def batch_rigid_transform(rot_mats, joints, parents, dtype=torch.float32):
     transform_chain = [0]*bone_num    
     
     # order for leapmotion hand
-    order = (0 ,1, 3, 2, 4, 13, 12, 5, 11, 10, 6, 9, 8, 7, 15, 14)
-
+    # order = (0 ,1, 3, 2, 4, 13, 12, 5, 11, 10, 6, 9, 8, 7, 15, 14)
+    order = (0 ,1, 3, 2, 5, 13, 12, 4, 11, 10, 6, 9, 8, 7, 15, 14)
     transform_chain[0] = transforms_mat[:, 0]
     assert len(order) == bone_num
     for i in range(1, bone_num):
@@ -135,7 +135,7 @@ def batch_rigid_transform(rot_mats, joints, parents, dtype=torch.float32):
         curr_res = torch.matmul(transform_chain[parents[index]],
                                 transforms_mat[:, index])
         transform_chain[index] = curr_res
-    
+
     # if 0:
     #     transform_chain = [transforms_mat[:, 0]]
     #     for i in range(1, parents.shape[0]):
@@ -151,7 +151,6 @@ def batch_rigid_transform(rot_mats, joints, parents, dtype=torch.float32):
 
     #     transform_chain = [0]*bone_num
     #     transform_chain[0] = transforms_mat[:, 0]
-
     #     while got.sum() != bone_num:
     #         for i in range(1,bone_num):
     #             # if parents isn't transformed                
@@ -183,7 +182,7 @@ def batch_rigid_transform(rot_mats, joints, parents, dtype=torch.float32):
     rel_transforms = transforms - F.pad(
         torch.matmul(transforms, joints_homogen), [3, 0, 0, 0, 0, 0, 0, 0])
 
-    return posed_joints, rel_transforms
+    return posed_joints, rel_transforms, J_transformed
 
 # def batch_rigid_transform_unity(rot_mats, rel_joints, dtype=torch.float32):
     

@@ -74,10 +74,17 @@ def get_default_cfg():
     cfg.UPDATE_SEG = True
     cfg.IF_BN = False
 
+    cfg.MH = False
     ## Loss for LBS
+    cfg.NOCS_LOSS = False
+    cfg.MASK_LOSS = False
+    
     cfg.SKIN_LOSS = False
+    cfg.AS_SEG = False
+    
     cfg.LOC_LOSS = False
     cfg.LOC_MAP_LOSS = False
+    
     cfg.POSE_LOSS = False
     cfg.POSE_MAP_LOSS = False
 

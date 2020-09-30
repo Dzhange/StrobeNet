@@ -13,31 +13,44 @@ sys.path.append(os.path.join(FileDirPath, '..'))
 from models.loss import L2MaskLoss, L2Loss, LBSLoss
 from utils.DataUtils import *
 
-class HandDatasetLBS(torch.utils.data.Dataset):
+
+
+class SAPIENDataset(torch.utils.data.Dataset):
     """
-    A basic dataloader for HandRigDatasetv3
-    Most codes copied from HandRigDatasetV3 from Srinath
+    A Dataloader for SAPIEN dataset:
+    Items to load:
+        1. Color Images
+        2. NOCS
+        3. PNNOCS
+        4. POSE
+        5. Segmentation
+        5. Occupancy
     """
     def __init__(self, root, train=True, transform=None,
                  img_size=(320, 240), limit=10, frame_load_str=None, required='color00', rel=False):
-        self.num_cameras = 10
-        self.file_name = 'hand_rig_dataset_v3.zip'
-        self.frame_load_str = ['color00', 'color01', 'normals00', 'normals01',\
-                        'nox00', 'nox01', 'pnnocs00', 'pnnocs01',\
-                        'uv00', 'uv01'] if frame_load_str is None else frame_load_str
+        
+        self.num_cameras = 10        
+        self.frame_load_str = ['color00', 'nocs00', 'pnnocs00', 'linkseg'] \
+            if frame_load_str is None else frame_load_str
 
         self.init(root, train, transform, img_size, limit, self.frame_load_str, required, rel=rel)
         self.load_data()
 
     def init(self, root, train=True, transform=None,
              img_size=(320, 240), limit=100, frame_load_str=None, required='VertexColors', rel=False):
+        
         self.dataset_dir = root
         self.is_train_data = train
         self.transform = transform
         self.img_size = img_size
         self.required = required
         self.frame_load_str = frame_load_str
-        # self.rel = rel # use relative pose or the global pose?
+        
+        # For occupancies
+        self.occ_load_str = ['boundary_0.1_samples', 'boundary_0.01_samples']
+        self.sample_distribt = np.array([0.5, 0.5])
+        self.num_sample_points = 50000
+        self.num_samples = np.rint(self.sample_distribt * self.num_sample_points).astype(np.uint32)
 
         self.data_offset = 0
         # self.data_offset = 2000
@@ -51,19 +64,14 @@ class HandDatasetLBS(torch.utils.data.Dataset):
         ######### Add BoneWeights #########
         self.bone_num = 16
 
-        ###### Change Boneweight into Segmentation map ######
-        
+        ###### Change Boneweight into Segmentation map ######        
         # self.as_seg = True
         self.as_seg = False
         
         ###### Uniformly Sample Dataset? ######
-
         # self.shuffle_in_limit = True
         self.shuffle_in_limit = False
-
-        for i in range(self.bone_num):
-            self.frame_load_str.append("BoneWeight00bone_" + str(i))
-            # self.frame_load_str.append("BoneWeight01bone_" + str(i))
+                    
         if os.path.exists(self.dataset_dir) == False:
             print("Dataset {} doesn't exist".format(self.dataset_dir))
             exit()
@@ -72,25 +80,12 @@ class HandDatasetLBS(torch.utils.data.Dataset):
         return len(self.frame_files[self.frame_load_str[0]])
 
     def __getitem__(self, idx):
-        RGB, target_imgs, pose, mesh_path = self.load_images(idx)
+        required_path = self.frame_files[self.required][idx]
+        RGB, target_imgs, pose, mesh_path = self.load_images(idx)        
         load_imgs = torch.cat(target_imgs, 0)
-        # print(load_imgs.shape)
-        # mask = load_imgs[3]
-        # skin_w = load_imgs[4:20]
-        # masked = torch.where(mask > 0.7, skin_w, torch.zeros(skin_w.size(), device=skin_w.device))
-        # print(masked.sum(dim=0).max())
-        return RGB, load_imgs, pose, mesh_path
+        occ_data = self.load_occupancies(required_path)
 
-    def bw2seg(self, bw):
-        _, max_idx = bw.max(dim=0, keepdim=True)
-        all_one = torch.ones(1, bw.shape[1], bw.shape[2])
-        all_zero = torch.zeros(1, bw.shape[1], bw.shape[2])
-        cated = ()
-        for i in range(self.bone_num):
-            cur_seg = torch.where(max_idx == i, all_one, all_zero)
-            cated = cated + (cur_seg, )
-
-        return torch.cat(cated, 0)
+        return RGB, load_imgs, pose, occ_data, mesh_path    
 
     def load_data(self):
         """
@@ -102,23 +97,16 @@ class HandDatasetLBS(torch.utils.data.Dataset):
         else:
             file_path = os.path.join(self.dataset_dir, 'val/')
 
-        # Load index for data 
-        # camera_idx_str = '*'
-        camera_idx_str = '00'
-        # camera_idx_str = ['00', '01', '02', '03']
-
+        # Load index for data
+        # camera_idx_str = '00'
         prepend_list = []
         for i in self.frame_load_str:
-            if "Bone" not in i:
-                prepend_list.append(i)
-        prepend_list.append("LBS")
+            prepend_list.append(i)
 
+        prepend_list.append("sapien")
         glob_prepend = '_'.join(prepend_list)
-        if camera_idx_str == '*':
-            glob_cache = os.path.join(file_path, 'all_glob_' + glob_prepend + '.cache')
-        else:            
-            glob_cache = os.path.join(file_path, 'glob_' + camera_idx_str + '_' + glob_prepend + '.cache')
-            
+        glob_cache = os.path.join(file_path, 'all_glob_' + glob_prepend + '.cache')
+                    
         if os.path.exists(glob_cache):
             # use pre-cached index
             print('[ INFO ]: Loading from glob cache:', glob_cache)
@@ -129,7 +117,7 @@ class HandDatasetLBS(torch.utils.data.Dataset):
             # glob and save cache
             print('[ INFO ]: Saving to glob cache:', glob_cache)
             for string in self.frame_load_str:
-                self.frame_files[string] = glob.glob(file_path + '/**/frame_*_view_' + camera_idx_str + '_' + string + '.*')                
+                self.frame_files[string] = glob.glob(file_path + '/**/frame_*_view_' + camera_idx_str + '_' + string + '.*')
                 self.frame_files[string].sort()                
             with open(glob_cache, 'wb') as fp:
                 for string in self.frame_load_str:
@@ -181,22 +169,16 @@ class HandDatasetLBS(torch.utils.data.Dataset):
         """
         typical_path = self.frame_files['color00'][idx]
 
-        dir = os.path.dirname(typical_path)
+        curdir = os.path.dirname(typical_path)
         file_name = os.path.basename(typical_path)
         idx_of_frame = find_frame_num(file_name)
+                
+        cur_pose_path = os.path.join(curdir, "frame_" + idx_of_frame + '_curr_pose.txt')
+        cano_pose_path = os.path.join(curdir, "frame_" + idx_of_frame + '_cano_pose.txt')        
         
-        # if self.rel == True:
-        nocs = 1
-        if nocs:
-            rel_pose_path = os.path.join(dir, "frame_" + idx_of_frame + '_hpose_nocs.txt')
-        else:
-            rel_pose_path = os.path.join(dir, "frame_" + idx_of_frame + '_hpose_glob.txt')
-        
-        pose = torch.Tensor(np.loadtxt(rel_pose_path))
-        
-        if nocs:
-            pose[:,3:6] = pose[:,3:6] / 180 * np.pi
-
+        # angles in poses are in radians format
+        cur_pose = torch.Tensor(np.loadtxt(cur_pose_path))
+        cano_pose = torch.Tensor(np.loadtxt(cano_pose_path))
         frame = {}
         for k in self.frame_files:
             if "BoneWeight" in k:
@@ -205,10 +187,7 @@ class HandDatasetLBS(torch.utils.data.Dataset):
             else:
                 frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)
             if k == "nox00":
-                frame[k] = torch.cat((frame[k], createMask(frame[k])), 0).type(torch.FloatTensor)
-            # if self.transform is not None:
-            #     frame[k] = self.transform(frame[k])
-            # # Convert range to 0.0 - 1.0
+                frame[k] = torch.cat((frame[k], createMask(frame[k])), 0).type(torch.FloatTensor)            
             frame[k] /= 255.0
 
         grouped_frame_str = [list(i) for j, i in groupby(self.frame_load_str,\
@@ -223,36 +202,74 @@ class HandDatasetLBS(torch.utils.data.Dataset):
                     continue
                 concated = concated + (frame[frame_str],)
             if len(concated) > 0:
-                if self.as_seg and "BoneWeight" in group[0]: # for boneweight
-                    cated_bw = torch.cat(concated, 0)
-                    # seg_map = self.bw2seg(cated_bw)
-                    _, seg_map = cated_bw.max(dim=0, keepdim=True)
-                    load_tuple = load_tuple + (seg_map.to(dtype=torch.float), )
-                else:
-                    load_tuple = load_tuple + (torch.cat(concated, 0), )
+                load_tuple = load_tuple + (torch.cat(concated, 0), )
 
         # faster!
         img_shape = load_tuple[0].shape
-        joint_map = torch.Tensor(pose.shape[0]*6, img_shape[1], img_shape[2])
+        joint_map = torch.Tensor(cur_pose.shape[0]*6, img_shape[1], img_shape[2])
 
         cnt = 0
-        for i in range(pose.shape[0]):
-            for j in range(3):
-                # print(i, j)
-                joint_map[cnt] = joint_map[cnt].fill_(pose[i, j])
+        for i in range(cur_pose.shape[0]):
+            for j in range(3):                
+                joint_map[cnt] = joint_map[cnt].fill_(cur_pose[i, j])
                 cnt += 1
-        for i in range(pose.shape[0]):
-            for j in range(3, 6):
-                # print(i, j)
-                joint_map[cnt] = joint_map[cnt].fill_(pose[i, j])
+        for i in range(cur_pose.shape[0]):
+            for j in range(3, 6):                
+                joint_map[cnt] = joint_map[cnt].fill_(cur_pose[i, j])
                 cnt += 1
 
         load_tuple = load_tuple + (joint_map, )
         load_tuple = (load_tuple[0], load_tuple[2], load_tuple[1])
 
-        mesh_path = os.path.join(dir, "frame_" + idx_of_frame + '_NOCS_mesh.obj')
+        mesh_path = os.path.join(curdir, "frame_" + idx_of_frame + '_wt_mesh.obj')
 
-        return frame['color00'], load_tuple, pose, mesh_path
+        return frame['color00'], load_tuple, cur_pose, mesh_path
+
+    def load_occupancies(self, required_path):
+        """
+        load the occupancy data for the 2nd part(IF-Net)
+            coords: position to be queried
+            occupancies: ground truth for position to be queried
+        """
+        data_dir = os.path.dirname(required_path)
+        file_name = os.path.basename(required_path)
+        index_of_frame = find_frame_num(file_name)
+        transform_path = os.path.join(data_dir, "frame_" + index_of_frame + '_transform.npz')
+
+        nocs_transform = {}
+        nocs_transform['translation'] = np.load(transform_path)['translation']
+        nocs_transform['scale'] = np.load(transform_path)['scale']
+
+        points = []
+        coords = []
+        occupancies = []
+        for i, num in enumerate(self.num_samples):
+            boundary_samples_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
+                                                    self.occ_load_str[i] + '.npz')
+            boundary_samples_npz = np.load(boundary_samples_path)
+            boundary_sample_points = boundary_samples_npz['points']
+            boundary_sample_coords = boundary_samples_npz['grid_coords']
+            boundary_sample_occupancies = boundary_samples_npz['occupancies']
+            subsample_indices = np.random.randint(0, len(boundary_sample_points), num)
+            points.extend(boundary_sample_points[subsample_indices])
+            coords.extend(boundary_sample_coords[subsample_indices])
+            occupancies.extend(boundary_sample_occupancies[subsample_indices])
+
+        assert len(points) == self.num_sample_points
+        assert len(occupancies) == self.num_sample_points
+        assert len(coords) == self.num_sample_points
+        
+        gt_mesh_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
+                                                    "isosurf_scaled.off")            
+        # None of the if-data would be needed if in validation mode
+        if_data = {
+            'grid_coords':np.array(coords, dtype=np.float32),
+            'occupancies': np.array(occupancies, dtype=np.float32),
+            'translation': nocs_transform['translation'],
+            'scale': nocs_transform['scale'],
+            'mesh': gt_mesh_path
+            }
+        return if_data    
 
     # def check_map(self, tar_joint_map, out_mask, tar_joints):
     #     n_batch = tar_joint_map.shape[0]
@@ -273,7 +290,7 @@ if __name__ == '__main__':
 
     Args, _ = Parser.parse_known_args()
 
-    Data = HandDatasetLBS(root=Args.data_dir, train=True, frame_load_str=["color00", "nox00"])
+    Data = SAPIENDataset(root=Args.data_dir, train=True, frame_load_str=["color00", "nox00"])
     # Data.saveItem(random.randint(0, len(Data)))
     # Data.visualizeRandom(10, nColsPerSam=len(Data.FrameLoadStr)-1) # Ignore Pose
     # exit()
@@ -282,4 +299,4 @@ if __name__ == '__main__':
     # loss = LBSLoss()
     for i, Data in enumerate(DataLoader, 0):  # Get each batch
         target_img = Data[1]
-        # print(target_imgs.shape)
+        

@@ -285,6 +285,7 @@ class LBSLoss(nn.Module):
         tar_loc_map = tar_maps[:, 4:4+bone_num*3, :, :]
         tar_rot_map = tar_maps[:, 4+bone_num*3:4+bone_num*6, :, :]
         tar_skin_weights = tar_maps[:, 4+bone_num*6:4+bone_num*7, :, :]
+        
         tar_pose = target['pose']
         tar_loc = tar_pose[:, :, 0:3]
         tar_rot = tar_pose[:, :, 3:6]
@@ -292,17 +293,18 @@ class LBSLoss(nn.Module):
         mask_loss = self.mask_loss(out_mask, target_mask)
         nocs_loss = self.masked_l2_loss(pred_nocs, target_nocs, target_mask)
         skin_loss = self.masked_l2_loss(self.sigmoid(pred_skin_weights), tar_skin_weights, target_mask)
+        
         skin_sum = pred_skin_weights.sum(dim=1)
-        skin_bound_loss = torch.max(torch.zeros(1).to(device=skin_sum.device), skin_sum-1).mean()
-        # loc_map_loss = self.masked_l2_loss(pred_loc_map, tar_loc_map, target_mask)
+        skin_bound_loss = torch.max(torch.zeros(1).to(device=skin_sum.device), skin_sum-1).mean()        
+        
         loc_map_loss = self.l2_loss(pred_loc_map, tar_loc_map, target_mask)
-        rot_map_loss = self.masked_l2_loss(pred_rot_map, tar_rot_map, target_mask)
+        pose_map_loss = self.l2_loss(pred_rot_map, tar_rot_map, target_mask)
 
         joint_loc_loss = self.pose_nocs_loss(pred_loc_map,
                                             pred_joint_score,
                                             target_mask,
                                             tar_loc)
-        joint_rot_loss = self.pose_nocs_loss(pred_rot_map,
+        joint_pose_loss = self.pose_nocs_loss(pred_rot_map,
                                             pred_joint_score,
                                             target_mask,
                                             tar_rot)
@@ -315,16 +317,23 @@ class LBSLoss(nn.Module):
                 import sys
                 sys.exit()
 
+        if self.cfg.NOCS_LOSS:
+            loss += nocs_loss
+        if self.cfg.NOCS_LOSS:
+            loss += mask_loss
+        
         if self.cfg.SKIN_LOSS:
             loss += skin_loss
+        
         if self.cfg.LOC_MAP_LOSS:
             loss += loc_map_loss
         if self.cfg.LOC_LOSS:
             loss += joint_loc_loss * 20
+        
         if self.cfg.POSE_MAP_LOSS:
-            loss += rot_map_loss
+            loss += pose_map_loss
         if self.cfg.POSE_LOSS:
-            loss += joint_rot_loss * 20
+            loss += joint_pose_loss * 20
         # print("[ DIFF ] map_loss is {:5f}; loc_loss is {:5f}".format(loc_map_loss, joint_loc_loss))
         
         return loss

@@ -7,7 +7,7 @@ sys.path.append(os.path.join(FileDirPath, '../..'))
 from models.networks.modules import *
 
 class MHSegNet(nn.Module):
-    def __init__(self, nocs_channels=4+64, pose_channels=48+48+16+16, input_channels=3,
+    def __init__(self, nocs_channels=4, pose_channels=48+48+16+16, input_channels=3,
                  pretrained=True, withSkipConnections=True, bn=True):
 
         super().__init__()

@@ -51,13 +51,13 @@ class Trainer:
                     toc = getCurrentEpochTime()
                     elapsed = math.floor((toc - tic) * 1e-6)
                     total_elapsed = math.floor((toc - all_tic) * 1e-6)
-                    done = int(50 * (i+1) / len(self.train_data_loader))
+                    done = int(30 * (i+1) / len(self.train_data_loader))
                     # Compute ETA
                     time_per_batch = (toc - all_tic) / ((cur_epoch * len(self.train_data_loader)) + (i+1)) # Time per batch
                     ETA = math.floor(time_per_batch * self.config.EPOCH_TOTAL * len(self.train_data_loader) * 1e-6)
 
                     progress_str = ('\r[{}>{}] epoch - {}/{}, train loss - {:.8f} | epoch - {}, total - {} ETA - {} |')\
-                                            .format('=' * done, '-' * (50 - done),
+                                            .format('=' * done, '-' * (30 - done),
                                                     self.model.start_epoch + cur_epoch + 1,
                                                     self.model.start_epoch + self.config.EPOCH_TOTAL,
                                                     np.mean(np.asarray(epoch_losses)),
@@ -113,9 +113,9 @@ class Trainer:
             # Print stats
             toc = getCurrentEpochTime()
             elapsed = math.floor((toc - tic) * 1e-6)
-            done = int(50 * (i+1) / len(self.val_data_loader))
+            done = int(30 * (i+1) / len(self.val_data_loader))
             sys.stdout.write(('\r[{}>{}] val loss - {:.8f}, elapsed - {}')
-                             .format('+' * done, '-' * (50 - done), np.mean(np.asarray(val_losses)), getTimeDur(elapsed)))
+                             .format('+' * done, '-' * (30 - done), np.mean(np.asarray(val_losses)), getTimeDur(elapsed)))
             sys.stdout.flush()
         sys.stdout.write('\n')
         

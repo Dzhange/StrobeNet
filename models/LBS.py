@@ -9,6 +9,7 @@ import torch.nn as nn
 import trimesh
 from models.networks.SegNet import SegNet as old_SegNet
 from models.networks.say4n_SegNet import SegNet as new_SegNet
+from models.networks.MultiHeadSegNet import MHSegNet
 from models.loss import LBSLoss
 from utils.DataUtils import *
 import time
@@ -19,9 +20,13 @@ class ModelLBSNOCS(object):
         self.config = config
         self.lr = config.LR # set learning rate
         # self.net = new_SegNet(input_channels=3, output_channels=config.OUT_CHANNELS)
-        self.net = old_SegNet(output_channels=config.OUT_CHANNELS, bn=False)
-        # self.objective = LBSLoss()
-        # self.objective = LBSLoss()
+        
+        if config.MH:
+            self.net = MHSegNet(bn=False)
+        else:
+            self.net = old_SegNet(output_channels=config.OUT_CHANNELS, bn=False)
+        
+        
         self.bone_num = 16
         self.loss_history = []
         self.val_loss_history = []
@@ -141,12 +146,18 @@ class ModelLBSNOCS(object):
             if self.config.SKIN_LOSS or self.config.TASK == "lbs_seg":
                 self.save_mask(output, target['maps'], i)
             if self.config.LOC_LOSS or self.config.LOC_MAP_LOSS:
-                self.save_joint_location(output, target, i, self.config.LOC_LOSS)
-                self.visualize_joint_prediction(output, target, i)
-                gt_path = os.path.join(self.output_dir, 'frame_{}_gt.obj').format(str(i).zfill(3))
-                mesh = trimesh.load(target['mesh'][0])
-                trimesh.repair.fix_inversion(mesh)
-                mesh.export(gt_path)
+                self.save_joint(output, target, i, self.config.LOC_LOSS)
+                self.visualize_joint_prediction(output, target, i)            
+            if self.config.POSE_LOSS or self.config.POSE_MAP_LOSS:
+                self.save_joint(output, target, i, use_score=self.config.POSE_LOSS, loc=False)
+                self.save_mask(output, target['maps'], i)
+                self.save_joint(output, target, i, self.config.LOC_LOSS)
+                # self.visualize_joint_prediction(output, target, i)
+            
+            gt_path = os.path.join(self.output_dir, 'frame_{}_gt.obj').format(str(i).zfill(3))
+            mesh = trimesh.load(target['mesh'][0])
+            trimesh.repair.fix_inversion(mesh)
+            mesh.export(gt_path)
                 # shutil.copyfile(target['mesh'][0], gt_path)
 
         print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
@@ -170,13 +181,12 @@ class ModelLBSNOCS(object):
 
     def save_mask(self, output, target, i):
         bone_num = self.bone_num
-        mask = target[:, 3, :, :]
-        print(mask.max())
+        mask = target[:, 3, :, :]        
         sigmoid = torch.nn.Sigmoid()
         zero_map = torch.zeros(mask.size(), device=mask.device)
         pred_bw_index = 4+bone_num*6
         tar_bw_index = 4+bone_num*6
-
+        print(target.shape)
         for b_id in range(bone_num):
             pred_bw = sigmoid(output[:, pred_bw_index + b_id, :, :])*255
             pred_bw = torch.where(mask > 0.7, pred_bw, zero_map)
@@ -190,7 +200,7 @@ class ModelLBSNOCS(object):
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_BW{}_00gt.png').format(str(i).zfill(3), b_id), tar_bw)
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_BW{}_01pred.png').format(str(i).zfill(3), b_id), pred_bw)
 
-    def save_joint_location(self, output, target, i, use_score=False):
+    def save_joint(self, output, target, i, use_score=False, loc=True):
         """
         input:
             predicted joint map
@@ -201,29 +211,41 @@ class ModelLBSNOCS(object):
         """
         bone_num = self.bone_num
         n_batch = output.shape[0]
-        pred_joint_map = output[:, 4:4+bone_num*3, :, :]
+        if loc:
+            pred_joint_map = output[:, 4:4+bone_num*3, :, :]
+            # gt
+            gt_joint = target['pose'][0, :, 0:3]
+            gt_path = os.path.join(self.output_dir, 'frame_{}_gt_loc.xyz').format(str(i).zfill(3))
+
+            pred_path = os.path.join(self.output_dir, 'frame_{}_pred_loc.xyz').format(str(i).zfill(3))
+            mean_pred_path = os.path.join(self.output_dir, 'frame_{}_mean_pred_loc.xyz').format(str(i).zfill(3))
+        else:
+            pred_joint_map = output[:, 4+bone_num*3:4+bone_num*6, :, :] * 180 / np.pi
+            gt_joint = target['pose'][0, :, 3:6]
+            gt_path = os.path.join(self.output_dir, 'frame_{}_gt_pose.xyz').format(str(i).zfill(3))
+
+            pred_path = os.path.join(self.output_dir, 'frame_{}_pred_pose.xyz').format(str(i).zfill(3))
+            mean_pred_path = os.path.join(self.output_dir, 'frame_{}_mean_pred_pose.xyz').format(str(i).zfill(3))
+
+        self.write(gt_path, gt_joint)
+
         # get final prediction: score map summarize
         pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
                                                 pred_joint_map.shape[3])  # B,bone_num,3,R,R
         out_mask = target['maps'][:, 3, :, :]
         pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
 
-        # gt
-        gt_joint = target['pose'][0, :, 0:3]
-        gt_path = os.path.join(self.output_dir, 'frame_{}_gt_loc.xyz').format(str(i).zfill(3))
-        self.write(gt_path, gt_joint)
+        # # Mean results
+        # gt_joint_map = target['maps'][:, 4:4+bone_num*3, :, :]
+        # gt_joint_map = gt_joint_map.reshape(n_batch, bone_num, 3, gt_joint_map.shape[2],
+        #                                         gt_joint_map.shape[3])  # B,bone_num,3,R,R
+        # gt_joint_map = gt_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
 
-        # Mean results
-        gt_joint_map = target['maps'][:, 4:4+bone_num*3, :, :]
-        gt_joint_map = gt_joint_map.reshape(n_batch, bone_num, 3, gt_joint_map.shape[2],
-                                                gt_joint_map.shape[3])  # B,bone_num,3,R,R
-        gt_joint_map = gt_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
-
-        mean_gt_joint = gt_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
-        mean_gt_joint /= out_mask.nonzero().shape[0]
-        mean_gt_joint = mean_gt_joint[0]
-        mean_gt_path = os.path.join(self.output_dir, 'frame_{}_gt_mean_loc.xyz').format(str(i).zfill(3))
-        self.write(mean_gt_path, mean_gt_joint)
+        # mean_gt_joint = gt_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
+        # mean_gt_joint /= out_mask.nonzero().shape[0]
+        # mean_gt_joint = mean_gt_joint[0]
+        # mean_gt_path = os.path.join(self.output_dir, 'frame_{}_gt_mean_loc.xyz').format(str(i).zfill(3))
+        # self.write(mean_gt_path, mean_gt_joint)
 
         if use_score:
             # # Vote results
@@ -237,14 +259,14 @@ class ModelLBSNOCS(object):
             pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
 
             pred_joint = pred_joint[0] # retrive the first one from batch
-            pred_path = os.path.join(self.output_dir, 'frame_{}_pred_loc.xyz').format(str(i).zfill(3))
+            
             self.write(pred_path, pred_joint)
         else:
             # Mean results
             mean_pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
             mean_pred_joint /= out_mask.nonzero().shape[0]
             mean_pred_joint = mean_pred_joint[0]
-            mean_pred_path = os.path.join(self.output_dir, 'frame_{}_mean_pred_loc.xyz').format(str(i).zfill(3))
+            
             self.write(mean_pred_path, mean_pred_joint)
 
         # tell difference
@@ -256,6 +278,7 @@ class ModelLBSNOCS(object):
             mean_joint_diff = torch.sum((mean_pred_joint - gt_joint) ** 2, dim=1)  # B,22
             mean_joint_loc_loss = mean_joint_diff.sum() / (n_batch * bone_num)
             print("[ DIFF ] mean diff is {:5f}".format(mean_joint_loc_loss))
+    
 
     def visualize_joint_prediction(self, output, target, frame_id):
         """
