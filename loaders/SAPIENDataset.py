@@ -30,7 +30,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
                  img_size=(320, 240), limit=10, frame_load_str=None, required='color00', rel=False):
         
         self.num_cameras = 10        
-        self.frame_load_str = ['color00', 'nocs00', 'pnnocs00', 'linkseg'] \
+        self.frame_load_str = ['color00', 'nox00', 'pnnocs', 'linkseg'] \
             if frame_load_str is None else frame_load_str
 
         self.init(root, train, transform, img_size, limit, self.frame_load_str, required, rel=rel)
@@ -81,11 +81,11 @@ class SAPIENDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         required_path = self.frame_files[self.required][idx]
-        RGB, target_imgs, pose, mesh_path = self.load_images(idx)        
+        RGB, target_imgs, pose, mesh_path = self.load_images(idx)
         load_imgs = torch.cat(target_imgs, 0)
         occ_data = self.load_occupancies(required_path)
 
-        return RGB, load_imgs, pose, occ_data, mesh_path    
+        return RGB, load_imgs, pose, occ_data, mesh_path
 
     def load_data(self):
         """
@@ -117,8 +117,8 @@ class SAPIENDataset(torch.utils.data.Dataset):
             # glob and save cache
             print('[ INFO ]: Saving to glob cache:', glob_cache)
             for string in self.frame_load_str:
-                self.frame_files[string] = glob.glob(file_path + '/**/frame_*_view_' + camera_idx_str + '_' + string + '.*')
-                self.frame_files[string].sort()                
+                self.frame_files[string] = glob.glob(file_path + '/**/frame_*_view00_' + string + '.*')
+                self.frame_files[string].sort()
             with open(glob_cache, 'wb') as fp:
                 for string in self.frame_load_str:
                     pickle.dump(self.frame_files[string], fp)
@@ -180,12 +180,8 @@ class SAPIENDataset(torch.utils.data.Dataset):
         cur_pose = torch.Tensor(np.loadtxt(cur_pose_path))
         cano_pose = torch.Tensor(np.loadtxt(cano_pose_path))
         frame = {}
-        for k in self.frame_files:
-            if "BoneWeight" in k:
-                frame[k] = imread_gray_torch(self.frame_files[k][idx], Size=self.img_size)\
-                    .type(torch.FloatTensor).unsqueeze(0) # 1,W,H
-            else:
-                frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)
+        for k in self.frame_files:            
+            frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)
             if k == "nox00":
                 frame[k] = torch.cat((frame[k], createMask(frame[k])), 0).type(torch.FloatTensor)            
             frame[k] /= 255.0
@@ -210,16 +206,17 @@ class SAPIENDataset(torch.utils.data.Dataset):
 
         cnt = 0
         for i in range(cur_pose.shape[0]):
-            for j in range(3):                
+            for j in range(3):
                 joint_map[cnt] = joint_map[cnt].fill_(cur_pose[i, j])
                 cnt += 1
         for i in range(cur_pose.shape[0]):
-            for j in range(3, 6):                
+            for j in range(3, 6):
                 joint_map[cnt] = joint_map[cnt].fill_(cur_pose[i, j])
                 cnt += 1
 
         load_tuple = load_tuple + (joint_map, )
-        load_tuple = (load_tuple[0], load_tuple[2], load_tuple[1])
+        # print(len(load_tuple))
+        # load_tuple = (load_tuple[0], load_tuple[2], load_tuple[1])
 
         mesh_path = os.path.join(curdir, "frame_" + idx_of_frame + '_wt_mesh.obj')
 
@@ -290,12 +287,12 @@ if __name__ == '__main__':
 
     Args, _ = Parser.parse_known_args()
 
-    Data = SAPIENDataset(root=Args.data_dir, train=True, frame_load_str=["color00", "nox00"])
+    Data = SAPIENDataset(root=Args.data_dir, train=True, frame_load_str=["color00", "nox00", "pnnocs00", "linkseg"])
     # Data.saveItem(random.randint(0, len(Data)))
     # Data.visualizeRandom(10, nColsPerSam=len(Data.FrameLoadStr)-1) # Ignore Pose
     # exit()
     # LossUnitTest = GenericImageDataset.L2MaskLoss(0.7)
-    DataLoader = torch.utils.data.DataLoader(Data, batch_size=4, shuffle=True, num_workers=0)
+    DataLoader = torch.utils.data.DataLoader(Data, batch_size=1, shuffle=True, num_workers=0)
     # loss = LBSLoss()
     for i, Data in enumerate(DataLoader, 0):  # Get each batch
         target_img = Data[1]

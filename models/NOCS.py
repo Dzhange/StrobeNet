@@ -94,7 +94,7 @@ class ModelNOCS(object):
             data_todevice.append(tuple_or_tensor_td)
         return data_todevice
 
-    def validate(self, val_dataloader, device):
+    def validate(self, val_dataloader, objective, device):
 
         self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
         if os.path.exists(self.output_dir) == False:
@@ -109,18 +109,18 @@ class ModelNOCS(object):
                 break
             net_input, target = self.preprocess(data, device)
             output = self.net(net_input)
-            loss = self.objective(output, target)
+            loss = objective(output, target)
             epoch_losses.append(loss.item())
-
+            
             print("validating on the {}th data, loss is {}".format(i, loss))
             print("average validation loss is ",np.mean(np.asarray(epoch_losses)))            
-            self.save_img(net_input, output, target, i)            
+            self.save_img(net_input, output[:, :4, :, :], target, i)
         print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
 
     def save_img(self, net_input, output, target, i):
         input_img, gt_out_tuple_rgb, gt_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(target, 'cpu'))
         _, pred_out_tuple_rgb, pred_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(output.detach(), 'cpu'), isMaskNOX=True)
-        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_color00.png').format(str(i).zfill(3)),  cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB))
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_color00.png').format(str(i).zfill(3)), cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB))
 
         out_target_str = [self.config.TARGETS]
 

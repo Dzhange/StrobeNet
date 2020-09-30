@@ -77,6 +77,7 @@ class HandDataset(torch.utils.data.Dataset):
             # glob and save cache
             print('[ INFO ]: Saving to glob cache:', glob_cache)
             for string in self.frame_load_str:
+                print(file_path + '/**/frame_*_view_' + camera_idx_str + '_' + string + '.*')
                 self.frame_files[string] = glob.glob(file_path + '/**/frame_*_view_' + camera_idx_str + '_' + string + '.*')
                 self.frame_files[string].sort()
             with open(glob_cache, 'wb') as fp:
