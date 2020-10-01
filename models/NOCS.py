@@ -4,6 +4,7 @@ The model to train, validate and test NOCS
 import os
 import glob
 import torch
+import torch.nn as nn 
 from models.networks.SegNet import SegNet as old_SegNet
 from models.networks.say4n_SegNet import SegNet as new_SegNet
 from models.loss import L2MaskLoss
@@ -16,7 +17,7 @@ class ModelNOCS(object):
         self.lr = config.LR # set learning rate
         # self.net = new_SegNet(input_channels=3, output_channels=config.OUT_CHANNELS)
         if config.TASK == "pretrain":
-            self.net = old_SegNet(output_channels=config.OUT_CHANNELS + config.FEATURE_CHANNELS) # 3 + 1 + 16 * 1 = 116
+            self.net = old_SegNet(output_channels=config.OUT_CHANNELS + config.FEATURE_CHANNELS, bn=config.BN) # 3 + 1 + 16 * 1 = 116
         else:
             self.net = old_SegNet(output_channels=config.OUT_CHANNELS)
 
@@ -101,6 +102,11 @@ class ModelNOCS(object):
             os.makedirs(self.output_dir)
         self.setup_checkpoint(device)
         self.net.eval()
+        # self.net.train()
+        
+        # for child in self.net.children():
+        #     if type(child) == nn.BatchNorm2d:
+        #         child.track_running_stats = False
 
         num_test_sample = 30
         epoch_losses = []

@@ -1,0 +1,33 @@
+##################################################################################################
+# IF+NOCS
+# Using the intermediate feature of SegNet
+# pretrained weights from full dataset
+
+# DATASET_ROOT: '/workspace/Data/8_7_cut_BW_IF'
+DATASET_ROOT: '/workspace/Data/SAPIEN/5obj_IF'
+OUTPUT_DIR: '/workspace/nrnocs_dev/output/'
+
+MODES: ['train','val']
+
+BATCHSIZE: 2
+DATALOADER_WORKERS: 2
+EPOCH_TOTAL: 100
+
+LR: 1e-4
+
+SAVE_FREQ: 5
+DATA_LIMIT: 100 # 10 percent
+IMAGE_SIZE: (320,240)
+TARGETS: "default"
+TASK: "sapien_lbs"
+OUT_CHANNELS: 132 #4 + 48 + 48 + 16 + 16
+
+TEST_ON_TRAIN: True
+
+LOC_LOSS: True
+LOC_MAP_LOSS: True
+
+BONE_NUM: 3
+
+EXPT_NAME: "sapien_pose_0"
+GPU: 3

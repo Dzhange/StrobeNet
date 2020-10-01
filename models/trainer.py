@@ -50,7 +50,7 @@ class Trainer:
                     epoch_losses.append(loss.item())
                     toc = getCurrentEpochTime()
                     elapsed = math.floor((toc - tic) * 1e-6)
-                    total_elapsed = math.floor((toc - all_tic) * 1e-6)
+                    total_elapsed = math.floor((toc - all_tic) * 1e-6)                    
                     done = int(30 * (i+1) / len(self.train_data_loader))
                     # Compute ETA
                     time_per_batch = (toc - all_tic) / ((cur_epoch * len(self.train_data_loader)) + (i+1)) # Time per batch
@@ -65,7 +65,7 @@ class Trainer:
                                                     getTimeDur(total_elapsed),
                                                     getTimeDur(ETA-total_elapsed))
 
-                    sys.stdout.write(progress_str.ljust(150))
+                    sys.stdout.write(progress_str.ljust(100))
                     sys.stdout.flush()
                 sys.stdout.write('\n')
                 gc.collect()

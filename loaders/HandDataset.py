@@ -94,9 +94,11 @@ class HandDataset(torch.utils.data.Dataset):
 
         if len(set(frame_files_lengths)) != 1:
             raise RuntimeError('[ ERR ]: Data corrupted. Sizes do not match', frame_files_lengths)
-
+        
+        
         total_size = len(self)
         dataset_length = math.ceil((self.data_limit / 100) * total_size)
+        # dataset_length = 1
         print('[ INFO ]: Loading {} / {} items.'.format(dataset_length, total_size))
 
         for k in self.frame_files:

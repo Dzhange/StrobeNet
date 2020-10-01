@@ -164,7 +164,7 @@ class ModelIFNOCS(object):
         # Otherwise it perform bad           
         for child in self.net.IFNet.children():
             if type(child) == nn.BatchNorm3d:
-                child.track_running_stats = False            
+                child.track_running_stats = False
 
         test_net = self.net
         num_samples = min(num_test_sample, len(val_dataloader))

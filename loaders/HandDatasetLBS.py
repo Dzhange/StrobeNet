@@ -248,6 +248,10 @@ class HandDatasetLBS(torch.utils.data.Dataset):
                 cnt += 1
 
         load_tuple = load_tuple + (joint_map, )
+        
+        # 0: NOCS
+        # 1: skin weights
+        # 2. joint map
         load_tuple = (load_tuple[0], load_tuple[2], load_tuple[1])
 
         mesh_path = os.path.join(dir, "frame_" + idx_of_frame + '_NOCS_mesh.obj')

@@ -7,11 +7,12 @@ sys.path.append(os.path.join(FileDirPath, '../..'))
 from models.networks.modules import *
 
 class MHSegNet(nn.Module):
-    def __init__(self, nocs_channels=4, pose_channels=48+48+16+16, input_channels=3,
+    def __init__(self, nocs_channels=4, pose_channels=48+48+16+16,
+                 input_channels=3,
                  pretrained=True, withSkipConnections=True, bn=True):
 
         super().__init__()
-        self.in_channels = input_channels
+        self.in_channels = input_channels    
         self.withSkipConnections = withSkipConnections
         self.down1 = segnetDown2(self.in_channels, 64, withFeatureMap=self.withSkipConnections, bn=bn)
         self.down2 = segnetDown2(64, 128, withFeatureMap=self.withSkipConnections, bn=bn)

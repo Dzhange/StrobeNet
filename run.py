@@ -9,13 +9,17 @@ import torch
 from loaders.HandDataset import HandDataset
 from loaders.HandDatasetLBS import HandDatasetLBS
 from loaders.HandOccDataset import HandOccDataset
+from loaders.SAPIENDataset import SAPIENDataset
 
 # from inout.logger import get_logger
 from models.NOCS import ModelNOCS
 from models.Baseline import ModelIFNOCS
 from models.LBS import ModelLBSNOCS
 from models.SegLBS import ModelSegLBS
+from models.PMLBS import PMLBS
+
 from models.loss import *
+from models.sapien_loss import *
 # from core.coach import Coach
 from models.trainer import Trainer
 from config import get_cfg
@@ -32,10 +36,15 @@ task = cfg.TASK
 
 def get_loaders(Dataset):
     for mode in cfg.MODES:
+        if cfg.TARGETS == "default":
+            f_str = None
+        else:
+            f_str = ["color00", cfg.TARGETS]
+
         phase_dataset = Dataset(root=cfg.DATASET_ROOT,
                                 train=mode in ['train'] or cfg.TEST_ON_TRAIN,
                                 limit=cfg.DATA_LIMIT, img_size=cfg.IMAGE_SIZE,
-                                frame_load_str=["color00", cfg.TARGETS])
+                                frame_load_str=f_str)
 
         print("[ INFO ] {} dataset has {} elements.".format(mode, len(phase_dataset)))
         dataloader_dict[mode] = DataLoader(phase_dataset, batch_size=cfg.BATCHSIZE,
@@ -61,8 +70,10 @@ if task == "pretrain":
     objective = L2MaskLoss_wtFeature()
 if task == "nocs":
     objective = L2MaskLoss()
-if task == "joints":
-    pass
+if task == "sapien_lbs":
+    Dataset = SAPIENDataset
+    objective = PMLBSLoss(cfg)
+    Model = PMLBS(cfg)
 
 get_loaders(Dataset)
 

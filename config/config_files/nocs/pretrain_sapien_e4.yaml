@@ -1,0 +1,31 @@
+##################################################################################################
+# This is the pretrain stage for the SAPIEN
+# where only supervise the model with PNNOCS
+# the weights should be used later in NRNet
+
+# dataset root
+DATASET_ROOT: '/workspace/Data/SAPIEN/1obj_1000pose_IF'
+# TASK: "nocs"
+TASK: "pretrain"
+
+OUTPUT_DIR: '/workspace/nrnocs_dev/output/'
+
+MODES: ['train','val']
+
+BATCHSIZE: 2
+DATALOADER_WORKERS: 2
+EPOCH_TOTAL: 100 # First pretrain the model with only supervison
+
+LR: 1e-4
+
+SAVE_FREQ: 5
+DATA_LIMIT: 100
+IMAGE_SIZE: (320,240)
+MODEL_INIT_PATH: ['log/hand_nocsreg_epoch_31.model']
+# TARGETS: "pnnocs00"
+TARGETS: "nox00"
+
+OUT_CHANNELS: 4 # Temporarily, only 4 channels would be supervised.
+EXPT_NAME: pretrain_sapien_e4
+TEST_ON_TRAIN: True
+GPU: 3

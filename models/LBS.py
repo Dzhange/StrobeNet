@@ -25,9 +25,8 @@ class ModelLBSNOCS(object):
             self.net = MHSegNet(bn=False)
         else:
             self.net = old_SegNet(output_channels=config.OUT_CHANNELS, bn=False)
-        
-        
-        self.bone_num = 16
+                
+        self.bone_num = config.BONE_NUM
         self.loss_history = []
         self.val_loss_history = []
         self.start_epoch = 0
@@ -181,7 +180,7 @@ class ModelLBSNOCS(object):
 
     def save_mask(self, output, target, i):
         bone_num = self.bone_num
-        mask = target[:, 3, :, :]        
+        mask = target[:, 3, :, :]
         sigmoid = torch.nn.Sigmoid()
         zero_map = torch.zeros(mask.size(), device=mask.device)
         pred_bw_index = 4+bone_num*6
@@ -194,8 +193,7 @@ class ModelLBSNOCS(object):
 
             tar_bw = target[:, tar_bw_index + b_id, :, :]*255
             tar_bw = torch.where(mask > 0.7, tar_bw, zero_map)
-            tar_bw = tar_bw.squeeze().cpu().detach().numpy()
-            
+            tar_bw = tar_bw.squeeze().cpu().detach().numpy()            
 
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_BW{}_00gt.png').format(str(i).zfill(3), b_id), tar_bw)
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_BW{}_01pred.png').format(str(i).zfill(3), b_id), pred_bw)
@@ -279,7 +277,6 @@ class ModelLBSNOCS(object):
             mean_joint_loc_loss = mean_joint_diff.sum() / (n_batch * bone_num)
             print("[ DIFF ] mean diff is {:5f}".format(mean_joint_loc_loss))
     
-
     def visualize_joint_prediction(self, output, target, frame_id):
         """
         save the inter results of joint predication as RGB image
@@ -310,7 +307,6 @@ class ModelLBSNOCS(object):
         big_img = np.concatenate(to_cat, axis=0)
         cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_pred_joint.png').format(str(frame_id).zfill(3)),
                         cv2.cvtColor(big_img, cv2.COLOR_BGR2RGB))
-
 
     def write(self, path, joint):
         f = open(path, "a")

@@ -73,8 +73,11 @@ def get_default_cfg():
 
     cfg.UPDATE_SEG = True
     cfg.IF_BN = False
+    cfg.BN = False
 
     cfg.MH = False
+    
+    cfg.BONE_NUM = 16
     ## Loss for LBS
     cfg.NOCS_LOSS = False
     cfg.MASK_LOSS = False

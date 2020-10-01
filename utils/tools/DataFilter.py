@@ -46,7 +46,7 @@ class DataFilter:
         self.sapien = args.sapien
         self.SampleNum = 100000
         if self.sapien:
-            self.frame_per_dir = 10000 
+            self.frame_per_dir = 1000 
         else:
             self.frame_per_dir = 100
     
@@ -162,14 +162,14 @@ class DataFilter:
         except:
             print('Error with {}: {}'.format(mesh_path, traceback.format_exc()))
 
-    def copyImgs(self, Frame):        
+    def copyImgs(self, Frame):
         in_dir = os.path.join(self.inputDir, self.mode, str(int(Frame) // self.frame_per_dir).zfill(4))
         out_dir = os.path.join(self.outputDir, self.mode, str(int(Frame) // self.frame_per_dir).zfill(4))
         if self.sapien:
             view = 0            
             frame_view = "frame_" + Frame
-            suffixs = ['_view00_color00.png', '_view00_nocs00.png', '_view00_pnnocs.png',\
-                 '_view00_linkseg.png', "_curr_pose.txt", "_cano_pose.txt"]
+            suffixs = ['_view_00_color00.png', '_view_00_nox00.png', '_view_00_pnnocs00.png',\
+                 '_view_00_linkseg.png', "_curr_pose.txt", "_cano_pose.txt"]
             for fix in suffixs:
                 f_name = frame_view + fix
                 old_f = os.path.join(in_dir, f_name)

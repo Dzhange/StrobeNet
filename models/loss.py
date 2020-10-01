@@ -229,19 +229,18 @@ class LBSLoss(nn.Module):
         output structure:
             [0:3]: nocs
             [3]: mask
-            [4:4+16*3]: joints position
-            [4+16*3:4+16*6]: joint direction
-            [4+16*6:4+16*7]: skinning weights
-            [4+16*7:20+16*8]: confidence
+            [4:4+bone_num*3]: joints position
+            [4+bone_num*3:4+bone_num*6]: joint direction
+            [4+bone_num*6:4+bone_num*7]: skinning weights
+            [4+bone_num*7:4+bone_num*8]: confidence
 
         target structure:
             maps = target['map']
                 maps[0:3]: nocs
                 maps[3]: mask
-                maps[4:4+16*3]: joints position
-                maps[4+16*3:4+16*6]: joint direction
-                maps[4+16*6:4+16*7]: skinning weights
-
+                maps[4:4+bone_num*3]: joints position
+                maps[4+bone_num*3:4+bone_num*6]: joint direction
+                maps[4+bone_num*6:4+bone_num*7]: skinning weights
 
             pose = target['pose']
                 pose[0:3] location
@@ -261,9 +260,9 @@ class LBSLoss(nn.Module):
         if os.path.exists(self.expt_dir_path) == False:
             os.makedirs(self.expt_dir_path)
 
-        self.output_dir = os.path.join(self.expt_dir_path, "Check")
-        if os.path.exists(self.output_dir) == False:
-            os.makedirs(self.output_dir)
+        # self.output_dir = os.path.join(self.expt_dir_path, "Check")
+        # if os.path.exists(self.output_dir) == False:
+        #     os.makedirs(self.output_dir)
         
         self.frame_id = 0
 
@@ -280,11 +279,11 @@ class LBSLoss(nn.Module):
         pred_joint_score = output[:, 4+bone_num*7:4+bone_num*8, :, :].clone().requires_grad_(True)
 
         tar_maps = target['maps']
-        target_nocs = tar_maps[:, 0:3, :, :]
-        target_mask = tar_maps[:, 3, :, :]
-        tar_loc_map = tar_maps[:, 4:4+bone_num*3, :, :]
-        tar_rot_map = tar_maps[:, 4+bone_num*3:4+bone_num*6, :, :]
-        tar_skin_weights = tar_maps[:, 4+bone_num*6:4+bone_num*7, :, :]
+        target_nocs = tar_maps[:, 0:3, :, :] # nocs
+        target_mask = tar_maps[:, 3, :, :] # mask
+        tar_loc_map = tar_maps[:, 4:4+bone_num*3, :, :] # location
+        tar_rot_map = tar_maps[:, 4+bone_num*3:4+bone_num*6, :, :] # rotation, angle axis
+        tar_skin_weights = tar_maps[:, 4+bone_num*6:4+bone_num*7, :, :] 
         
         tar_pose = target['pose']
         tar_loc = tar_pose[:, :, 0:3]
@@ -443,28 +442,39 @@ class LBSLoss(nn.Module):
     #     return joint_loc_loss
 
 class LBSSegLoss(LBSLoss):
-
     def __init__(self, cfg, bone_num=16):
         super().__init__(cfg, bone_num)
         self.seg_loss = torch.nn.CrossEntropyLoss()
-
     def forward(self, output, target):
         bone_num = self.bone_num
         loss = torch.Tensor([0]).to(device=output.device)
-
         pred_skin_seg = output[:, 4+bone_num*6:4+bone_num*7, :, :].clone().requires_grad_(True)
-
         tar_maps = target['maps']
         target_mask = tar_maps[:, 3, :, :]
         tar_skin_seg = tar_maps[:, 4+bone_num*6:4+bone_num*6+1, :, :] ## as Seg
-
         # skin_loss = self.masked_l2_loss(self.sigmoid(pred_skin_weights), tar_skin_weights, target_mask)
         # skin_loss = self.seg_loss(pred_skin_seg, tar_skin_seg.squeeze(1).long().detach())
         input = pred_skin_seg.transpose(1, 2).transpose(2, 3).contiguous().view(-1, bone_num)
         skin_loss = self.seg_loss(input, tar_skin_seg.long().squeeze(1).view(-1))
-
         loss += skin_loss
+        return loss
 
+class LBSSegLoss(LBSLoss):
+    def __init__(self, cfg, bone_num=16):
+        super().__init__(cfg, bone_num)
+        self.seg_loss = torch.nn.CrossEntropyLoss()
+    def forward(self, output, target):
+        bone_num = self.bone_num
+        loss = torch.Tensor([0]).to(device=output.device)
+        pred_skin_seg = output[:, 4+bone_num*6:4+bone_num*7, :, :].clone().requires_grad_(True)
+        tar_maps = target['maps']
+        target_mask = tar_maps[:, 3, :, :]
+        tar_skin_seg = tar_maps[:, 4+bone_num*6:4+bone_num*6+1, :, :] ## as Seg
+        # skin_loss = self.masked_l2_loss(self.sigmoid(pred_skin_weights), tar_skin_weights, target_mask)
+        # skin_loss = self.seg_loss(pred_skin_seg, tar_skin_seg.squeeze(1).long().detach())
+        input = pred_skin_seg.transpose(1, 2).transpose(2, 3).contiguous().view(-1, bone_num)
+        skin_loss = self.seg_loss(input, tar_skin_seg.long().squeeze(1).view(-1))
+        loss += skin_loss
         return loss
 
 class Discarded_LBSLoss(nn.Module):
