@@ -11,8 +11,7 @@ from utils.DataUtils import *
 class ModelSegLBS(ModelLBSNOCS):
 
     def __init__(self, config):
-        super().__init__(config)
-        self.bone_num = 16
+        super().__init__(config)        
         self.label_color = np.asarray(
             [                
                 [128, 0, 0],
@@ -37,16 +36,16 @@ class ModelSegLBS(ModelLBSNOCS):
     def label2map(self, bw):
         all_one = torch.ones(1, bw.shape[1], bw.shape[2])
         all_zero = torch.zeros(1, bw.shape[1], bw.shape[2])
-        cated = ()
+        cated = ()        
         for i in range(self.bone_num):
             cur_seg = torch.where(bw == i, all_one, all_zero)
             cated = cated + (cur_seg, )
         return torch.cat(cated, 0)
 
     def map2seg(self, bw):
-        # 1, 16, W, H
+        # 1, bone_num, W, H
         bw = bw.cpu()
-        _, max_idx = bw.max(dim=0, keepdim=True)
+        _, max_idx = bw.max(dim=0, keepdim=True)        
         cur_seg = torch.zeros(3, bw.shape[1], bw.shape[2])
         for i in range(self.bone_num):
             cur_color = torch.Tensor(self.label_color[i]).unsqueeze(1).unsqueeze(2)
@@ -56,18 +55,21 @@ class ModelSegLBS(ModelLBSNOCS):
     def save_mask(self, output, target, i):
         bone_num = self.bone_num
         mask = target[:, 3, :, :].cpu().detach()
-
         tar_seg = target[:, 4+bone_num*6, :, :].cpu().detach()
-        gt_bw = self.label2map(tar_seg)
-        gt_bw = gt_bw*255
-        pred_bw = output[0, 4+bone_num*6:4+bone_num*7, :, :]*255
+        gt_bw = self.label2map(tar_seg*255)
+        # print(np.unique(gt_bw))
         gt_seg = self.map2seg(gt_bw)
-        pred_seg = self.map2seg(pred_bw)
-        zero_map = torch.zeros(gt_seg.size())        
+        zero_map = torch.zeros(gt_seg.size())
         gt_seg = torch.where(mask > 0.7, gt_seg, zero_map)
-        pred_seg = torch.where(mask > 0.7, pred_seg, zero_map)
         gt_seg = torch2np(gt_seg)
+
+        pred_bw = output[0, 4+bone_num*6:4+bone_num*7, :, :]*255
+        
+        pred_seg = self.map2seg(pred_bw)
+        # print(np.unique(pred_seg.cpu().detach().numpy()))
+        pred_seg = torch.where(mask > 0.7, pred_seg, zero_map)
         pred_seg = torch2np(pred_seg)
+        
         cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_gt_seg.png').format(str(i).zfill(3)), gt_seg)
         cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_pred_seg.png').format(str(i).zfill(3)), pred_seg)
 

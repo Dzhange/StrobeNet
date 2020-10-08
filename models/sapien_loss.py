@@ -36,8 +36,8 @@ class PMLBSLoss(nn.Module):
             [3]: mask
             [4:4+bone_num*3]: joints position
             [4+bone_num*3:4+bone_num*6]: joint direction
-            [4+bone_num*6:4+bone_num*7]: skinning weights
-            [4+bone_num*7:4+bone_num*8]: confidence
+            [4+bone_num*6:4+bone_num*7+2]: skinning weights
+            [4+bone_num*7+2:4+bone_num*8+2]: confidence
 
         target structure:
             maps = target['map']
@@ -80,32 +80,33 @@ class PMLBSLoss(nn.Module):
         out_mask = output[:, 3, :, :].clone().requires_grad_(True)
         out_mask = self.sigmoid(out_mask)
 
-        pred_loc_map = output[:, 4:4+bone_num*3, :, :].clone().requires_grad_(True)
-        pred_rot_map = output[:, 4+bone_num*3:4+bone_num*6, :, :].clone().requires_grad_(True)
-        pred_skin_seg = output[:, 4+bone_num*6:4+bone_num*7, :, :].clone().requires_grad_(True)
-        pred_joint_score = output[:, 4+bone_num*7:4+bone_num*8, :, :].clone().requires_grad_(True)
+        pred_loc_map = self.sigmoid(output[:, 4:4+bone_num*3, :, :].clone().requires_grad_(True))
+        pred_rot_map = self.sigmoid(output[:, 4+bone_num*3:4+bone_num*6, :, :].clone().requires_grad_(True))
+
+        pred_skin_seg = output[:, 4+bone_num*6:4+bone_num*7+2, :, :].clone().requires_grad_(True)
+        pred_joint_score = output[:, 4+bone_num*7+2:4+bone_num*8+2, :, :].clone().requires_grad_(True)
 
         tar_maps = target['maps']
         target_nocs = tar_maps[:, 0:3, :, :] # nocs
         target_mask = tar_maps[:, 3, :, :] # mask
-        tar_loc_map = tar_maps[:, 4:4+bone_num*3, :, :] # location
-        tar_rot_map = tar_maps[:, 4+bone_num*3:4+bone_num*6, :, :] # rotation, angle axis
-        tar_skin_seg = tar_maps[:, 4+bone_num*6:4+bone_num*7, :, :]
-        
-        tar_pose = target['pose']
-        tar_loc = tar_pose[:, :, 0:3]
-        tar_rot = tar_pose[:, :, 3:6]
+        tar_loc_map = self.sigmoid(tar_maps[:, 4:4+bone_num*3, :, :]) # location
+        tar_rot_map = self.sigmoid(tar_maps[:, 4+bone_num*3:4+bone_num*6, :, :]) # rotation, angle axis
+        tar_skin_seg = tar_maps[:, 4+bone_num*6:4+bone_num*6+1, :, :]
 
+        tar_pose = target['pose']
+        tar_loc = self.sigmoid(tar_pose[:, :, 0:3])
+        tar_rot = self.sigmoid(tar_pose[:, :, 3:6])
         mask_loss = self.mask_loss(out_mask, target_mask)
         nocs_loss = self.masked_l2_loss(pred_nocs, target_nocs, target_mask)
+
+        # skin_loss = self.masked_l2_loss(self.sigmoid(pred_skin_seg), tar_skin_weights, target_mask)
+        pred_seg = pred_skin_seg.transpose(1, 2).transpose(2, 3).contiguous().view(-1, bone_num+2)
+        tar_seg = tar_skin_seg.long().squeeze(1).view(-1)
         
-        # skin_loss = self.masked_l2_loss(self.sigmoid(pred_skin_seg), tar_skin_weights, target_mask)                      
-        pred_seg = pred_skin_seg.transpose(1, 2).transpose(2, 3).contiguous().view(-1, bone_num)
-        skin_loss = self.seg_loss(pred_seg, tar_skin_seg.long().squeeze(1).view(-1))
-                
+        skin_loss = self.seg_loss(pred_seg, tar_seg)
         loc_map_loss = self.l2_loss(pred_loc_map, tar_loc_map, target_mask)
         pose_map_loss = self.l2_loss(pred_rot_map, tar_rot_map, target_mask)
-
+                
         joint_loc_loss = self.pose_nocs_loss(pred_loc_map,
                                             pred_joint_score,
                                             target_mask,
@@ -114,7 +115,7 @@ class PMLBSLoss(nn.Module):
                                             pred_joint_score,
                                             target_mask,
                                             tar_rot)
-        
+
         vis = 0
         if vis:
             self.vis_joint_loc(tar_loc_map, target_mask, self.frame_id)
@@ -125,21 +126,28 @@ class PMLBSLoss(nn.Module):
 
         if self.cfg.NOCS_LOSS:
             loss += nocs_loss
+
         if self.cfg.NOCS_LOSS:
             loss += mask_loss
 
         if self.cfg.SKIN_LOSS:
-            loss += skin_loss
+            loss += skin_loss            
 
         if self.cfg.LOC_MAP_LOSS:
             loss += loc_map_loss
         if self.cfg.LOC_LOSS:
-            loss += joint_loc_loss * 20
+            loss += joint_loc_loss
 
         if self.cfg.POSE_MAP_LOSS:
             loss += pose_map_loss
         if self.cfg.POSE_LOSS:
-            loss += joint_rot_loss * 20
+            loss += joint_rot_loss
+
+        if output.shape[1] > 64 + 4+bone_num*8+2:
+            pred_pnnocs = output[:, -3:, :, :].clone().requires_grad_(True)            
+            tar_pnnocs = tar_maps[:, -3:, :, :]
+            pnnocs_loss = self.masked_l2_loss(pred_pnnocs, tar_pnnocs, target_mask)
+            loss += pnnocs_loss
         # print("[ DIFF ] map_loss is {:5f}; loc_loss is {:5f}".format(loc_map_loss, joint_loc_loss))
 
         return loss
@@ -166,8 +174,7 @@ class PMLBSLoss(nn.Module):
     def pose_nocs_loss(self, pred_joint_map, pred_joint_score, out_mask, tar_joints):
 
         n_batch = pred_joint_map.shape[0]
-        bone_num = self.bone_num
-
+        bone_num = self.bone_num        
         # get final prediction: score map summarize
         pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
                                                 pred_joint_map.shape[3])  # B,bone_num,3,R,R
@@ -175,7 +182,7 @@ class PMLBSLoss(nn.Module):
         pred_joint_score = self.sigmoid(pred_joint_score) * out_mask.unsqueeze(1)
         pred_score_map = pred_joint_score / (torch.sum(pred_joint_score.reshape(n_batch, bone_num, -1),
                                                     dim=2, keepdim=True).unsqueeze(3) + 1e-5)
-
+                
         pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
         pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
         
@@ -200,7 +207,7 @@ class PMLBSLoss(nn.Module):
         to_cat = ()
         for i in range(bone_num):
             cur_bone = joint_map[0, i*3:i*3+3, :, :]
-            gt = gt_joint_map[0, i*3:i*3+3, :, :]
+            gt = joint_map[0, i*3:i*3+3, :, :]
 
             joint_map = torch.where(mask > 0.7, cur_bone, zero_map)
             joint_map = torch2np(joint_map) * 255
@@ -247,3 +254,32 @@ class PMLBSLoss(nn.Module):
     #     joint_diff = torch.sum((pred_joint - tar_joints) ** 2, dim=2)  # B,22
     #     joint_loc_loss = joint_diff.sum() / (n_batch * tar_joint_map.shape[1])
     #     return joint_loc_loss
+
+class PMLoss(nn.Module):
+    """
+    The Loss function for the whole lbs pipeline
+    segnet loss would be used to supervise the first stage
+    ifnet loss would supervise the final reconstrution error
+    """
+
+    def __init__(self, config):
+        self.segnet_loss = PMLBSLoss(config)
+
+    def forward(self, output, target):
+        segnet_output = output[0]
+        loss1 = self.segnet_loss(segnet_output, target)
+
+        ifnet_output = output[1]
+        loss2 = self.recon_loss(ifnet_output, target)
+        return loss1 + loss2
+
+    def recon_loss(self, recon, target):
+
+        occ = target['occupancies'].to(device=recon.device)
+        # out = (B,num_points) by componentwise comparing vecots of size num_samples :)
+        occ_loss = nn.functional.binary_cross_entropy_with_logits(
+                recon, occ, reduction='none')
+        num_sample = occ_loss.shape[1]
+        occ_loss = occ_loss.sum(-1).mean() / num_sample
+
+        return occ_loss

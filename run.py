@@ -17,6 +17,7 @@ from models.Baseline import ModelIFNOCS
 from models.LBS import ModelLBSNOCS
 from models.SegLBS import ModelSegLBS
 from models.PMLBS import PMLBS
+from models.LNR import ModelLNRNET
 
 from models.loss import *
 from models.sapien_loss import *
@@ -36,14 +37,14 @@ task = cfg.TASK
 
 def get_loaders(Dataset):
     for mode in cfg.MODES:
-        if cfg.TARGETS == "default":
+        if "default" in cfg.TARGETS:
             f_str = None
         else:
-            f_str = ["color00", cfg.TARGETS]
-
+            f_str = cfg.TARGETS
         phase_dataset = Dataset(root=cfg.DATASET_ROOT,
                                 train=mode in ['train'] or cfg.TEST_ON_TRAIN,
-                                limit=cfg.DATA_LIMIT, img_size=cfg.IMAGE_SIZE,
+                                limit=cfg.DATA_LIMIT if mode == 'train' else cfg.VAL_DATA_LIMIT,
+                                img_size=cfg.IMAGE_SIZE,
                                 frame_load_str=f_str)
 
         print("[ INFO ] {} dataset has {} elements.".format(mode, len(phase_dataset)))
@@ -74,6 +75,11 @@ if task == "sapien_lbs":
     Dataset = SAPIENDataset
     objective = PMLBSLoss(cfg)
     Model = PMLBS(cfg)
+if task == "lnrnet":
+    Dataset = SAPIENDataset
+    objective = PMLBSLoss(cfg)
+    Model = ModelLNRNET(cfg)
+
 
 get_loaders(Dataset)
 

@@ -32,7 +32,7 @@ class Trainer:
         cur_epoch = 0
 
         all_tic = getCurrentEpochTime()
-        while cur_epoch < self.config.EPOCH_TOTAL:            
+        while cur_epoch < self.config.EPOCH_TOTAL:
             try:
                 epoch_losses = [] # For all batches in an epoch
                 tic = getCurrentEpochTime()
@@ -50,7 +50,7 @@ class Trainer:
                     epoch_losses.append(loss.item())
                     toc = getCurrentEpochTime()
                     elapsed = math.floor((toc - tic) * 1e-6)
-                    total_elapsed = math.floor((toc - all_tic) * 1e-6)                    
+                    total_elapsed = math.floor((toc - all_tic) * 1e-6)
                     done = int(30 * (i+1) / len(self.train_data_loader))
                     # Compute ETA
                     time_per_batch = (toc - all_tic) / ((cur_epoch * len(self.train_data_loader)) + (i+1)) # Time per batch

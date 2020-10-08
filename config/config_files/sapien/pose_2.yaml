@@ -11,12 +11,12 @@ MODES: ['train','val']
 
 BATCHSIZE: 2
 DATALOADER_WORKERS: 2
-EPOCH_TOTAL: 100
+EPOCH_TOTAL: 10000
 
 LR: 1e-4
 
-SAVE_FREQ: 5
-DATA_LIMIT: 20 # 10 percent
+SAVE_FREQ: 100
+DATA_LIMIT: 2 # 10 percent
 IMAGE_SIZE: (320,240)
 TARGETS: "default"
 TASK: "sapien_lbs"
@@ -25,10 +25,10 @@ OUT_CHANNELS: 28 #4 + 3*8
 TEST_ON_TRAIN: True
 
 # NOCS_LOSS: True
-LOC_LOSS: True
-LOC_MAP_LOSS: True
+POSE_LOSS: True
+POSE_MAP_LOSS: True
 
 BONE_NUM: 3
 
-EXPT_NAME: "sapien_pose_0"
-GPU: 3
+EXPT_NAME: "sapien_pose_1"
+GPU: 2

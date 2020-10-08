@@ -59,13 +59,14 @@ def get_default_cfg():
     cfg.OUTPUT_DIR = ''
     cfg.SAVE_FREQ = 1
     cfg.DATA_LIMIT = 10
+    cfg.VAL_DATA_LIMIT = 10
     cfg.IMAGE_SIZE = (320, 240)
     cfg.EXPT_NAME = "UNKNOWN"
     cfg.TEST_ON_TRAIN = False
     cfg.OUT_CHANNELS = 4
     cfg.FEATURE_CHANNELS = 64
     cfg.TASK = "occupancy"
-    cfg.TARGETS = "nox00"
+    cfg.TARGETS = ["nox00"]
 
     cfg.NRNET_TYPE = "out_feature" # inter_feature
     cfg.NRNET_PRETRAIN = False
@@ -91,4 +92,6 @@ def get_default_cfg():
     cfg.POSE_LOSS = False
     cfg.POSE_MAP_LOSS = False
 
+    # for optimizer
+    cfg.WEIGHT_DECAY = 0.0
     return cfg

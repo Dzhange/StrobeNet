@@ -68,7 +68,8 @@ def batch_rodrigues(rot_vecs, epsilon=1e-8, dtype=torch.float32):
     
     rot_dir = rot_vecs / angle    
 
-    angle = np.deg2rad(angle)
+    # TODO: lbs for hand needs to be fixed
+    # angle = np.deg2rad(angle) 
     cos = torch.unsqueeze(torch.cos(angle), dim=1)
     sin = torch.unsqueeze(torch.sin(angle), dim=1)
 
@@ -123,11 +124,11 @@ def batch_rigid_transform(rot_mats, joints, parents, dtype=torch.float32):
     # transform_chain = [transforms_mat[:, 0]] #Add root transform
     
     bone_num = joints.shape[1]
-    transform_chain = [0]*bone_num    
+    transform_chain = [0] * bone_num    
     
     # order for leapmotion hand
     # order = (0 ,1, 3, 2, 4, 13, 12, 5, 11, 10, 6, 9, 8, 7, 15, 14)
-    order = (0 ,1, 3, 2, 5, 13, 12, 4, 11, 10, 6, 9, 8, 7, 15, 14)
+    order = (0, 1, 3, 2, 5, 13, 12, 4, 11, 10, 6, 9, 8, 7, 15, 14)
     transform_chain[0] = transforms_mat[:, 0]
     assert len(order) == bone_num
     for i in range(1, bone_num):
@@ -148,52 +149,48 @@ def batch_rigid_transform(rot_mats, joints, parents, dtype=torch.float32):
     #     bone_num = joints.shape[1]
     #     got = np.array([0]*bone_num)
     #     got[0] = 1
-
     #     transform_chain = [0]*bone_num
     #     transform_chain[0] = transforms_mat[:, 0]
     #     while got.sum() != bone_num:
     #         for i in range(1,bone_num):
-    #             # if parents isn't transformed                
+    #             # if parents isn't transformed
     #             if got[parents[i]] == 0:
     #                 continue
     #             # if parents has value
     #             elif got[i] == 0:
-    #                 # set current joint valid                    
-    #                 got[i] += 1                    
+    #                 # set current joint valid
+    #                 got[i] += 1
     #                 curr_res = torch.matmul(transform_chain[parents[i]],
     #                                 transforms_mat[:, i])
-    #                 transform_chain[i] = curr_res                    
+    #                 transform_chain[i] = curr_res
     #             else:
-    #                 continue        
-    #     ##debug 
+    #                 continue
+    #     ##debug
     #     if 0:
     #         for i in range(bone_num):
     #             print(i, "th ")
     #             print(transforms_mat[:, i])
     #             print(transform_chain[i])
     
-    transforms = torch.stack(transform_chain, dim=1)    
+    transforms = torch.stack(transform_chain, dim=1)
 
     # The last column of the transformations contains the posed joints
     posed_joints = transforms[:, :, :3, 3]
-
     joints_homogen = F.pad(joints, [0, 0, 0, 1])
-
     rel_transforms = transforms - F.pad(
         torch.matmul(transforms, joints_homogen), [3, 0, 0, 0, 0, 0, 0, 0])
 
-    return posed_joints, rel_transforms, J_transformed
+    return posed_joints, rel_transforms
 
 # def batch_rigid_transform_unity(rot_mats, rel_joints, dtype=torch.float32):
-    
+
 #     transforms_mat = transform_mat(
 #         rot_mats.reshape(-1, 3, 3),
 #         rel_joints.reshape(-1, 3, 1)).reshape(-1, joints.shape[1], 4, 4)
-    
 #     transform_chain = []
-#     for i in range(1, parents.shape[0]):        
+#     for i in range(1, parents.shape[0]):
 #         curr_res = torch.matmul(transform_chain[parents[i]],
-#                                 transforms_mat[:, i])        
+#                                 transforms_mat[:, i])
 #         transform_chain.append(curr_res)
 
 def write_off(path, pc):
@@ -216,7 +213,7 @@ def transform_mat(R, t):
         Returns:
             - T: Bx4x4 Transformation matrix
     '''
-    # No padding left or right, only add an extra row
+    # No padding left or right, only add an extra row    
     return torch.cat([F.pad(R, [0, 0, 0, 1]),
                       F.pad(t, [0, 0, 0, 1], value=1)], dim=2)
 
@@ -234,7 +231,7 @@ def rotation_matrix(pose,
     # N x J x 3 x 3    
     if pose2rot:
         rot_mats = batch_rodrigues(pose.view(-1, 3),
-                                   dtype=dtype).view([batch_size, -1, 3, 3])                                   
+                                   dtype=dtype).view([batch_size, -1, 3, 3])
         # (N x P) x (P, V * 3) -> N x V x 3
     else:
         rot_mats = pose.view(batch_size, -1, 3, 3)

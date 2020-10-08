@@ -3,7 +3,7 @@ Loader for HandRigDataSet
 """
 import os, sys, argparse, zipfile, glob, random, pickle, math
 from itertools import groupby
-import re
+import re, json
 import time
 import numpy as np
 import torch
@@ -25,25 +25,34 @@ class SAPIENDataset(torch.utils.data.Dataset):
         5. Occupancy
     """
     def __init__(self, root, train=True, transform=None,
-                 img_size=(320, 240), limit=10, frame_load_str=None, required='color00', rel=False):
+                 img_size=(320, 240), limit=100, frame_load_str=None, required='color00', rel=False):
         
-        self.num_cameras = 10        
-        self.frame_load_str = ['color00', 'nox00', 'linkseg'] \
+        self.num_cameras = 10
+        self.frame_load_str = ['color00', 'nox00', 'linkseg','pnnocs00'] \
             if frame_load_str is None else frame_load_str
-
+        # print(self.frame_load_str)
         self.init(root, train, transform, img_size, limit, self.frame_load_str, required, rel=rel)
+        # print(self.frame_load_str)
         self.load_data()
 
     def init(self, root, train=True, transform=None,
              img_size=(320, 240), limit=100, frame_load_str=None, required='VertexColors', rel=False):
         
         self.dataset_dir = root
+        config_path = os.path.join(root,'config.json')
+        # pose num let us know how can we find the occupancies
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                configs = json.load(f)
+                self.pose_num = configs['pose_num']
+        else:
+                self.pose_num = 1
         self.is_train_data = train
         self.transform = transform
         self.img_size = img_size
         self.required = required
-        self.frame_load_str = frame_load_str
-        
+        # self.frame_load_str = frame_load_str
+
         # For occupancies
         self.occ_load_str = ['boundary_0.1_samples', 'boundary_0.01_samples']
         self.sample_distribt = np.array([0.5, 0.5])
@@ -62,10 +71,9 @@ class SAPIENDataset(torch.utils.data.Dataset):
         ######### Add BoneWeights #########
         self.bone_num = 16
 
-        ###### Change Boneweight into Segmentation map ######        
+        ###### Change Boneweight into Segmentation map ######
         # self.as_seg = True
         self.as_seg = False
-        
         ###### Uniformly Sample Dataset? ######
         # self.shuffle_in_limit = True
         self.shuffle_in_limit = False
@@ -95,13 +103,14 @@ class SAPIENDataset(torch.utils.data.Dataset):
         else:
             file_path = os.path.join(self.dataset_dir, 'val/')
 
+        
         # Load index for data
         # camera_idx_str = '00'
         prepend_list = []
-        for i in self.frame_load_str:
+        for i in self.frame_load_str:            
             prepend_list.append(i)
 
-        prepend_list.append("sapien")
+        prepend_list.append("sapien")        
         glob_prepend = '_'.join(prepend_list)
         glob_cache = os.path.join(file_path, 'all_glob_' + glob_prepend + '.cache')
                     
@@ -169,24 +178,38 @@ class SAPIENDataset(torch.utils.data.Dataset):
 
         curdir = os.path.dirname(typical_path)
         file_name = os.path.basename(typical_path)
-        idx_of_frame = find_frame_num(file_name)
-                
-        cur_pose_path = os.path.join(curdir, "frame_" + idx_of_frame + '_curr_pose.txt')
-        cano_pose_path = os.path.join(curdir, "frame_" + idx_of_frame + '_cano_pose.txt')
-        
+        index_of_frame = find_frame_num(file_name)
+        cur_pose_path = os.path.join(curdir, "frame_" + index_of_frame + '_pose.txt')
+        # cano_pose_path = os.path.join(curdir, "frame_" + idx_of_frame + '_cano_pose.txt')
         # angles in poses are in radians format
         cur_pose = torch.Tensor(np.loadtxt(cur_pose_path))
-        cano_pose = torch.Tensor(np.loadtxt(cano_pose_path))
         frame = {}
-        for k in self.frame_files:            
-            frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)
-            if k == "nox00":
-                frame[k] = torch.cat((frame[k], createMask(frame[k])), 0).type(torch.FloatTensor)            
+        has_mask = False
+        for k in self.frame_files:
+            if "linkseg" in k:
+                frame[k] = imread_gray_torch(self.frame_files[k][idx], Size=self.img_size)\
+                    .type(torch.FloatTensor).unsqueeze(0) # other wise would all be zero # 1,W,H
+                #TODO: for eyeglasses, the first link by default iteration order is baselink(link2),
+                # so we abandon this link.
+
+                # ones = torch.ones_like(frame[k])
+                # zeros = torch.zeros_like(frame[k])
+                # frame[k] = torch.where(frame[k]==1, zeros, frame[k])
+                # frame[k] = torch.where(frame[k]==2, ones, frame[k])
+                # frame[k] = torch.where(frame[k]==3, ones, frame[k])
+
+                # print("shapes are", np.unique(frame[k].detach().cpu().numpy()))
+                continue # no need to be divided by 255
+            else:
+                frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)
+            if (k == "nox00" or k == "pnnocs00") and not has_mask:
+                frame[k] = torch.cat((frame[k], createMask(frame[k])), 0).type(torch.FloatTensor)
+                has_mask = True
+
             frame[k] /= 255.0
 
         grouped_frame_str = [list(i) for j, i in groupby(self.frame_load_str,\
-                                lambda a: ''.join([i for i in a if not i.isdigit()]))]
-        
+                                lambda a: ''.join([i for i in a if not i.isdigit()]))]        
         load_tuple = ()
         # Concatenate any peeled outputs
         for group in grouped_frame_str:
@@ -194,6 +217,8 @@ class SAPIENDataset(torch.utils.data.Dataset):
             for frame_str in group:
                 if 'color00' in frame_str: # Append manually
                     continue
+                # if 'pnnocs' in frame_str and 'nox' in self.frame_load_str: # Append manually
+                #     continue
                 concated = concated + (frame[frame_str],)
             if len(concated) > 0:
                 load_tuple = load_tuple + (torch.cat(concated, 0), )
@@ -217,11 +242,13 @@ class SAPIENDataset(torch.utils.data.Dataset):
         
         # 0: NOCS
         # 1: Seg
-        # 2: joint map
-        load_tuple = (load_tuple[0], load_tuple[2], load_tuple[1])
+        # 2. PNNOCS
+        # 3: joint map
+        load_tuple = (load_tuple[0], load_tuple[3], load_tuple[1], load_tuple[2])
 
-        mesh_path = os.path.join(curdir, "frame_" + idx_of_frame + '_wt_mesh.obj')
-
+        index_of_frame = str(int(index_of_frame) // self.pose_num * self.pose_num).zfill(8)
+        mesh_path = os.path.join(curdir, "frame_" + index_of_frame + '_wt_mesh.obj')
+        
         return frame['color00'], load_tuple, cur_pose, mesh_path
 
     def load_occupancies(self, required_path):
@@ -233,6 +260,9 @@ class SAPIENDataset(torch.utils.data.Dataset):
         data_dir = os.path.dirname(required_path)
         file_name = os.path.basename(required_path)
         index_of_frame = find_frame_num(file_name)
+
+        index_of_frame = str(int(index_of_frame) // self.pose_num * self.pose_num).zfill(8)
+
         transform_path = os.path.join(data_dir, "frame_" + index_of_frame + '_transform.npz')
 
         nocs_transform = {}
@@ -245,6 +275,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
         for i, num in enumerate(self.num_samples):
             boundary_samples_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
                                                     self.occ_load_str[i] + '.npz')
+            # print(boundary_samples_path)
             boundary_samples_npz = np.load(boundary_samples_path)
             boundary_sample_points = boundary_samples_npz['points']
             boundary_sample_coords = boundary_samples_npz['grid_coords']
@@ -259,7 +290,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
         assert len(coords) == self.num_sample_points
         
         gt_mesh_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
-                                                    "isosurf_scaled.off")            
+                                                    "isosurf_scaled.off")                                                            
         # None of the if-data would be needed if in validation mode
         if_data = {
             'grid_coords':np.array(coords, dtype=np.float32),
@@ -289,7 +320,7 @@ if __name__ == '__main__':
 
     Args, _ = Parser.parse_known_args()
 
-    Data = SAPIENDataset(root=Args.data_dir, train=True, frame_load_str=["color00", "nox00", "pnnocs00", "linkseg"])
+    Data = SAPIENDataset(root=Args.data_dir, train=False, frame_load_str=["color00", "nox00", "pnnocs00", "linkseg"])
     # Data.saveItem(random.randint(0, len(Data)))
     # Data.visualizeRandom(10, nColsPerSam=len(Data.FrameLoadStr)-1) # Ignore Pose
     # exit()

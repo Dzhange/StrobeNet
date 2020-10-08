@@ -26,7 +26,7 @@
 # |   ##### Input for IFNet will be generated during pipeline
 # +-- Other frame sets
 
-import os,sys,glob,traceback,shutil
+import os, sys, glob, traceback, shutil
 import numpy as np
 import multiprocessing as mp
 from multiprocessing import Pool
@@ -44,12 +44,14 @@ class DataFilter:
         self.inputDir = args.input_dir
         self.outputDir = args.output_dir
         self.sapien = args.sapien
+        self.pose_num = args.pose_per_actor
+
         self.SampleNum = 100000
         if self.sapien:
-            self.frame_per_dir = 1000 
+            self.frame_per_dir = self.pose_num
         else:
             self.frame_per_dir = 100
-    
+
     def filter(self):        
         if not os.path.exists(self.outputDir):
             os.mkdir(self.outputDir)
@@ -65,10 +67,8 @@ class DataFilter:
             all_frames = [self.findFrameNum(p) for p in all_color_imgs ]
             all_frames = list(dict.fromkeys(all_frames))
             all_frames.sort()
-            # AllFrames = ["00000000"]
             
-            p = Pool(mp.cpu_count() >> 1)
-            # p = Pool(4)
+            p = Pool(mp.cpu_count()>>3)
 
             p.map(self.processFrame, all_frames)
 
@@ -79,14 +79,11 @@ class DataFilter:
                 os.mkdir(out_dir)
             except:
                 print("subdir already exists")
-
         success = self.normalizeNOCS(Frame)
         if success == ERROR:
             return
-
         for sigma in [0.01, 0.1]:
             self.boudarySampling(Frame, sigma)
-        
         self.copyImgs(Frame)
         return
 
@@ -94,8 +91,8 @@ class DataFilter:
 
         in_dir = os.path.join(self.inputDir, self.mode, str(int(Frame) // self.frame_per_dir).zfill(4))
         out_dir = os.path.join(self.outputDir, self.mode, str(int(Frame) // self.frame_per_dir).zfill(4))
-
         if self.sapien:
+            Frame = str(int(Frame) // self.pose_num * self.pose_num).zfill(8)
             orig_mesh_path = os.path.join(in_dir, "frame_" + Frame + "_wt_mesh.obj")
         else:
             orig_mesh_path = os.path.join(in_dir, "frame_" + Frame + "_NOCS_pn_mesh.obj")
@@ -105,7 +102,7 @@ class DataFilter:
             if args.write_over:
                 print('overwrite ', target_mesh_path)
             else:
-                print('File {} exists. Done.'.format(target_mesh_path))
+                # print('File {} exists. Done.'.format(target_mesh_path))
                 return 0
 
         translation = 0
@@ -114,24 +111,23 @@ class DataFilter:
             mesh = trimesh.load(orig_mesh_path, process=False)
             total_size = (mesh.bounds[1] - mesh.bounds[0]).max()
             centers = (mesh.bounds[1] + mesh.bounds[0]) /2
-
             translation = -centers
             scale = 1/total_size
-
             mesh.apply_translation(-centers)
             mesh.apply_scale(1/total_size)
             mesh.export(target_mesh_path)
-
             np.savez(transform_path, translation=translation, scale=scale)
-            print('Finished {}'.format(orig_mesh_path))
+            # print('Finished {}'.format(orig_mesh_path))
         except Exception as e:
             print('Error normalize_NOCS {} with {}'.format(e, orig_mesh_path))
             return -1
-
         return 0
 
     def boudarySampling(self, Frame, sigma):
         out_dir = os.path.join(self.outputDir, self.mode, str(int(Frame) // self.frame_per_dir).zfill(4))
+        if self.sapien:
+            Frame = str(int(Frame) // self.pose_num * self.pose_num).zfill(8)
+
         mesh_path = os.path.join(out_dir, "frame_" + Frame + "_isosurf_scaled.off")
         while not os.path.exists(mesh_path):
             print("waiting for ", mesh_path)
@@ -143,7 +139,7 @@ class DataFilter:
                 if args.write_over:
                     print('overwrite ', out_file)
                 else:
-                    print('File {} exists. Done.'.format(out_file))
+                    # print('File {} exists. Done.'.format(out_file))
                     return
 
             mesh = trimesh.load(mesh_path)
@@ -158,7 +154,7 @@ class DataFilter:
             occupancies = iw.implicit_waterproofing(mesh, boundary_points)[0]
 
             np.savez(out_file, points=boundary_points, occupancies=occupancies, grid_coords=grid_coords)
-            print('Finished {}'.format(mesh_path))
+            # print('Finished {}'.format(mesh_path))
         except:
             print('Error with {}: {}'.format(mesh_path, traceback.format_exc()))
 
@@ -169,11 +165,10 @@ class DataFilter:
             view = 0            
             frame_view = "frame_" + Frame
             suffixs = ['_view_00_color00.png', '_view_00_nox00.png', '_view_00_pnnocs00.png',\
-                 '_view_00_linkseg.png', "_curr_pose.txt", "_cano_pose.txt"]
+                 '_view_00_linkseg.png', "_pose.txt", '_wt_mesh.obj']
             for fix in suffixs:
                 f_name = frame_view + fix
-                old_f = os.path.join(in_dir, f_name)
-                print(old_f)
+                old_f = os.path.join(in_dir, f_name)                
                 new_f = os.path.join(out_dir, f_name)
                 if os.path.exists(old_f) and not os.path.exists(new_f):
                     shutil.copy(old_f, new_f)
@@ -204,6 +199,8 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--output-dir', default='/ZG/meshedNOCS/IF_hand_dataset' ,help='Provide the output directory where the processed Model')
     parser.add_argument('-i', '--input-dir', default='/ZG/meshedNOCS/hand_rig_dataset_v3/', help='the root of dataset as input for nocs')
     parser.add_argument('-s','--sapien', default=False, type=bool, help="SAPIEN dataset is a little different")
+    # args = parser.parse_args()
+    parser.add_argument('-p', '--pose_per_actor', type=int, required=True, help="if use sapien, must specify number of poses")
     args = parser.parse_args()
 
     df = DataFilter(args) 
