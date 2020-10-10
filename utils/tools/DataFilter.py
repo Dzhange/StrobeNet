@@ -56,10 +56,20 @@ class DataFilter:
         if not os.path.exists(self.outputDir):
             os.mkdir(self.outputDir)
 
+        
+        if self.sapien:
+            config_path = os.path.join(self.outputDir, "config.json")
+            f = open(config_path, "a")
+            configs = '{' + "\"pose_num\": {}".format(self.pose_num) + '}'
+            f.write(configs)
+            f.close()
+
         for mode in ['train', 'val']:
             cur_out_dir = os.path.join(self.outputDir,mode)
             if not os.path.exists(cur_out_dir):
                 os.mkdir(cur_out_dir)
+            
+            
 
             self.mode = mode
             # all_color_imgs = glob.glob(os.path.join(self.inputDir, mode, '**/frame_*_view_*_color00.*'))

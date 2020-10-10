@@ -77,7 +77,8 @@ if task == "sapien_lbs":
     Model = PMLBS(cfg)
 if task == "lnrnet":
     Dataset = SAPIENDataset
-    objective = PMLBSLoss(cfg)
+    # objective = PMLBSLoss(cfg)
+    objective = PMLoss(cfg)
     Model = ModelLNRNET(cfg)
 
 

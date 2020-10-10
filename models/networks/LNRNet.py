@@ -98,7 +98,7 @@ class LNRNet(nn.Module):
         nocs_feature = output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
         
         pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
-        # output = torch.cat((output, pnnocs_maps), dim=1)
+        output = torch.cat((output, pnnocs_maps), dim=1)
         # print(output.shape)
         # then: we transform the point cloud into occupancy(along with the features )
         occupancies = self.voxelize(output, nocs_feature, transform)
@@ -107,12 +107,12 @@ class LNRNet(nn.Module):
         # and then feed into IF-Net. The ground truth shouled be used in the back projection
         recon = self.IFNet(grid_coords, occupancies)
         # return pred_nocs, recon
-        return output
+        return output, recon
 
     def vote(self, pred_joint_map, pred_joint_score, out_mask):
         
         n_batch = pred_joint_map.shape[0]
-        joint_num = self.joint_num        
+        joint_num = self.joint_num
         # get final prediction: score map summarize
         pred_joint_map = pred_joint_map.reshape(n_batch, joint_num, 3, pred_joint_map.shape[2],
                                                 pred_joint_map.shape[3])  # B,joint_num,3,R,R
@@ -125,7 +125,7 @@ class LNRNet(nn.Module):
         return pred_joint
 
     def repose_pm(self, pred_nocs, pred_loc_map, pred_pose_map, pred_skin, conf, pred_mask):
-        """ 
+        """
         reposing function for partial mobility models
         """
         sigmoid = nn.Sigmoid()
@@ -206,6 +206,7 @@ class LNRNet(nn.Module):
 
         pnnocs_maps = torch.stack(tuple(all_pnnocs))
         return pnnocs_maps
+    
 
     def repose_lbs(self, pred_nocs, pred_loc_map, pred_pose_map, pred_weight, conf, pred_mask):
         """

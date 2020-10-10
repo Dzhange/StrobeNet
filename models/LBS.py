@@ -227,6 +227,7 @@ class ModelLBSNOCS(object):
             # gt
             gt_joint = target['pose'][0, :, 0:3]
             gt_path = os.path.join(self.output_dir, 'frame_{}_gt_loc.xyz').format(str(i).zfill(3))
+            self.write(gt_path, gt_joint)
 
             pred_path = os.path.join(self.output_dir, 'frame_{}_pred_loc.xyz').format(str(i).zfill(3))
             mean_pred_path = os.path.join(self.output_dir, 'frame_{}_mean_pred_loc.xyz').format(str(i).zfill(3))
@@ -239,8 +240,7 @@ class ModelLBSNOCS(object):
             pred_path = os.path.join(self.output_dir, 'frame_{}_pred_pose.xyz').format(str(i).zfill(3))
             mean_pred_path = os.path.join(self.output_dir, 'frame_{}_mean_pred_pose.xyz').format(str(i).zfill(3))
 
-        self.write(gt_path, gt_joint)
-        
+
         # get final prediction: score map summarize
         pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
                                                 pred_joint_map.shape[3])  # B,bone_num,3,R,R
@@ -266,20 +266,19 @@ class ModelLBSNOCS(object):
             pred_joint_score = sigmoid(pred_joint_score) * out_mask.unsqueeze(1)
             pred_score_map = pred_joint_score / (torch.sum(pred_joint_score.reshape(n_batch, bone_num, -1),
                                                     dim=2, keepdim=True).unsqueeze(3) + 1e-5)
-
             pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
             pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
-
-            pred_joint = pred_joint[0] # retrive the first one from batch
-            
-            self.write(pred_path, pred_joint)
+            pred_joint = pred_joint[0] # retrive the first one from batch            
+            if loc:
+                self.write(pred_path, pred_joint)
         else:
             # Mean results
             mean_pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
             mean_pred_joint /= out_mask.nonzero().shape[0]
             mean_pred_joint = mean_pred_joint[0]
             
-            self.write(mean_pred_path, mean_pred_joint)
+            if loc:
+                self.write(mean_pred_path, mean_pred_joint)
 
         # tell difference
         if use_score:
@@ -289,9 +288,8 @@ class ModelLBSNOCS(object):
             return np.sqrt(joint_loc_loss.detach().cpu().numpy())
         else:
             mean_joint_diff = torch.sum((mean_pred_joint - gt_joint) ** 2, dim=1)  # B,22
-            mean_joint_loc_loss = mean_joint_diff.sum() / (n_batch * bone_num)
-            # print("[ DIFF ] mean diff is {:5f}".format(mean_joint_loc_loss))
-            return np.sqrt(joint_loc_loss.detach().cpu().numpy())
+            mean_joint_loc_loss = mean_joint_diff.sum() / (n_batch * bone_num)            
+            return np.sqrt(mean_joint_loc_loss.detach().cpu().numpy())
     
     def visualize_joint_prediction(self, output, target, frame_id, loc=True):
         """
@@ -304,19 +302,30 @@ class ModelLBSNOCS(object):
             pred_joint_map = output[:, 4:4+bone_num*3, :, :].cpu().detach()
             gt_joint_map = target['maps'][:, 4:4+bone_num*3, :, :].cpu().detach()
         else:
-            pred_joint_map = output[:, 4+bone_num*3:4+bone_num*6, :, :].cpu().detach()            
+            pred_joint_map = output[:, 4+bone_num*3:4+bone_num*6, :, :].cpu().detach()
             gt_joint_map = target['maps'][:, 4+bone_num*3:4+bone_num*6, :, :].cpu().detach()
         zero_map = torch.zeros(3, pred_joint_map.shape[2], pred_joint_map.shape[3])
-        
         to_cat = ()
         for i in range(bone_num):
             cur_pred = pred_joint_map[0, i*3:i*3+3, :, :]
             gt = gt_joint_map[0, i*3:i*3+3, :, :]
+
+            # rough linear normalize
+            if not loc:
+                cur_pred = torch.abs(cur_pred)
+                gt = torch.abs(gt)
+                max_v = max(cur_pred.max(), gt.max())
+                cur_pred /= max_v
+                gt /= max_v
+                # print(cur_preds)
+                # cur_pred = (cur_pred + 1) / 2
+                # gt = (gt + 1) / 2
+
             masked_map = torch.where(mask > 0.7, cur_pred, zero_map)
             joint_map = torch2np(masked_map) * 255
-
             gt = torch.where(mask > 0.7, gt, zero_map)
             gt = torch2np(gt) * 255
+                            
             diff = np.abs(gt-joint_map)
             comb = np.concatenate((gt, joint_map, diff), axis=1)
             to_cat = to_cat + (comb, )

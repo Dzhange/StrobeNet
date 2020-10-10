@@ -263,6 +263,7 @@ class PMLoss(nn.Module):
     """
 
     def __init__(self, config):
+        super().__init__()
         self.segnet_loss = PMLBSLoss(config)
 
     def forward(self, output, target):
