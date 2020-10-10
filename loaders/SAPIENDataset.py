@@ -75,8 +75,8 @@ class SAPIENDataset(torch.utils.data.Dataset):
         # self.as_seg = True
         self.as_seg = False
         ###### Uniformly Sample Dataset? ######
-        # self.shuffle_in_limit = True
-        self.shuffle_in_limit = False
+        self.shuffle_in_limit = True
+        # self.shuffle_in_limit = False
                     
         if os.path.exists(self.dataset_dir) == False:
             print("Dataset {} doesn't exist".format(self.dataset_dir))
@@ -183,6 +183,8 @@ class SAPIENDataset(torch.utils.data.Dataset):
         # cano_pose_path = os.path.join(curdir, "frame_" + idx_of_frame + '_cano_pose.txt')
         # angles in poses are in radians format
         cur_pose = torch.Tensor(np.loadtxt(cur_pose_path))
+        if len(cur_pose.shape) == 1:
+            cur_pose = cur_pose.unsqueeze(0)
         frame = {}
         has_mask = False
         for k in self.frame_files:
@@ -320,13 +322,14 @@ if __name__ == '__main__':
 
     Args, _ = Parser.parse_known_args()
 
-    Data = SAPIENDataset(root=Args.data_dir, train=False, frame_load_str=["color00", "nox00", "pnnocs00", "linkseg"])
+    Data = SAPIENDataset(root=Args.data_dir, train=True, frame_load_str=["color00", "nox00", "pnnocs00", "linkseg"])
     # Data.saveItem(random.randint(0, len(Data)))
     # Data.visualizeRandom(10, nColsPerSam=len(Data.FrameLoadStr)-1) # Ignore Pose
     # exit()
     # LossUnitTest = GenericImageDataset.L2MaskLoss(0.7)
-    DataLoader = torch.utils.data.DataLoader(Data, batch_size=1, shuffle=True, num_workers=0)
+    DataLoader = torch.utils.data.DataLoader(Data, batch_size=8, shuffle=True, num_workers=8)
     # loss = LBSLoss()
     for i, Data in enumerate(DataLoader, 0):  # Get each batch
+        # print(type(Data))
         target_img = Data[1]
         

@@ -91,6 +91,18 @@ class PMLBS(ModelSegLBS):
             cur_seg = torch.where(max_idx == i, cur_color, cur_seg)
         return cur_seg
 
+    
+    def map2link(self, bw):
+        # 1, bone_num, W, H
+        # bw = bw.cpu()
+        _, max_idx = bw.max(dim=0, keepdim=True)
+        cur_seg = torch.zeros(1, bw.shape[1], bw.shape[2])
+        for i in range(self.bone_num):
+            # cur_color = torch.Tensor(self.label_color[i]).unsqueeze(1).unsqueeze(2)
+            cur_seg = torch.where(max_idx == i, torch.Tensor(i), torch.zeros(1))
+        return cur_seg
+
+
     def save_mask(self, output, target, i):
         bone_num = self.bone_num
         mask = target[:, 3, :, :].cpu().detach()
@@ -103,10 +115,14 @@ class PMLBS(ModelSegLBS):
         gt_seg = torch2np(gt_seg)
 
         pred_seg = output[0, 4+bone_num*6:4+bone_num*7+2, :, :]
-        pred_seg = self.map2seg(pred_seg)
+        pred_seg_color = self.map2seg(pred_seg)
+        # pred_seg_id = self.map2link(pred_seg)
         # print(np.unique(pred_seg.cpu().detach().numpy()))
         # pred_seg = torch.where(mask > 0.7, pred_seg, zero_map)
-        pred_seg = torch2np(pred_seg)
-        
+                
+        pred_seg_color = torch2np(pred_seg_color)                
+        # pred_seg_id = torch2np(pred_seg_id)
+
         cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_gt_seg.png').format(str(i).zfill(3)), gt_seg)
-        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_pred_seg.png').format(str(i).zfill(3)), pred_seg)
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_pred_seg.png').format(str(i).zfill(3)), pred_seg_color)
+        # cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_link_seg.png').format(str(i).zfill(3)), pred_seg)

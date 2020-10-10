@@ -96,7 +96,6 @@ def imread_gray_torch(Path, Size=None, interp=cv2.INTER_NEAREST): # Use only for
     Image = torch.from_numpy(np.transpose(ImageCV, (0, 1)))
     return Image
 
-
 def saveData(Items, OutPath='.'):
     for Ctr, I in enumerate(Items, 0):
         if len(I.shape) == 3:
@@ -135,7 +134,7 @@ def convertData(RGB, Targets, isMaskNOX=False):
     OutTupRGB = ()
     OutTupMask = ()
     # Convert range to 0-255
-    for T in TargetsTup:            
+    for T in TargetsTup:
         T = T.squeeze() * 255
         nChannels = T.size(0)
         if nChannels != 4 and nChannels != 8:
@@ -190,12 +189,12 @@ def normalizeInput(Image, format='imagenet'):
 
     return ImageN
 
-
 def expandTilde(Path):
     if '~' == Path[0]:
         return os.path.expanduser(Path)
 
     return Path
+
 
 ################################ TIME RELATED UTILS ####################################
 

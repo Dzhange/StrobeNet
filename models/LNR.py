@@ -4,20 +4,23 @@ We directly take the input from the pnnocs
 and feed it to the IFNet
 """
 
-import os
+import os, sys
 import shutil
 import glob
 import torch
 import torch.nn as nn
 from models.networks.LNRNet import LNRNet
 from models.loss import MixLoss
+# from models.LBS import ModelLBSNOCS
+from models.SegLBS import ModelSegLBS
 from utils.DataUtils import *
 import trimesh, mcubes
 
 
-class ModelLNRNET(object):
+class ModelLNRNET(ModelSegLBS):
 
     def __init__(self, config):
+        super().__init__(config)
         self.config = config
         self.lr = config.LR
         device = torch.device(config.GPU)
@@ -35,50 +38,10 @@ class ModelLNRNET(object):
             pretrained_dir = config.NRNET_PRETRAIN_PATH
             self.LoadSegNetCheckpoint(device, pretrained_dir)
 
-    def setup_checkpoint(self, TrainDevice):
-        latest_checkpoint_dict = None
-        all_checkpoints = glob.glob(os.path.join(self.expt_dir_path, '*.tar'))
-        if len(all_checkpoints) > 0:
-            latest_checkpoint_dict = loadLatestPyTorchCheckpoint(self.expt_dir_path, map_location=TrainDevice)
-            print('[ INFO ]: Loading from last checkpoint.')
-        if latest_checkpoint_dict is not None:
-            # Make sure experiment names match
-            if self.config.EXPT_NAME == latest_checkpoint_dict['Name']:
-                self.net.load_state_dict(latest_checkpoint_dict['ModelStateDict'])
-                self.start_epoch = latest_checkpoint_dict['Epoch']
-                self.optimizer.load_state_dict(latest_checkpoint_dict['OptimizerStateDict'])
-                self.loss_history = latest_checkpoint_dict['LossHistory']
-                if 'ValLossHistory' in latest_checkpoint_dict:
-                    self.val_loss_history = latest_checkpoint_dict['ValLossHistory']
-                else:
-                    self.val_loss_history = self.loss_history
-
-                if TrainDevice is not 'cpu':
-                    for state in self.optimizer.state.values():
-                        for k, v in state.items():
-                            if isinstance(v, torch.Tensor):
-                                state[k] = v.to(TrainDevice)
-            else:
-                print('[ INFO ]: Experiment names do not match. Training from scratch.')
-
-    # def save_check_point(self):
-    def save_checkpoint(self, epoch, time_string='humanlocal', print_str='*'*3):
-        checkpoint_dict = {
-            'Name': self.config.EXPT_NAME,
-            'ModelStateDict': self.net.state_dict(),
-            'OptimizerStateDict': self.optimizer.state_dict(),
-            'LossHistory': self.loss_history,
-            'ValLossHistory': self.val_loss_history,
-            'Epoch': self.start_epoch + epoch + 1,
-            'SavedTimeZ': getZuluTimeString(),
-        }
-        out_file_path = savePyTorchCheckpoint(checkpoint_dict, self.expt_dir_path, TimeString=time_string)
-        saveLossesCurve(self.loss_history, self.val_loss_history, out_path=os.path.splitext(out_file_path)[0] + '.png',
-                        xlim=[0, int(self.config.EPOCH_TOTAL + self.start_epoch)],
-                        legend=["train loss", "val loss"], title=self.config.EXPT_NAME)
-        # print('[ INFO ]: Checkpoint saved.')
-        print(print_str) # Checkpoint saved. 50 + 3 characters [>]
-
+        # generation conifgs
+        self.resolution = 128
+        self.batch_points = 100000
+        
     @staticmethod
     def preprocess(data, device):
         """
@@ -132,7 +95,6 @@ class ModelLNRNET(object):
         targets['mesh'] = data[4]
         return inputs, targets
 
-
     def LoadSegNetCheckpoint(self, train_device, TargetPath):
         all_checkpoints = glob.glob(os.path.join(TargetPath, '*.tar'))
         if len(all_checkpoints) > 0:
@@ -141,12 +103,7 @@ class ModelLNRNET(object):
 
         if latest_checkpoint_dict is not None:
             # Make sure experiment names match
-            self.net.SegNet.load_state_dict(latest_checkpoint_dict['ModelStateDict'])            
-            # if train_device is not 'cpu':
-            #     for state in self.optimizer.state.values():
-            #         for k, v in state.items():
-            #             if isinstance(v, torch.Tensor):
-            #                 state[k] = v.to(train_device)
+            self.net.SegNet.load_state_dict(latest_checkpoint_dict['ModelStateDict'])
 
     def validate(self, val_dataloader, objective, device):
 
@@ -158,70 +115,112 @@ class ModelLNRNET(object):
         self.net.eval()
 
         num_test_sample = 30
-        resolution = 128
-        batch_points = 100000
+
+        grid_coords = self.net.grid_coords
+        grid_points_split = torch.split(grid_coords, self.batch_points, dim=1)
 
         # Make sure we are not tracking running stats
         # Otherwise it perform bad           
         for child in self.net.IFNet.children():
             if type(child) == nn.BatchNorm3d:
                 child.track_running_stats = False
-
-        test_net = self.net
+        
         num_samples = min(num_test_sample, len(val_dataloader))
         print('Testing on ' + str(num_samples) + ' samples')
 
-        grid_coords = test_net.initGrids(resolution)
-        grid_points_split = torch.split(grid_coords, batch_points, dim=1)
+        epoch_losses = []
+        pose_diff = []
+        loc_diff = []
+        
         for i, data in enumerate(val_dataloader, 0):  # Get each batch
-            if i > (num_samples-1): break
+            if i > (num_samples-1): 
+                break
 
             # first pass generate loss
             net_input, target = self.preprocess(data, device)
             output = self.net(net_input)
             loss = objective(output, target)
+            epoch_losses.append(loss.item())
             
-            logits_list = []
-            for points in grid_points_split:
-                with torch.no_grad():
-                    net_input, target = self.preprocess(data, device)                    
-                    net_input['grid_coords'] = points.to(device)
-                    output = test_net(net_input)
-                    self.save_img(net_input['RGB'], output[0], target['NOCS'], i)
-                    logits_list.append(output[1].squeeze(0).detach().cpu())
+            # self.gen_mesh(grid_points_split, data, i)
+            self.save_img(net_input['RGB'], output[:, 0:4, :, :], target['maps'][:, 0:4, :, :], i)
+            if self.config.SKIN_LOSS or self.config.TASK == "lbs_seg":
+                self.save_mask(output, target['maps'], i)
+            if self.config.LOC_LOSS or self.config.LOC_MAP_LOSS:
+                cur_loc_diff = self.save_joint(output, target, i, self.config.LOC_LOSS)
+                loc_diff.append(cur_loc_diff)
+                self.visualize_joint_prediction(output, target, i)
+            if self.config.POSE_LOSS or self.config.POSE_MAP_LOSS:
+                cur_pose_diff = self.save_joint(output, target, i, use_score=self.config.POSE_LOSS, loc=False)
+                pose_diff.append(cur_pose_diff)
+                self.visualize_joint_prediction(output, target, i, loc=False)
             
-            # generate predicted mesh from occupancy and save
-            logits = torch.cat(logits_list, dim=0).numpy()
-            mesh = self.mesh_from_logits(logits, resolution)
-            export_pred_path = os.path.join(self.output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
-            mesh.export(export_pred_path)
 
-            # Copy ground truth in the val results
-            export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
-            shutil.copyfile(target['mesh'][0], export_gt_path)
+            if output.shape[1] > 64 + 4+self.config.BONE_NUM*8+2:
+                pred_pnnocs = output[:, -3:, :, :]
+                tar_pnnocs = target['maps'][:, -3:, :, :]
+                self.save_single_img(pred_pnnocs, tar_pnnocs, "reposed_pn", i)
 
-            # Get the transformation into val results
-            export_trans_path = os.path.join(self.output_dir, "frame_{}_trans.npz".format(str(i).zfill(3)))
-            trans_path = target['mesh'][0].replace("isosurf_scaled.off", "transform.npz")
-            shutil.copyfile(trans_path, export_trans_path)
+            ## save nocs point cloud
+            # nocs_pc = self.gen_NOCS_pc(output[:, 0:3, :, :], output[:, 0:3, :, :])
+            # pnnocs_pc = self.gen_NOCS_pc(output[:, -3:, :, :], output[:, 0:3, :, :])
 
-    def save_img(self, net_input, output, target, i):
 
-        input_img, gt_out_tuple_rgb, gt_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(target, 'cpu'))
-        _, pred_out_tuple_rgb, pred_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(output.detach(), 'cpu'), isMaskNOX=True)
-        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_color00.png').format(str(i).zfill(3)),  cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB))
+            str_loc_diff = "avg loc diff is {:.6f}".format(  np.mean(np.asarray(loc_diff)))
+            str_angle_diff = "avg diff is {:.6f} degree".format(  np.degrees(np.mean(np.asarray(pose_diff))))
+            str_loss = "avg validation loss is {}".format( np.mean(np.asarray(epoch_losses)))
+            sys.stdout.write("\r[ VAL ] " + str_loc_diff + str_angle_diff + str_loss) 
+            sys.stdout.flush()
 
-        out_target_str = [self.config.TARGETS]
+    def save_single_img(self, output, target, target_str, i):
+        
+        output = sendToDevice(output.detach(), 'cpu')
+        target = sendToDevice(target, 'cpu')
+        output_img = torch2np(output.squeeze()).squeeze() * 255
+        target_img = torch2np(target.squeeze()).squeeze() * 255
 
-        for target_str, gt, pred, gt_mask, pred_mask in zip(out_target_str, gt_out_tuple_rgb, pred_out_tuple_rgb, gt_out_tuple_mask, pred_out_tuple_mask):
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_00gt.png').format(str(i).zfill(3), target_str),
-                        cv2.cvtColor(gt, cv2.COLOR_BGR2RGB))
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_01pred.png').format(str(i).zfill(3), target_str),
-                        cv2.cvtColor(pred, cv2.COLOR_BGR2RGB))
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_02gtmask.png').format(str(i).zfill(3), target_str),
-                        gt_mask)
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_03predmask.png').format(str(i).zfill(3), target_str),
-                        pred_mask)
+        
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_00gt.png').format(str(i).zfill(3), target_str),
+                    cv2.cvtColor(target_img, cv2.COLOR_BGR2RGB))
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_01pred.png').format(str(i).zfill(3), target_str),
+                    cv2.cvtColor(output_img, cv2.COLOR_BGR2RGB))
+
+
+    def gen_mesh(self, grid_points_split, data, i):
+        
+        device = self.net.device
+        logits_list = []
+        for points in grid_points_split:
+            with torch.no_grad():
+                net_input, target = self.preprocess(data, device)
+                net_input['grid_coords'] = points.to(device)
+                output = self.net(net_input)
+                # self.save_img(net_input['RGB'], output[0], target['NOCS'], i)
+                logits_list.append(output[1].squeeze(0).detach().cpu())
+        
+        # generate predicted mesh from occupancy and save
+        logits = torch.cat(logits_list, dim=0).numpy()
+        mesh = self.mesh_from_logits(logits, self.resolution)
+        export_pred_path = os.path.join(self.output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
+        mesh.export(export_pred_path)
+
+        # Copy ground truth in the val results
+        export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
+        shutil.copyfile(target['mesh'][0], export_gt_path)
+
+        # Get the transformation into val results
+        export_trans_path = os.path.join(self.output_dir, "frame_{}_trans.npz".format(str(i).zfill(3)))
+        trans_path = target['mesh'][0].replace("isosurf_scaled.off", "transform.npz")
+        shutil.copyfile(trans_path, export_trans_path)
+
+    # @staticmethod
+    # def gen_NOCS_pc(nocs_map, mask):
+        
+    #     nocs_pc = nocs_map[i, :, index[0], index[1]].transpose(0, 1).unsqueeze(0)
+    #     print(nocs_pc.shape)
+    #     nocs_pc = nocs_pc.detach().cpu().numpy()
+    #     print(nocs_pc.shape)
+        
 
     @staticmethod
     def mesh_from_logits(logits, resolution):

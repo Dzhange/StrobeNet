@@ -158,10 +158,10 @@ class ModelLBSNOCS(object):
                 # self.save_mask(output, target['maps'], i)
                 # self.save_joint(output, target, i, self.config.LOC_LOSS)
                 # self.visualize_joint_prediction(output, target, i)
-            str_loc_diff = "\raverage loc diff is {:.6f} \n".format(  np.mean(np.asarray(loc_diff)))
-            str_angle_diff = "\raverage diff is {:.6f} degree\n".format(  np.degrees(np.mean(np.asarray(pose_diff))))
-            str_loss = "average validation loss is {} \n".format( np.mean(np.asarray(epoch_losses)))
-            sys.stdout.write(str_loc_diff + str_angle_diff + str_loss)
+            str_loc_diff = "avg loc diff is {:.6f}".format(  np.mean(np.asarray(loc_diff)))
+            str_angle_diff = "avg diff is {:.6f} degree".format(  np.degrees(np.mean(np.asarray(pose_diff))))
+            str_loss = "avg validation loss is {}".format( np.mean(np.asarray(epoch_losses)))
+            sys.stdout.write("\r[ VAL ]" + str_loc_diff + str_angle_diff + str_loss)
             sys.stdout.flush()
             gt_path = os.path.join(self.output_dir, 'frame_{}_gt.obj').format(str(i).zfill(3))
             mesh = trimesh.load(target['mesh'][0])
@@ -171,6 +171,7 @@ class ModelLBSNOCS(object):
         # print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
     
     def save_img(self, net_input, output, target, i):
+        # print(type(net_input), type(ou
         input_img, gt_out_tuple_rgb, gt_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(target, 'cpu'))
         _, pred_out_tuple_rgb, pred_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(output.detach(), 'cpu'), isMaskNOX=True)
         cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_color00.png').format(str(i).zfill(3)), cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB))

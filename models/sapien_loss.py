@@ -174,7 +174,7 @@ class PMLBSLoss(nn.Module):
     def pose_nocs_loss(self, pred_joint_map, pred_joint_score, out_mask, tar_joints):
 
         n_batch = pred_joint_map.shape[0]
-        bone_num = self.bone_num        
+        bone_num = self.bone_num
         # get final prediction: score map summarize
         pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
                                                 pred_joint_map.shape[3])  # B,bone_num,3,R,R

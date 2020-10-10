@@ -27,16 +27,16 @@ from loaders.HandOccDataset import HandOccDataset
 
 class LNRNet(nn.Module):
 
-    def __init__(self, config, device=torch.device("cpu"), is_unpooling=True, Args=None, pretrained=True, withSkipConnections=False,Sample=False):
+    def __init__(self, config, device=torch.device("cpu"), is_unpooling=True, Args=None, pretrained=True, withSkipConnections=False, Sample=False):
         super().__init__()
         self.config = config
         self.joint_num = config.BONE_NUM
-        self.SegNet = THSegNet(pose_channels=self.joint_num*(3+3+1+1)+2)        
+        self.SegNet = THSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, bn=config.BN)
         self.SegNet.to(device)
         self.device = device
         self.IFNet = SVR(config, device)
         self.resolution = 128
-        self.initGrids(self.resolution)
+        self.init_grids(self.resolution)
         self.UpdateSegNet = config.UPDATE_SEG
         self.use_pretrained = False
         self.init_hp()
@@ -60,7 +60,7 @@ class LNRNet(nn.Module):
         self.conf_end = self.skin_end + self.joint_num
         self.ft_end = self.conf_end + 64
 
-    def initGrids(self, resolution):
+    def init_grids(self, resolution):
         bb_min = -0.5
         bb_max = 0.5
 
@@ -73,7 +73,8 @@ class LNRNet(nn.Module):
         grid_coords = grid_coords / b
         grid_coords = torch.from_numpy(grid_coords).to(self.device, dtype=torch.float)
         grid_coords = torch.reshape(grid_coords, (1, len(grid_points), 3)).to(self.device)
-        return grid_coords
+        self.grid_coords = grid_coords
+        # return grid_coords
     
     def forward(self, inputs):
         color = inputs['RGB']
@@ -95,7 +96,6 @@ class LNRNet(nn.Module):
         pred_weight = output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
         conf = output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
         nocs_feature = output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
-
         
         pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
         # output = torch.cat((output, pnnocs_maps), dim=1)
@@ -148,6 +148,7 @@ class LNRNet(nn.Module):
             num_valid = valid_idx[0].shape[0]
             if num_valid == 0:
                 # No valid point at all. This will cut off the gradient flow
+                all_pnnocs.append(torch.zeros(pred_nocs[0].size()).to(device=pred_nocs.device))
                 continue
 
             nocs_pc = masked_nocs[i, :, index[0], index[1]].transpose(0, 1).unsqueeze(0)
@@ -157,19 +158,17 @@ class LNRNet(nn.Module):
             _, max_idx = seg_pc.max(dim=1, keepdim=True)
             # print(seg_pc.shape, max_idx.max(), max_idx.shape)
             for flag in range(1, self.joint_num+2):
-                link = torch.where(max_idx == flag, torch.ones(1).to(device=pred_nocs.device), torch.zeros(1).to(device=pred_nocs.device))
-                # print(link.shape)
+                link = torch.where(max_idx == flag, torch.ones(1).to(device=pred_nocs.device), torch.zeros(1).to(device=pred_nocs.device))                
                 to_cat = to_cat + (link, )
 
-            seg_pc = torch.cat(to_cat, dim=1)
-            # print(seg_pc.shape)
+            seg_pc = torch.cat(to_cat, dim=1)            
             pred_loc = pred_locs[i].unsqueeze(0)
             pred_pose = pred_poses[i].unsqueeze(0)
 
             # TODO: following 2 rows would be deleted
             # as here link 2 is the lens with no pose, but we didn't record that
-            pred_loc = F.pad(pred_loc, (0, 0, 0, 1), value=0)
-            pred_pose = F.pad(pred_pose, (0, 0, 0, 1), value=0)
+            pred_loc = F.pad(pred_loc, (0, 0, 1, 0), value=0)
+            pred_pose = F.pad(pred_pose, (0, 0, 1, 0), value=0)
             joint_num = self.joint_num + 1 #TODO
             # rotation
             rodrigues = batch_rodrigues(
@@ -199,7 +198,7 @@ class LNRNet(nn.Module):
                             torch.matmul(rot_mats, back_trslt_mat)
                             )
             T = torch.matmul(seg_pc, repose_mat.view(1, joint_num, 16)) \
-                .view(1, -1, 4, 4)            
+                .view(1, -1, 4, 4)
             pnnocs_pc = lbs_(nocs_pc, T, dtype=nocs_pc.dtype).to(device=pred_nocs.device)
             pnnocs_map = torch.zeros(pred_nocs[0].size()).to(device=pred_nocs.device)
             pnnocs_map[:, index[0], index[1]] = pnnocs_pc.transpose(2, 1)

@@ -1,0 +1,41 @@
+##################################################################################################
+# IF+NOCS
+# Using the intermediate feature of SegNet
+# pretrained weights from full dataset
+
+# DATASET_ROOT: '/workspace/Data/8_7_cut_BW_IF'
+DATASET_ROOT: '/workspace/Data/SAPIEN/eyeglasses/b16_q100_IF'
+OUTPUT_DIR: '/workspace/nrnocs_dev/output/sapien/'
+
+MODES: ['train','val']
+
+BATCHSIZE: 1
+DATALOADER_WORKERS: 2
+EPOCH_TOTAL: 20
+
+LR: 1e-4
+
+SAVE_FREQ: 1
+DATA_LIMIT: 100 # 10 percent
+IMAGE_SIZE: (320,240)
+TARGETS: ["default"]
+TASK: "sapien_lbs"
+OUT_CHANNELS: 20 #4 + 2*8
+
+# TEST_ON_TRAIN: True
+
+MH: True
+
+NOCS_LOSS: True
+POSE_LOSS: True
+POSE_MAP_LOSS: True
+LOC_LOSS: True
+LOC_MAP_LOSS: True
+SKIN_LOSS: True
+
+
+BONE_NUM: 2
+
+# EXPT_NAME: "sapien_pose_aa" # rot loss * 20 coefficient
+EXPT_NAME: "38similar" # * 1
+GPU: 5

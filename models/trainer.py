@@ -98,7 +98,7 @@ class Trainer:
         self.model.net.eval()         #switch to evaluation mode
         if self.config.TASK == "occupancy":
             for child in self.model.net.IFNet.children():
-                if type(child) == nn.BatchNorm3d:
+                if type(child) == nn.BatchNorm3d or type(child) == nn.BatchNorm2d:
                     child.track_running_stats = False
 
         val_losses = []

@@ -16,6 +16,7 @@ from models.Baseline import ModelIFNOCS
 from models.LBS import ModelLBSNOCS
 from models.SegLBS import ModelSegLBS
 from models.PMLBS import PMLBS
+from models.LNR import ModelLNRNET
 
 
 from models.loss import *
@@ -53,6 +54,10 @@ if task == "sapien_lbs":
     Dataset = SAPIENDataset
     objective = PMLBSLoss(cfg)
     Model = PMLBS(cfg)
+if task == "lnrnet":
+    Dataset = SAPIENDataset
+    objective = PMLBSLoss(cfg)
+    Model = ModelLNRNET(cfg)
 # prepare dataset
 # DatasetClass = get_dataset(cfg.DATASET)
 dataloader_dict = dict()
