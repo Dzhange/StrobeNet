@@ -92,6 +92,10 @@ def get_default_cfg():
     cfg.POSE_LOSS = False
     cfg.POSE_MAP_LOSS = False
 
+    # for final pipeline
+    cfg.STAGE_ONE = True
+    cfg.REPOSE = True
+
     # for optimizer
     cfg.WEIGHT_DECAY = 0.0
     return cfg

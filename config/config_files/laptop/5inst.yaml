@@ -1,0 +1,43 @@
+##################################################################################################
+# IF+NOCS
+# Using the intermediate feature of SegNet
+# pretrained weights from full dataset
+
+# DATASET_ROOT: '/workspace/Data/8_7_cut_BW_IF'
+# DATASET_ROOT: '/workspace/Data/SAPIEN/eyeglasses/pose_aa_IF'
+DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/5_2000_IF'
+OUTPUT_DIR: '/workspace/nrnocs_dev/output/sapien'
+
+MODES: ['train','val']
+
+BATCHSIZE: 1
+DATALOADER_WORKERS: 2
+EPOCH_TOTAL: 200
+
+LR: 1e-4
+
+SAVE_FREQ: 2
+DATA_LIMIT: 100 
+VAL_DATA_LIMIT: 1
+IMAGE_SIZE: (320,240)
+TARGETS: ["default"]
+TASK: "lnrnet"
+OUT_CHANNELS: 12 #4 + 1*8
+
+TEST_ON_TRAIN: True
+
+MH: True
+BN: False
+
+NOCS_LOSS: True
+POSE_LOSS: True
+POSE_MAP_LOSS: True
+LOC_LOSS: True
+LOC_MAP_LOSS: True
+SKIN_LOSS: True
+BONE_NUM: 1
+
+STAGE_ONE: False
+
+EXPT_NAME: "5inst_debug"
+GPU: 0

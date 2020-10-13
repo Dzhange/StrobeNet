@@ -51,9 +51,8 @@ def get_loaders(Dataset):
         dataloader_dict[mode] = DataLoader(phase_dataset, batch_size=cfg.BATCHSIZE,
                                         shuffle=mode in ['train'] or cfg.TEST_ON_TRAIN,
                                         num_workers=cfg.DATALOADER_WORKERS, drop_last=True)
-
-Dataset = HandDataset
-Model = ModelNOCS(cfg)
+Dataset = None
+Model = None
 
 if task == "lbs":
     Dataset = HandDatasetLBS
@@ -78,8 +77,12 @@ if task == "sapien_lbs":
 if task == "lnrnet":
     Dataset = SAPIENDataset
     # objective = PMLBSLoss(cfg)
-    objective = PMLoss(cfg)
+    objective = PMLoss(cfg)    
     Model = ModelLNRNET(cfg)
+else:
+    Dataset = HandDataset
+    Model = ModelNOCS(cfg)
+
 
 
 get_loaders(Dataset)

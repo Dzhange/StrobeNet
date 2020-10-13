@@ -111,28 +111,28 @@ class ModelLNRNET(ModelSegLBS):
         self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
         if os.path.exists(self.output_dir) == False:
             os.makedirs(self.output_dir)
-        
+
         self.setup_checkpoint(device)
         self.net.eval()
 
-        num_test_sample = 30
+        num_test_sample = 30000
 
         grid_coords = self.net.grid_coords
         grid_points_split = torch.split(grid_coords, self.batch_points, dim=1)
 
         # Make sure we are not tracking running stats
-        # Otherwise it perform bad           
+        # Otherwise it perform bad
         for child in self.net.IFNet.children():
             if type(child) == nn.BatchNorm3d:
                 child.track_running_stats = False
-        
+
         num_samples = min(num_test_sample, len(val_dataloader))
         print('Testing on ' + str(num_samples) + ' samples')
 
         epoch_losses = []
         pose_diff = []
         loc_diff = []
-        
+
         for i, data in enumerate(val_dataloader, 0):  # Get each batch
             if i > (num_samples-1): 
                 break
@@ -142,8 +142,9 @@ class ModelLNRNET(ModelSegLBS):
             output_recon = self.net(net_input)
             loss = objective(output_recon, target)
             epoch_losses.append(loss.item())
-
-            self.gen_mesh(grid_points_split, data, i)
+            
+            if not self.config.STAGE_ONE:
+                self.gen_mesh(grid_points_split, data, i)
 
             segnet_output = output_recon[0]
             self.save_img(net_input['RGB'], segnet_output[:, 0:4, :, :], target['maps'][:, 0:4, :, :], i)
@@ -164,13 +165,18 @@ class ModelLNRNET(ModelSegLBS):
                 pred_pnnocs = segnet_output[:, -3:, :, :]
                 mask = segnet_output[:, 3, :, :]
                 tar_pnnocs = target['maps'][:, -3:, :, :]
-                self.save_single_img(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i)
+                
+                self.save_single_img(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i)                
+
+                tar_nocs_map = target['maps'][:, 0:3, :, :]
+                                
+                self.gt_debug(target, "reposed_debug", i)
                 self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i)
 
             str_loc_diff = "avg loc diff is {:.6f} ".format(  np.mean(np.asarray(loc_diff)))
             str_angle_diff = "avg diff is {:.6f} degree ".format(  np.degrees(np.mean(np.asarray(pose_diff))))
             str_loss = "avg validation loss is {:6f}".format( np.mean(np.asarray(epoch_losses)))
-            sys.stdout.write("\r[ VAL ] " + str_loc_diff + str_angle_diff + str_loss)
+            sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loc_diff + str_angle_diff + str_loss)
             sys.stdout.flush()
         print("\n")
 
@@ -222,8 +228,8 @@ class ModelLNRNET(ModelSegLBS):
         tar_nocs_map = sendToDevice(tar_nocs_map.detach(), 'cpu')
 
         mask_prob = torch2np(torch.squeeze(F.sigmoid(mask.squeeze())))
-        pred_nocs_map = torch2np(torch.squeeze(pred_nocs_map)) * 255
-        tar_nocs_map = torch2np(torch.squeeze(tar_nocs_map)) * 255
+        pred_nocs_map = torch2np(torch.squeeze(pred_nocs_map))
+        tar_nocs_map = torch2np(torch.squeeze(tar_nocs_map))
 
         pred_nocs = pred_nocs_map[mask_prob > 0.75]
         tar_nocs = tar_nocs_map[mask_prob > 0.75]
@@ -253,68 +259,16 @@ class ModelLNRNET(ModelSegLBS):
         vertices += [pmin, pmin, pmin]
         return trimesh.Trimesh(vertices, triangles)
 
-    def repose_gt(self, nocs_map, loc, pose, seg, mask):
-        threshold = 0.75
-        valid = mask > threshold
-        masked_nocs = torch.where(torch.unsqueeze(valid, 1),\
-                        nocs_map,\
-                        torch.zeros(nocs_map.size(), device=nocs_map.device)
-                        )
+    def gt_debug(self, target, target_str, i):
+        tar_pose = target['pose']
+        
+        tar_nocs = target['maps'][:, 0:3, :, :].squeeze() # nocs
+        tar_mask = target['maps'][:, 3, :, :].squeeze() # mask
+        tar_loc = tar_pose[:, :, 0:3].squeeze(0)
+        tar_rot = tar_pose[:, :, 3:6].squeeze(0)
+        tar_skin_seg = target['maps'][:, 4+self.bone_num*6:4+self.bone_num*6+1, :, :]        
+        tar_skin_seg = self.label2map(tar_skin_seg.squeeze(0))
 
-        cur_masked_nocs = masked_nocs.squeeze().cpu().detach().numpy()
-        valid_idx = np.where(np.all(cur_masked_nocs > np.zeros((3, 1, 1)), axis=0))
-        index = valid_idx
-        num_valid = valid_idx[0].shape[0]
-
-        nocs_pc = masked_nocs[0, :, index[0], index[1]].transpose(0, 1).unsqueeze(0)
-        seg_pc = seg[0, :, index[0], index[1]].transpose(0, 1)
-
-        to_cat = ()
-        _, max_idx = seg_pc.max(dim=1, keepdim=True)
-        # print(seg_pc.shape, max_idx.max(), max_idx.shape)
-        for flag in range(1, self.joint_num+2):
-            link = torch.where(max_idx == flag, torch.ones(1).to(device=pred_nocs.device), torch.zeros(1).to(device=pred_nocs.device))                
-            to_cat = to_cat + (link, )
-
-        seg_pc = torch.cat(to_cat, dim=1)            
-        pred_loc = pred_locs[i].unsqueeze(0)
-        pred_pose = pred_poses[i].unsqueeze(0)
-
-        # TODO: following 2 rows would be deleted
-        # as here link 2 is the lens with no pose, but we didn't record that
-        pred_loc = F.pad(pred_loc, (0, 0, 1, 0), value=0)
-        pred_pose = F.pad(pred_pose, (0, 0, 1, 0), value=0)
-        joint_num = self.joint_num + 1 #TODO
-        # rotation
-        rodrigues = batch_rodrigues(
-                -pred_pose.view(-1, 3),
-                dtype=pred_pose.dtype
-                ).view([-1, 3, 3])
-        I_t = torch.Tensor([0, 0, 0]).to(device=pred_pose.device)\
-                    .repeat((joint_num), 1).view(-1, 3, 1)
-        rot_mats = transform_mat(
-                        rodrigues,
-                        I_t,
-                        ).reshape(-1, joint_num, 4, 4)
-        # translation
-        I_r = torch.eye(3).to(device=pred_pose.device)\
-                    .repeat(joint_num, 1).view(-1, 3, 3)
-        trslt_mat = transform_mat(
-                        I_r,
-                        pred_loc.reshape(-1, 3, 1),
-                        ).reshape(-1, joint_num, 4, 4)
-        back_trslt_mat = transform_mat(
-                        I_r,
-                        -pred_loc.reshape(-1, 3, 1),
-                        ).reshape(-1, joint_num, 4, 4)
-        # whole transformation point cloud
-        repose_mat = torch.matmul(
-                        trslt_mat,
-                        torch.matmul(rot_mats, back_trslt_mat)
-                        )
-        T = torch.matmul(seg_pc, repose_mat.view(1, joint_num, 16)) \
-            .view(1, -1, 4, 4)
-        pnnocs_pc = lbs_(nocs_pc, T, dtype=nocs_pc.dtype).to(device=pred_nocs.device)
-        pnnocs_map = torch.zeros(pred_nocs[0].size()).to(device=pred_nocs.device)
-        pnnocs_map[:, index[0], index[1]] = pnnocs_pc.transpose(2, 1)
-        all_pnnocs.append(pnnocs_map)
+        pnnocs_pc, _ = self.net.repose_pm_core(tar_nocs, tar_loc, tar_rot, tar_skin_seg, tar_mask, self.bone_num)
+        pn_path = os.path.join(self.output_dir, 'frame_{}_{}_00gt.xyz').format(str(i).zfill(3), target_str)
+        write_off(pn_path, pnnocs_pc[0])

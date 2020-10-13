@@ -190,7 +190,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
         for k in self.frame_files:
             if "linkseg" in k:
                 frame[k] = imread_gray_torch(self.frame_files[k][idx], Size=self.img_size)\
-                    .type(torch.FloatTensor).unsqueeze(0) # other wise would all be zero # 1,W,H
+                    .type(torch.FloatTensor).unsqueeze(0) # other wise would all be zero # 1,W,H                
                 #TODO: for eyeglasses, the first link by default iteration order is baselink(link2),
                 # so we abandon this link.
 
@@ -259,14 +259,14 @@ class SAPIENDataset(torch.utils.data.Dataset):
             coords: position to be queried
             occupancies: ground truth for position to be queried
         """
+        # print(required_path)
         data_dir = os.path.dirname(required_path)
         file_name = os.path.basename(required_path)
         index_of_frame = find_frame_num(file_name)
 
         index_of_frame = str(int(index_of_frame) // self.pose_num * self.pose_num).zfill(8)
 
-        transform_path = os.path.join(data_dir, "frame_" + index_of_frame + '_transform.npz')
-
+        transform_path = os.path.join(data_dir, "frame_" + index_of_frame + '_transform.npz')        
         nocs_transform = {}
         nocs_transform['translation'] = np.load(transform_path)['translation']
         nocs_transform['scale'] = np.load(transform_path)['scale']
@@ -322,7 +322,7 @@ if __name__ == '__main__':
 
     Args, _ = Parser.parse_known_args()
 
-    Data = SAPIENDataset(root=Args.data_dir, train=True, frame_load_str=["color00", "nox00", "pnnocs00", "linkseg"])
+    Data = SAPIENDataset(root=Args.data_dir, train=False, frame_load_str=["color00", "nox00", "pnnocs00", "linkseg"])
     # Data.saveItem(random.randint(0, len(Data)))
     # Data.visualizeRandom(10, nColsPerSam=len(Data.FrameLoadStr)-1) # Ignore Pose
     # exit()

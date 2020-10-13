@@ -146,7 +146,7 @@ class PMLBSLoss(nn.Module):
         if output.shape[1] > 64 + 4+bone_num*8+2:
             pred_pnnocs = output[:, -3:, :, :].clone().requires_grad_(True)            
             tar_pnnocs = tar_maps[:, -3:, :, :]
-            pnnocs_loss = self.masked_l2_loss(pred_pnnocs, tar_pnnocs, target_mask)
+            pnnocs_loss = self.masked_l2_loss(pred_pnnocs, tar_pnnocs, target_mask)            
             loss += pnnocs_loss
         # print("[ DIFF ] map_loss is {:5f}; loc_loss is {:5f}".format(loc_map_loss, joint_loc_loss))
 
@@ -264,6 +264,7 @@ class PMLoss(nn.Module):
 
     def __init__(self, config):
         super().__init__()
+        self.config = config
         self.segnet_loss = PMLBSLoss(config)
 
     def forward(self, output, target):
@@ -272,7 +273,11 @@ class PMLoss(nn.Module):
 
         ifnet_output = output[1]
         loss2 = self.recon_loss(ifnet_output, target)
-        return loss1 + loss2
+
+        if self.config.STAGE_ONE:
+            return loss1
+        else:
+            return loss1 + loss2
 
     def recon_loss(self, recon, target):
 

@@ -21,21 +21,22 @@ class ModelLBSNOCS(object):
         self.lr = config.LR # set learning rate
         # self.net = new_SegNet(input_channels=3, output_channels=config.OUT_CHANNELS)
         self.bone_num = config.BONE_NUM
-        if config.MH:
-            # self.net = MHSegNet(bn=False)
-            self.net = MHSegNet(bn=False, pose_channels=self.bone_num*(3+3+1+1)+2)
-        else:
-            self.net = old_SegNet(output_channels=config.OUT_CHANNELS, bn=False)
+
         self.loss_history = []
         self.val_loss_history = []
         self.start_epoch = 0
         self.expt_dir_path = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME)
         if os.path.exists(self.expt_dir_path) == False:
-            os.makedirs(self.expt_dir_path)
+            os.makedirs(self.expt_dir_path)        
+        if config.MH:
+            # self.net = MHSegNet(bn=False)
+            self.net = MHSegNet(bn=False, pose_channels=self.bone_num*(3+3+1+1)+2)
+        else:
+            self.net = old_SegNet(output_channels=config.OUT_CHANNELS, bn=False)
         self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr,
-                                          betas=(self.config.ADAM_BETA1, self.config.ADAM_BETA2),
-                                          weight_decay=config.WEIGHT_DECAY
-                                          )
+                                        betas=(self.config.ADAM_BETA1, self.config.ADAM_BETA2),
+                                        weight_decay=config.WEIGHT_DECAY
+                                        )
 
     def setup_checkpoint(self, TrainDevice):
         latest_checkpoint_dict = None
@@ -269,16 +270,16 @@ class ModelLBSNOCS(object):
             pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
             pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
             pred_joint = pred_joint[0] # retrive the first one from batch            
-            if loc:
-                self.write(pred_path, pred_joint)
+            # if loc:
+            self.write(pred_path, pred_joint)
         else:
             # Mean results
             mean_pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
             mean_pred_joint /= out_mask.nonzero().shape[0]
             mean_pred_joint = mean_pred_joint[0]
             
-            if loc:
-                self.write(mean_pred_path, mean_pred_joint)
+            # if loc:
+            self.write(mean_pred_path, mean_pred_joint)
 
         # tell difference
         if use_score:

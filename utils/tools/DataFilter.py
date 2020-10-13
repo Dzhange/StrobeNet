@@ -59,6 +59,9 @@ class DataFilter:
         
         if self.sapien:
             config_path = os.path.join(self.outputDir, "config.json")
+            if os.path.exists(config_path):
+                os.remove(config_path)
+                
             f = open(config_path, "a")
             configs = '{' + "\"pose_num\": {}".format(self.pose_num) + '}'
             f.write(configs)
@@ -70,17 +73,20 @@ class DataFilter:
                 os.mkdir(cur_out_dir)
             
             
-
-            self.mode = mode
-            # all_color_imgs = glob.glob(os.path.join(self.inputDir, mode, '**/frame_*_view_*_color00.*'))
-            all_color_imgs = glob.glob(os.path.join(self.inputDir, mode, '**/frame_*_color00.*'))
-            all_frames = [self.findFrameNum(p) for p in all_color_imgs ]
-            all_frames = list(dict.fromkeys(all_frames))
-            all_frames.sort()
+            if 0:
+                self.mode = mode
             
-            p = Pool(mp.cpu_count()>>3)
-
-            p.map(self.processFrame, all_frames)
+                all_color_imgs = glob.glob(os.path.join(self.inputDir, mode, '**/frame_*_view_*_color00.*'))
+                all_color_imgs = glob.glob(os.path.join(self.inputDir, mode, '**/frame_*_color00.*'))
+                all_frames = [self.findFrameNum(p) for p in all_color_imgs ]
+                all_frames = list(dict.fromkeys(all_frames))
+                all_frames.sort()
+            
+                p = Pool(mp.cpu_count()>>3)            
+                p.map(self.processFrame, all_frames)
+            else:
+                self.mode = "val"
+                self.processFrame("00048000")
 
     def processFrame(self, Frame):
         out_dir = os.path.join(self.outputDir, self.mode, str(int(Frame) // self.frame_per_dir).zfill(4))

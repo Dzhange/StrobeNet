@@ -55,7 +55,7 @@ class Trainer:
                     # Compute ETA
                     time_per_batch = (toc - all_tic) / ((cur_epoch * len(self.train_data_loader)) + (i+1)) # Time per batch
                     ETA = math.floor(time_per_batch * self.config.EPOCH_TOTAL * len(self.train_data_loader) * 1e-6)
-
+                    
                     progress_str = ('\r[{}>{}] epoch - {}/{}, train loss - {:.8f} | epoch - {}, total - {} ETA - {} |')\
                                             .format('=' * done, '-' * (30 - done),
                                                     self.model.start_epoch + cur_epoch + 1,
@@ -67,6 +67,10 @@ class Trainer:
 
                     sys.stdout.write(progress_str.ljust(100))
                     sys.stdout.flush()
+                    # if i % 100 == 0:
+                    torch.cuda.empty_cache()
+                    gc.collect() 
+
                 sys.stdout.write('\n')
                 gc.collect()
                 self.model.loss_history.append(np.mean(np.asarray(epoch_losses)))

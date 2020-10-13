@@ -200,9 +200,8 @@ def write_off(path, pc):
 
     with open(path, 'a') as f1:
         for i in range(pc.shape[0]):
-            p = pc[i]
-            if np.linalg.norm(p) < 500:
-                f1.write("{} {} {}\n".format(p[0],p[1],p[2]))
+            p = pc[i]            
+            f1.write("{} {} {}\n".format(p[0], p[1], p[2]))
     f1.close()
 
 def transform_mat(R, t):
