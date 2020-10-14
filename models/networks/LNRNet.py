@@ -90,31 +90,38 @@ class LNRNet(nn.Module):
         # first lift them into 3D point cloud
         output = self.SegNet(color)
         
+        omax = output.max()
+        omin = output.min()
+        s = torch.sum(torch.isnan(output))
         pred_nocs = output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
-        pred_mask = output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)        
+        pred_mask = output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
+        
+
+        if torch.isnan(pred_mask).any():
+            print("f NAN encountered")
+            
         pred_loc = output[:, self.mask_end:self.loc_end, :, :].clone().requires_grad_(True)
         pred_pose = output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
         pred_weight = output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
         conf = output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
         nocs_feature = output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
         
-        pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
-        pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
-        
+        # pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
 
         if self.config.REPOSE:
+            pnnocs_maps_ = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
+            pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
+            print((pnnocs_maps-pnnocs_maps_).sum() )
             output = torch.cat((output, pnnocs_maps), dim=1)
-        # print(output.shape)
-        
+
         # then: we transform the point cloud into occupancy(along with the features )
         occupancies = self.voxelize(output, nocs_feature, transform)
-        
         # if self.vis == True:
         # self.visualize(occupancies, inputs['translation'], inputs['scale'])
-        
+
         # and then feed into IF-Net. The ground truth shouled be used in the back projection
         recon = self.IFNet(grid_coords, occupancies)
-                
+
         return output, recon
 
     def vote(self, pred_joint_map, pred_joint_score, out_mask):
@@ -141,34 +148,37 @@ class LNRNet(nn.Module):
         threshold = 0.75
         valid = pred_mask > threshold
         batch_size = pred_mask.shape[0]
-        masked_nocs = torch.where(torch.unsqueeze(valid, 1),\
-                                pred_nocs,\
-                                torch.zeros(pred_nocs.size(), device=pred_nocs.device)
-                                )
+        # masked_nocs = torch.where(torch.unsqueeze(valid, 1),\
+        #                         pred_nocs,\
+        #                         torch.zeros(pred_nocs.size(), device=pred_nocs.device)
+        #                         )
+
         pred_locs = self.vote(pred_loc_map, conf, pred_mask)
         pred_poses = self.vote(pred_pose_map, conf, pred_mask) # axis-angle representation for the joint
+
         all_pnnocs = []
         for i in range(batch_size):
-            cur_masked_nocs = masked_nocs[i, :].cpu().detach().numpy()
-            valid_idx = np.where(np.all(cur_masked_nocs > np.zeros((3, 1, 1)), axis=0))
-            index = valid_idx
-            num_valid = valid_idx[0].shape[0]
+            # cur_masked_nocs = masked_nocs[i, :].cpu().detach().numpy()
+            # valid_idx = np.where(np.all(cur_masked_nocs > np.zeros((3, 1, 1)), axis=0))
+            # index = valid_idx
+            # num_valid = valid_idx[0].shape[0]
+            masked = pred_mask[i] > threshold
+            nocs_pc = pred_nocs[i, :, masked].transpose(0, 1).unsqueeze(0)
+            seg_pc = pred_skin[i, :, masked].transpose(0, 1)
+            num_valid = nocs_pc.shape[1]
             if num_valid == 0:
                 # No valid point at all. This will cut off the gradient flow
                 all_pnnocs.append(torch.zeros(pred_nocs[0].size()).to(device=pred_nocs.device))
                 continue
-
-            nocs_pc = masked_nocs[i, :, index[0], index[1]].transpose(0, 1).unsqueeze(0)
-            seg_pc = pred_skin[i, :, index[0], index[1]].transpose(0, 1)
-
+            
             to_cat = ()
             _, max_idx = seg_pc.max(dim=1, keepdim=True)
-            # print(seg_pc.shape, max_idx.max(), max_idx.shape)
-            for flag in range(1, self.joint_num+2):
+            seg_flags = range(1, self.joint_num+2) # 0 is background            
+            for flag in seg_flags:
                 link = torch.where(max_idx == flag, torch.ones(1).to(device=pred_nocs.device), torch.zeros(1).to(device=pred_nocs.device))                
                 to_cat = to_cat + (link, )
+            seg_pc = torch.cat(to_cat, dim=1)
 
-            seg_pc = torch.cat(to_cat, dim=1)            
             pred_loc = pred_locs[i].unsqueeze(0)
             pred_pose = pred_poses[i].unsqueeze(0)
 
@@ -176,6 +186,7 @@ class LNRNet(nn.Module):
             # as here link 2 is the lens with no pose, but we didn't record that
             pred_loc = F.pad(pred_loc, (0, 0, 1, 0), value=0)
             pred_pose = F.pad(pred_pose, (0, 0, 1, 0), value=0)
+
             joint_num = self.joint_num + 1 #TODO
             # rotation
             rodrigues = batch_rodrigues(
@@ -211,69 +222,68 @@ class LNRNet(nn.Module):
             # re-normalize
             low_bound = pnnocs_pc.min(axis=1)[0]
             up_bound = pnnocs_pc.max(axis=1)[0]
-            scale = (up_bound - low_bound).max()            
-            pnnocs_pc -= low_bound
-            pnnocs_pc /= scale
+            scale = (up_bound - low_bound).max()
+            if scale != 0:
+                pnnocs_pc -= low_bound
+                pnnocs_pc /= scale
 
             pnnocs_map = torch.zeros(pred_nocs[0].size()).to(device=pred_nocs.device)
-            pnnocs_map[:, index[0], index[1]] = pnnocs_pc.transpose(2, 1)
+            pnnocs_map[:, masked] = pnnocs_pc.transpose(2, 1)
             all_pnnocs.append(pnnocs_map)
 
         pnnocs_maps = torch.stack(tuple(all_pnnocs))
         return pnnocs_maps
+
 
     def repose_pm_pred(self, pred_nocs, pred_loc_map, pred_pose_map, pred_seg, conf, pred_mask):
         """
         reposing function for partial mobility models
         """
         sigmoid = nn.Sigmoid()
-        pred_mask = sigmoid(pred_mask).squeeze(0)
-
+        pred_mask = sigmoid(pred_mask).squeeze(1)        
         pred_loc = self.vote(pred_loc_map, conf, pred_mask)
         pred_rot = self.vote(pred_pose_map, conf, pred_mask) # axis-angle representation for the joint
-
         all_pnnocs = []
         batch_size = pred_mask.shape[0]
         for i in range(batch_size):
-            if 1:
+            nocs = pred_nocs[i].clone().requires_grad_(True)
+            loc = pred_loc[i].clone().requires_grad_(True)
+            rot = pred_rot[i].clone().requires_grad_(True)
+            seg = pred_seg[i].clone().requires_grad_(True)
+            mask = pred_mask[i].clone().requires_grad_(True)
+            if torch.isnan(nocs).any() or torch.isnan(seg).any() or torch.isnan(mask).any():
                 all_pnnocs.append(torch.zeros(pred_nocs[0].size()).to(device=pred_nocs.device))
             else:
-                
-                pnnocs, pnnocs_map = self.repose_pm_core(pred_nocs[i],\
-                                            pred_loc, pred_rot,\
-                                            pred_seg.squeeze(), pred_mask.squeeze(),\
-                                            self.joint_num)
+                pnnocs, pnnocs_map = self.repose_pm_core(nocs, loc, rot, seg, mask, self.joint_num)
                 if pnnocs is None:
                     all_pnnocs.append(torch.zeros(pred_nocs[0].size()).to(device=pred_nocs.device))
                 else:
                     all_pnnocs.append(pnnocs_map)
-        
         pnnocs_maps = torch.stack(tuple(all_pnnocs))
         return pnnocs_maps
-            
+
     @staticmethod
     def repose_pm_core(NOX, loc, rot, seg, mask, joint_num):
         """
         input shape:
-            NOX: 3, W, H
+            NOX: 3, H, W
             loc: N, 3
             rot: N, 3
-            seg: N, W, H
-            mask: W, H
+            seg: N+2, H, W
+            mask: H, W
         """
         thresh = 0.75
         masked = mask > thresh
         NOX_pc = NOX[:, masked].transpose(0, 1)
         seg_pc = seg[:, masked].transpose(0, 1)
-        
+
         num_valid = NOX_pc.shape[0]
         if num_valid == 0:
             # No valid point at all. This will cut off the gradient flow
-            return None
-        
+            return None, None
         to_cat = ()
         # using max_idx to confirm the segmentation
-        _, max_idx = seg_pc.max(dim=1, keepdim=True)
+        _, max_idx = seg_pc.max(dim=1, keepdim=True)        
         seg_flags = range(1, joint_num+2) # 0 is background
         for flag in seg_flags:
             part = (max_idx == flag)
@@ -287,11 +297,11 @@ class LNRNet(nn.Module):
         # TODO: following 2 rows would be deleted
         # as here link 2 is the lens with no pose, but we didn't record that
         loc = F.pad(loc, (0, 0, 1, 0), value=0)
-        rot = F.pad(rot, (0, 0, 1, 0), value=0)
-        
+        rot = F.pad(rot, (0, 0, 1, 0), value=0)        
+
         # we will add the base joint, it's identical
         joint_num = joint_num + 1
-        
+
         # rotation
         rodrigues = batch_rodrigues(
                 -rot.view(-1, 3),
@@ -321,7 +331,7 @@ class LNRNet(nn.Module):
                         trslt_mat,
                         torch.matmul(rot_mats, back_trslt_mat)
                         )
-        T = torch.matmul(seg_pc, repose_mat.view(1, joint_num, 16)) \
+        T = torch.matmul(seg_pc, repose_mat.view(1, joint_num, 16))\
             .view(1, -1, 4, 4)
         pnnocs_pc = lbs_(NOX_pc.unsqueeze(0), T, dtype=NOX.dtype).to(device=NOX.device)
 
@@ -329,8 +339,10 @@ class LNRNet(nn.Module):
         low_bound = pnnocs_pc.min(axis=1)[0]
         up_bound = pnnocs_pc.max(axis=1)[0]
         scale = (up_bound - low_bound).max()
-        pnnocs_pc -= low_bound
-        pnnocs_pc /= scale
+
+        if scale != 0:
+            pnnocs_pc -= low_bound
+            pnnocs_pc /= scale
 
         pnnocs_map = torch.zeros(NOX.size(), device=NOX.device)
         pnnocs_map[:, masked] = pnnocs_pc.transpose(2, 1)
@@ -369,66 +381,38 @@ class LNRNet(nn.Module):
             pred_nocs = output[:, -3:, :, :].clone().requires_grad_(True)
         else:
             pred_nocs = output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
-        # print(pred_nocs.shape, out_mask.shape)
-
-        valid = out_mask > threshold
-        masked_nocs = torch.where(valid, pred_nocs, torch.zeros(pred_nocs.size(), device=pred_nocs.device))
 
         # get upsampeld feature
         upsampled_feature = F.interpolate(feature, size=img_size)
-
         all_occupancies = []
         for i in range(batch_size):
-            img = masked_nocs[i, :].cpu().detach().numpy()
-            valid_idx = np.where(np.all(img > np.zeros((3, 1, 1)), axis=0)) # Only white BG
-            # valid_idx = masked_nocs[i] > 0
-            index = valid_idx
+            cur_mask = out_mask[i].squeeze()
+            masked = cur_mask > threshold
+            point_cloud = pred_nocs[i, :, masked]
 
-            num_valid = valid_idx[0].shape[0]
-            if num_valid == 0:
-                # No valid point at all. This will cut off the gradient flow
-                # occ_empty = np.zeros(len(self.GridPoints), dtype=np.int8)
-                # occ_empty = np.reshape(occ_empty, (self.resolution,)*3)
-                occ_empty = torch.ones(feature_dim, *(self.resolution,)*3).to(device=masked_nocs.device)
+            point_cloud = torch.where(point_cloud < 0, torch.zeros(1, device=point_cloud.device), point_cloud)
+            point_cloud = torch.where(point_cloud > 1, torch.ones(1, device=point_cloud.device), point_cloud)
+
+            num_valid = point_cloud.shape[1]
+            if num_valid == 0 or torch.isnan(point_cloud).any():
+                occ_empty = torch.ones(feature_dim, *(self.resolution,)*3).to(device=pred_nocs.device)
                 # print("empty", occ_empty.shape)
                 all_occupancies.append(occ_empty)
                 continue
-            # print(num_valid)
-            if self.sample and num_valid > self.max_point:
-                random_index = np.random.choice(num_valid, self.max_point, replace=True)
-                # for current use we choose uniform sample
-                sampled_idx = (valid_idx[0][random_index], valid_idx[1][random_index])
-                index = sampled_idx
 
-            point_cloud = masked_nocs[i, :, index[0], index[1]]            
-            
+            if self.sample and num_valid > self.max_point:
+                pass
+
             if transform is not None:
                 translation = transform['translation'][i].view(3, 1).float()
-                # print(pointcloud.shape, translation.shape)
                 point_cloud = point_cloud + translation
                 point_cloud = point_cloud * transform['scale'][i]
 
-            # self.save_mesh(pointcloud)
-            # pc_lower_bound, _ = pointcloud.min(dim=1)
-            # pointcloud -= pc_lower_bound.unsqueeze(1)            
+            feature_cloud = upsampled_feature[i, :, masked]
+            voxelized_feature = self.discretize(point_cloud, feature_cloud, self.resolution)
+            all_occupancies.append(voxelized_feature)
 
-            if 1:
-                # Feature solution
-                feature_cloud = upsampled_feature[i, :, index[0], index[1]]
-                voxelized_feature = self.discretize(point_cloud, feature_cloud, self.resolution)
-                all_occupancies.append(voxelized_feature)
-                # print(voxelized_feature.shape)
-            else:
-                # occupancy solution
-                c, n = point_cloud.shape
-                point_cloud = point_cloud.view(1, n, c)
-                voxel = pc2vox(point_cloud, self.resolution)
-                all_occupancies.append(voxel)
-        
-        # AllOccupancies = torch.Tensor(np.array(AllOccupancies)).to(device=PointCloud.device,dtype=torch.float32)
-        # print(len(AllOccupancies))
         all_occupancies = torch.stack(tuple(all_occupancies))
-        
         return all_occupancies
 
     def discretize(self, point_cloud, FeatureCloud, Res):
@@ -441,11 +425,8 @@ class LNRNet(nn.Module):
         
         voxels = torch.floor(point_cloud*Res)
         # print(voxels.max(axis=1))
-
-        index = voxels[0, :]*Res**2 + voxels[1, :]*Res + voxels[2, :]
-        
+        index = voxels[0, :]*Res**2 + voxels[1, :]*Res + voxels[2, :]        
         index = index.unsqueeze(0).to(dtype=torch.long)
-
 
         #TODO: replace the mean operation to pointnet
         # print(FeatureCloud.shape)

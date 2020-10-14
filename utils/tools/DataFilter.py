@@ -184,6 +184,7 @@ class DataFilter:
                  '_view_00_linkseg.png', "_pose.txt", '_wt_mesh.obj']
             for fix in suffixs:
                 f_name = frame_view + fix
+                print(f_name)
                 old_f = os.path.join(in_dir, f_name)                
                 new_f = os.path.join(out_dir, f_name)
                 if os.path.exists(old_f) and not os.path.exists(new_f):

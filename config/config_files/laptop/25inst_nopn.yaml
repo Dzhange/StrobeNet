@@ -37,13 +37,12 @@ LOC_MAP_LOSS: True
 SKIN_LOSS: True
 BONE_NUM: 1
 
-# REPOSE: False
+REPOSE: False
 STAGE_ONE: True
 
 # EXPT_NAME: "25debug_1"
 
-# EXPT_NAME: "25inst"
-EXPT_NAME: "25inst_oldpm"
+EXPT_NAME: "25inst_nopn"
 
-GPU: 5
+GPU: 4
 

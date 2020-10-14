@@ -6,7 +6,7 @@
 # DATASET_ROOT: '/workspace/Data/8_7_cut_BW_IF'
 # DATASET_ROOT: '/workspace/Data/SAPIEN/eyeglasses/pose_aa_IF'
 DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/5_2000_IF'
-OUTPUT_DIR: '/workspace/nrnocs_dev/output/sapien'
+OUTPUT_DIR: '/workspace/nrnocs_dev/output/laptop_debug/'
 
 MODES: ['train','val']
 
@@ -37,7 +37,10 @@ LOC_MAP_LOSS: True
 SKIN_LOSS: True
 BONE_NUM: 1
 
-STAGE_ONE: False
+REPOSE: False
+# STAGE_ONE: False
 
-EXPT_NAME: "5inst_debug"
+# EXPT_NAME: "5inst_debug"
+EXPT_NAME: "5inst"
+
 GPU: 0

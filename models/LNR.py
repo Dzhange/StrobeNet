@@ -162,14 +162,12 @@ class ModelLNRNET(ModelSegLBS):
                 self.visualize_joint_prediction(segnet_output, target, i, loc=False)
 
             if segnet_output.shape[1] > 64 + 4+self.config.BONE_NUM*8+2:
-                pred_pnnocs = segnet_output[:, -3:, :, :]
-                mask = segnet_output[:, 3, :, :]
+                pred_pnnocs = segnet_output[:, -3:, :, :]                
+                mask = target['maps'][:, 3, :, :]
                 tar_pnnocs = target['maps'][:, -3:, :, :]
                 
-                self.save_single_img(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i)                
+                self.save_single_img(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i)
 
-                tar_nocs_map = target['maps'][:, 0:3, :, :]
-                                
                 self.gt_debug(target, "reposed_debug", i)
                 self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i)
 
@@ -184,7 +182,9 @@ class ModelLNRNET(ModelSegLBS):
         mask = sendToDevice(mask.detach(), 'cpu')
         output = sendToDevice(output.detach(), 'cpu')
         target = sendToDevice(target, 'cpu')
-        mask_prob = torch2np(torch.squeeze(mask.squeeze().sigmoid()))
+
+        # We use gt mask
+        mask_prob = torch2np(mask.squeeze())
         output = torch2np(torch.squeeze(output)) * 255
         target = torch2np(torch.squeeze(target)) * 255
         target[mask_prob <= 0.75] = 255
@@ -226,8 +226,9 @@ class ModelLNRNET(ModelSegLBS):
         mask = sendToDevice(mask.detach(), 'cpu')
         pred_nocs_map = sendToDevice(pred_nocs_map.detach(), 'cpu')
         tar_nocs_map = sendToDevice(tar_nocs_map.detach(), 'cpu')
-
-        mask_prob = torch2np(torch.squeeze(F.sigmoid(mask.squeeze())))
+        
+        # We use gt mask
+        mask_prob = torch2np(mask.squeeze())
         pred_nocs_map = torch2np(torch.squeeze(pred_nocs_map))
         tar_nocs_map = torch2np(torch.squeeze(tar_nocs_map))
 
@@ -262,13 +263,19 @@ class ModelLNRNET(ModelSegLBS):
     def gt_debug(self, target, target_str, i):
         tar_pose = target['pose']
         
-        tar_nocs = target['maps'][:, 0:3, :, :].squeeze() # nocs
+        tar_nocs = target['maps'][:, 0:3, :, :].squeeze() # nocs        
         tar_mask = target['maps'][:, 3, :, :].squeeze() # mask
         tar_loc = tar_pose[:, :, 0:3].squeeze(0)
         tar_rot = tar_pose[:, :, 3:6].squeeze(0)
-        tar_skin_seg = target['maps'][:, 4+self.bone_num*6:4+self.bone_num*6+1, :, :]        
+        tar_loc[:, 1] = 0
+        tar_skin_seg = target['maps'][:, 4+self.bone_num*6:4+self.bone_num*6+1, :, :]
         tar_skin_seg = self.label2map(tar_skin_seg.squeeze(0))
 
         pnnocs_pc, _ = self.net.repose_pm_core(tar_nocs, tar_loc, tar_rot, tar_skin_seg, tar_mask, self.bone_num)
         pn_path = os.path.join(self.output_dir, 'frame_{}_{}_00gt.xyz').format(str(i).zfill(3), target_str)
+        nox_path = os.path.join(self.output_dir, 'frame_{}_{}_01orig.xyz').format(str(i).zfill(3), target_str)
+
+        nocs_pc = tar_nocs[:,  tar_mask>0.75].transpose(0, 1)
+
         write_off(pn_path, pnnocs_pc[0])
+        write_off(nox_path, nocs_pc)
