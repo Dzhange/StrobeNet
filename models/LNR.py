@@ -148,7 +148,7 @@ class ModelLNRNET(ModelSegLBS):
 
             segnet_output = output_recon[0]
             self.save_img(net_input['RGB'], segnet_output[:, 0:4, :, :], target['maps'][:, 0:4, :, :], i)
-            self.gen_NOCS_pc(segnet_output[:, 0:3, :, :], target['maps'][:, 0:3, :, :], segnet_output[:, 3, :, :], "nocs", i)
+            self.gen_NOCS_pc(segnet_output[:, 0:3, :, :], target['maps'][:, 0:3, :, :], target['maps'][:, 3, :, :], "nocs", i)
 
             if self.config.SKIN_LOSS or self.config.TASK == "lbs_seg":
                 self.save_mask(segnet_output, target['maps'], i)

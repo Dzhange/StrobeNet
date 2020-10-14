@@ -178,7 +178,7 @@ class ModelLBSNOCS(object):
         cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_color00.png').format(str(i).zfill(3)), cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB))
 
         if "default" in self.config.TARGETS:
-            out_target_str = "nocs"
+            out_target_str = ["nocs"]
         else:
             out_target_str = self.config.TARGETS
 
