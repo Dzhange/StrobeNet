@@ -73,8 +73,11 @@ class PMLBSLoss(nn.Module):
         self.frame_id = 0
 
     def forward(self, output, target):
+        
+        loss = {}
+        
         bone_num = self.bone_num
-        loss = torch.Tensor([0]).to(device=output.device)
+        # loss = torch.Tensor([0]).to(device=output.device)
 
         pred_nocs = output[:, 0:3, :, :].clone().requires_grad_(True)
         out_mask = output[:, 3, :, :].clone().requires_grad_(True)
@@ -105,13 +108,13 @@ class PMLBSLoss(nn.Module):
         
         skin_loss = self.seg_loss(pred_seg, tar_seg)
         loc_map_loss = self.l2_loss(pred_loc_map, tar_loc_map, target_mask)
-        pose_map_loss = self.l2_loss(pred_rot_map, tar_rot_map, target_mask)
+        rot_map_loss = self.l2_loss(pred_rot_map, tar_rot_map, target_mask)
                 
-        joint_loc_loss = self.pose_nocs_loss(pred_loc_map,
+        loc_loss = self.pose_nocs_loss(pred_loc_map,
                                             pred_joint_score,
                                             target_mask,
                                             tar_loc)
-        joint_rot_loss = self.pose_nocs_loss(pred_rot_map,
+        rot_loss = self.pose_nocs_loss(pred_rot_map,
                                             pred_joint_score,
                                             target_mask,
                                             tar_rot)
@@ -123,31 +126,21 @@ class PMLBSLoss(nn.Module):
             if self.frame_id == 80:
                 import sys
                 sys.exit()
-
-        if self.cfg.NOCS_LOSS:
-            loss += nocs_loss
-
-        if self.cfg.NOCS_LOSS:
-            loss += mask_loss
-
-        if self.cfg.SKIN_LOSS:
-            loss += skin_loss            
-
-        if self.cfg.LOC_MAP_LOSS:
-            loss += loc_map_loss
-        if self.cfg.LOC_LOSS:
-            loss += joint_loc_loss
-
-        if self.cfg.POSE_MAP_LOSS:
-            loss += pose_map_loss
-        if self.cfg.POSE_LOSS:
-            loss += joint_rot_loss
-
+        
+        loss['nox_loss'] = nocs_loss
+        loss['mask_loss'] = mask_loss
+        loss['loc_loss'] = loc_loss
+        loss['loc_map_loss'] = loc_map_loss
+        loss['rot_loss'] = rot_loss
+        loss['rot_map_loss'] = rot_map_loss
+        loss['skin_loss'] = skin_loss
+        
         if output.shape[1] > 64 + 4+bone_num*8+2:
             pred_pnnocs = output[:, -3:, :, :].clone().requires_grad_(True)            
             tar_pnnocs = tar_maps[:, -3:, :, :]
             pnnocs_loss = self.masked_l2_loss(pred_pnnocs, tar_pnnocs, target_mask)            
-            loss += pnnocs_loss
+            # loss += pnnocs_loss
+            loss['pnnocs_loss'] = pnnocs_loss
         # print("[ DIFF ] map_loss is {:5f}; loc_loss is {:5f}".format(loc_map_loss, joint_loc_loss))
 
         return loss
@@ -269,15 +262,14 @@ class PMLoss(nn.Module):
 
     def forward(self, output, target):
         segnet_output = output[0]
-        loss1 = self.segnet_loss(segnet_output, target)
+        loss = self.segnet_loss(segnet_output, target)
 
         ifnet_output = output[1]
-        loss2 = self.recon_loss(ifnet_output, target)
+        loss['recon_loss'] = self.recon_loss(ifnet_output, target)
 
-        if self.config.STAGE_ONE:
-            return loss1
-        else:
-            return loss1 + loss2
+        all_loss = self.add_up(loss)
+
+        return all_loss
 
     def recon_loss(self, recon, target):
 
@@ -289,3 +281,20 @@ class PMLoss(nn.Module):
         occ_loss = occ_loss.sum(-1).mean() / num_sample
 
         return occ_loss
+    
+    
+    def add_up(self, loss):
+        
+        all_loss = torch.zeros(1, device=loss['nox_loss'].device)
+
+        cfg = self.config
+        all_loss = all_loss\
+            + cfg.NOCS_LOSS * loss['nox_loss']\
+            + cfg.NOCS_LOSS * loss['mask_loss']\
+            + cfg.LOC_LOSS * (loss['loc_loss'] + loss['loc_map_loss'])\
+            + cfg.POSE_LOSS * (loss['rot_loss'] + loss['rot_map_loss'])\
+            + cfg.SKIN_LOSS * loss['skin_loss']\
+            + loss['pnnocs_loss']
+        
+        return all_loss
+    

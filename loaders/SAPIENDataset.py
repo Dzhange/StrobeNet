@@ -35,6 +35,13 @@ class SAPIENDataset(torch.utils.data.Dataset):
         # print(self.frame_load_str)
         self.load_data()
 
+        ##############################################
+
+        print("[ SERIOUS WARNING!!!!! ] SETTING ALL Y LOCATIONS INTO 0")
+        self.projection = True
+        ##############################################
+
+
     def init(self, root, train=True, transform=None,
              img_size=(320, 240), limit=100, frame_load_str=None, required='VertexColors', rel=False):
         
@@ -180,11 +187,14 @@ class SAPIENDataset(torch.utils.data.Dataset):
         file_name = os.path.basename(typical_path)
         index_of_frame = find_frame_num(file_name)
         cur_pose_path = os.path.join(curdir, "frame_" + index_of_frame + '_pose.txt')
-        # cano_pose_path = os.path.join(curdir, "frame_" + idx_of_frame + '_cano_pose.txt')
-        # angles in poses are in radians format
         cur_pose = torch.Tensor(np.loadtxt(cur_pose_path))
         if len(cur_pose.shape) == 1:
             cur_pose = cur_pose.unsqueeze(0)
+
+        if self.projection:            
+            cur_pose[:, 1] = 0
+            
+
         frame = {}
         has_mask = False
         for k in self.frame_files:
@@ -230,10 +240,13 @@ class SAPIENDataset(torch.utils.data.Dataset):
         joint_map = torch.Tensor(cur_pose.shape[0]*6, img_shape[1], img_shape[2])
 
         cnt = 0
+        # get locations
         for i in range(cur_pose.shape[0]):
             for j in range(3):
                 joint_map[cnt] = joint_map[cnt].fill_(cur_pose[i, j])
                 cnt += 1
+
+        # get rotations
         for i in range(cur_pose.shape[0]):
             for j in range(3, 6):
                 joint_map[cnt] = joint_map[cnt].fill_(cur_pose[i, j])

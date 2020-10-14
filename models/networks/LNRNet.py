@@ -109,9 +109,8 @@ class LNRNet(nn.Module):
         # pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
 
         if self.config.REPOSE:
-            pnnocs_maps_ = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
-            pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
-            print((pnnocs_maps-pnnocs_maps_).sum() )
+            pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
+            # pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
             output = torch.cat((output, pnnocs_maps), dim=1)
 
         # then: we transform the point cloud into occupancy(along with the features )
@@ -297,7 +296,7 @@ class LNRNet(nn.Module):
         # TODO: following 2 rows would be deleted
         # as here link 2 is the lens with no pose, but we didn't record that
         loc = F.pad(loc, (0, 0, 1, 0), value=0)
-        rot = F.pad(rot, (0, 0, 1, 0), value=0)        
+        rot = F.pad(rot, (0, 0, 1, 0), value=0)
 
         # we will add the base joint, it's identical
         joint_num = joint_num + 1

@@ -80,7 +80,7 @@ class ModelLNRNET(ModelSegLBS):
             else:
                 # for gt mesh
                 continue
-        
+
         inputs = data_to_device[0]
         # TODO: uncomment these when pipeline finished
         inputs = {}
@@ -171,9 +171,9 @@ class ModelLNRNET(ModelSegLBS):
                 self.gt_debug(target, "reposed_debug", i)
                 self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i)
 
-            str_loc_diff = "avg loc diff is {:.6f} ".format(  np.mean(np.asarray(loc_diff)))
-            str_angle_diff = "avg diff is {:.6f} degree ".format(  np.degrees(np.mean(np.asarray(pose_diff))))
-            str_loss = "avg validation loss is {:6f}".format( np.mean(np.asarray(epoch_losses)))
+            str_loc_diff = "avg loc diff is {:.6f} ".format(np.mean(np.asarray(loc_diff)))
+            str_angle_diff = "avg diff is {:.6f} degree ".format(np.degrees(np.mean(np.asarray(pose_diff))))
+            str_loss = "avg validation loss is {:6f}".format(np.mean(np.asarray(epoch_losses)))
             sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loc_diff + str_angle_diff + str_loss)
             sys.stdout.flush()
         print("\n")

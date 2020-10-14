@@ -44,7 +44,10 @@ class Trainer:
                     net_input, target = self.model.preprocess(data, self.device)
                     output = self.model.net(net_input)
                     loss = self.objective(output, target)
-                    loss.backward()
+                    # if self.config.TASK == "lnrnet":
+                        # self.model.optim(loss)
+                    # else:
+                    loss.backward()                        
                     self.model.optimizer.step()
                     ####################### START MONITOR ################################
                     epoch_losses.append(loss.item())
@@ -68,8 +71,8 @@ class Trainer:
                     sys.stdout.write(progress_str.ljust(100))
                     sys.stdout.flush()
                     # if i % 100 == 0:
-                    torch.cuda.empty_cache()
-                    gc.collect() 
+                    # torch.cuda.empty_cache()
+                    # gc.collect() 
 
                 sys.stdout.write('\n')
                 gc.collect()

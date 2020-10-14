@@ -318,9 +318,6 @@ class ModelLBSNOCS(object):
                 max_v = max(cur_pred.max(), gt.max())
                 cur_pred /= max_v
                 gt /= max_v
-                # print(cur_preds)
-                # cur_pred = (cur_pred + 1) / 2
-                # gt = (gt + 1) / 2
 
             masked_map = torch.where(mask > 0.7, cur_pred, zero_map)
             joint_map = torch2np(masked_map) * 255
