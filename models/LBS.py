@@ -227,20 +227,20 @@ class ModelLBSNOCS(object):
             pred_joint_map = output[:, 4:4+bone_num*3, :, :]
             # gt
             gt_joint = target['pose'][0, :, 0:3]
-            gt_path = os.path.join(self.output_dir, 'frame_{}_gt_loc.xyz').format(str(i).zfill(3))
+            gt_path = os.path.join(self.output_dir, 'frame_{}_loc_gt.xyz').format(str(i).zfill(3))
             self.write(gt_path, gt_joint)
 
-            pred_path = os.path.join(self.output_dir, 'frame_{}_pred_loc.xyz').format(str(i).zfill(3))
-            mean_pred_path = os.path.join(self.output_dir, 'frame_{}_mean_pred_loc.xyz').format(str(i).zfill(3))
+            pred_path = os.path.join(self.output_dir, 'frame_{}_loc_pred.xyz').format(str(i).zfill(3))
+            mean_pred_path = os.path.join(self.output_dir, 'frame_{}_mean_loc_pred.xyz').format(str(i).zfill(3))
         else:
             # pred_joint_map = output[:, 4+bone_num*3:4+bone_num*6, :, :] * 180 / np.pi
             pred_joint_map = output[:, 4+bone_num*3:4+bone_num*6, :, :]
             gt_joint = target['pose'][0, :, 3:6]
-            gt_path = os.path.join(self.output_dir, 'frame_{}_gt_pose.xyz').format(str(i).zfill(3))
+            gt_path = os.path.join(self.output_dir, 'frame_{}_pose_gt.xyz').format(str(i).zfill(3))
 
-            pred_path = os.path.join(self.output_dir, 'frame_{}_pred_pose.xyz').format(str(i).zfill(3))
-            mean_pred_path = os.path.join(self.output_dir, 'frame_{}_mean_pred_pose.xyz').format(str(i).zfill(3))
-
+            pred_path = os.path.join(self.output_dir, 'frame_{}_pose_pred.xyz').format(str(i).zfill(3))
+            mean_pred_path = os.path.join(self.output_dir, 'frame_{}_mean_pose_pred.xyz').format(str(i).zfill(3))
+            self.write(gt_path, gt_joint)
 
         # get final prediction: score map summarize
         pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
@@ -315,9 +315,10 @@ class ModelLBSNOCS(object):
             if not loc:
                 cur_pred = torch.abs(cur_pred)
                 gt = torch.abs(gt)
-                max_v = max(cur_pred.max(), gt.max())
-                cur_pred /= max_v
-                gt /= max_v
+                # max_v = max(cur_pred.max(), gt.max())
+                # cur_pred /= max_v
+                # gt /= max_v
+                # print(cur_pred.mean(), gt.mean())
 
             masked_map = torch.where(mask > 0.7, cur_pred, zero_map)
             joint_map = torch2np(masked_map) * 255
@@ -330,11 +331,12 @@ class ModelLBSNOCS(object):
         
         big_img = np.concatenate(to_cat, axis=0)
         if loc:
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_pred_loc.png').format(str(frame_id).zfill(3)),
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_loc_comp.png').format(str(frame_id).zfill(3)),
                             cv2.cvtColor(big_img, cv2.COLOR_BGR2RGB))
         else:
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_pred_pose.png').format(str(frame_id).zfill(3)),
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_pose_comp.png').format(str(frame_id).zfill(3)),
                             cv2.cvtColor(big_img, cv2.COLOR_BGR2RGB))
+
 
     def write(self, path, joint):
         if os.path.exists(path):
@@ -342,5 +344,5 @@ class ModelLBSNOCS(object):
         f = open(path, "a")
         for i in range(joint.shape[0]):
             p = joint[i]
-            f.write("{} {} {}\n".format(p[0], p[1], p[2]))
+            f.write("{:6f} {:6f} {:6f}\n".format(p[0], p[1], p[2]))
         f.close()

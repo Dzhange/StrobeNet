@@ -90,12 +90,8 @@ class LNRNet(nn.Module):
         # first lift them into 3D point cloud
         output = self.SegNet(color)
         
-        omax = output.max()
-        omin = output.min()
-        s = torch.sum(torch.isnan(output))
         pred_nocs = output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
-        pred_mask = output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
-        
+        pred_mask = output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)        
 
         if torch.isnan(pred_mask).any():
             print("f NAN encountered")

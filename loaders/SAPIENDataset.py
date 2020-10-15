@@ -37,7 +37,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
 
         ##############################################
 
-        print("[ SERIOUS WARNING!!!!! ] SETTING ALL Y LOCATIONS INTO 0")
+        print("\033[93m [ SERIOUS WARNING!!!!! ] SETTING ALL Y LOCATIONS INTO 0 \033[0m")
         self.projection = True
         ##############################################
 
@@ -94,6 +94,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         required_path = self.frame_files[self.required][idx]
+        # print(required_path)
         RGB, target_imgs, pose, mesh_path = self.load_images(idx)
         load_imgs = torch.cat(target_imgs, 0)
         occ_data = self.load_occupancies(required_path)
@@ -221,7 +222,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
             frame[k] /= 255.0
 
         grouped_frame_str = [list(i) for j, i in groupby(self.frame_load_str,\
-                                lambda a: ''.join([i for i in a if not i.isdigit()]))]        
+                                lambda a: ''.join([i for i in a if not i.isdigit()]))]
         load_tuple = ()
         # Concatenate any peeled outputs
         for group in grouped_frame_str:
@@ -334,8 +335,9 @@ if __name__ == '__main__':
     Parser.add_argument('-d', '--data-dir', help='Specify the location of the directory to download and store HandRigDatasetV2', required=True)
 
     Args, _ = Parser.parse_known_args()
-
-    Data = SAPIENDataset(root=Args.data_dir, train=False, frame_load_str=["color00", "nox00", "pnnocs00", "linkseg"])
+    # f_str = ["color00", "nox00", "pnnocs00", "linkseg"]
+    f_str = None
+    Data = SAPIENDataset(root=Args.data_dir, train=True, frame_load_str=None)
     # Data.saveItem(random.randint(0, len(Data)))
     # Data.visualizeRandom(10, nColsPerSam=len(Data.FrameLoadStr)-1) # Ignore Pose
     # exit()

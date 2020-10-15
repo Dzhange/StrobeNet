@@ -27,7 +27,7 @@ class THSegNet(nn.Module):
         self.up2 = segnetUp2(128, 64, withSkipConnections=self.withSkipConnections, bn=bn)
 
         self.nocs_head = segnetUp2(64, nocs_channels, last_layer=True, withSkipConnections=self.withSkipConnections, bn=bn)
-        self.pose_head = segnetUp2(64, pose_channels, last_layer=True, withSkipConnections=self.withSkipConnections, bn=bn)        
+        self.pose_head = segnetUp2(64, pose_channels, last_layer=True, withSkipConnections=self.withSkipConnections, bn=bn)
         self.feature_head = segnetUp2(64, feature_channels, last_layer=True, withSkipConnections=self.withSkipConnections, bn=bn)
 
         if pretrained:

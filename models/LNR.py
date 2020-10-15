@@ -161,8 +161,10 @@ class ModelLNRNET(ModelSegLBS):
                 pose_diff.append(cur_pose_diff)
                 self.visualize_joint_prediction(segnet_output, target, i, loc=False)
 
+            self.visualize_confidence(segnet_output, i)
+
             if segnet_output.shape[1] > 64 + 4+self.config.BONE_NUM*8+2:
-                pred_pnnocs = segnet_output[:, -3:, :, :]                
+                pred_pnnocs = segnet_output[:, -3:, :, :]
                 mask = target['maps'][:, 3, :, :]
                 tar_pnnocs = target['maps'][:, -3:, :, :]
                 
@@ -279,3 +281,15 @@ class ModelLNRNET(ModelSegLBS):
 
         write_off(pn_path, pnnocs_pc[0])
         write_off(nox_path, nocs_pc)
+
+    def visualize_confidence(self, output, frame_id):
+        
+        bone_num = self.bone_num
+        # H, W
+        conf_map = output[:, self.net.skin_end:self.net.conf_end, :, :].sigmoid().cpu().detach().squeeze().numpy()        
+        scale = conf_map.max() - conf_map.min()
+        # print(conf_map.max(), conf_map.min())
+        if scale != 0:
+            conf_map /= scale
+        conf_map *= 255
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_conf.png').format(str(frame_id).zfill(3)), conf_map)

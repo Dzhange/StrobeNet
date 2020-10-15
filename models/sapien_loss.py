@@ -99,6 +99,7 @@ class PMLBSLoss(nn.Module):
         tar_pose = target['pose']
         tar_loc = self.sigmoid(tar_pose[:, :, 0:3])
         tar_rot = self.sigmoid(tar_pose[:, :, 3:6])
+
         mask_loss = self.mask_loss(out_mask, target_mask)
         nocs_loss = self.masked_l2_loss(pred_nocs, target_nocs, target_mask)
 
@@ -286,15 +287,21 @@ class PMLoss(nn.Module):
     def add_up(self, loss):
         
         all_loss = torch.zeros(1, device=loss['nox_loss'].device)
-
+        # print(loss)
         cfg = self.config
         all_loss = all_loss\
-            + cfg.NOCS_LOSS * loss['nox_loss']\
-            + cfg.NOCS_LOSS * loss['mask_loss']\
+            + cfg.NOCS_LOSS * (loss['nox_loss'] + loss['mask_loss'])\
             + cfg.LOC_LOSS * (loss['loc_loss'] + loss['loc_map_loss'])\
             + cfg.POSE_LOSS * (loss['rot_loss'] + loss['rot_map_loss'])\
             + cfg.SKIN_LOSS * loss['skin_loss']\
-            + loss['pnnocs_loss']
-        
+
+        if cfg.REPOSE == True:
+            all_loss += loss['pnnocs_loss']
+        if cfg.STAGE_ONE == False:
+            all_loss += loss['recon_loss']
+
+        # print("all loss is ", all_loss)
+        # if all_loss > 3:
+        #     print("error, outlier")
         return all_loss
     

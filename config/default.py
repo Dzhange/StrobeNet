@@ -77,20 +77,17 @@ def get_default_cfg():
     cfg.BN = False
 
     cfg.MH = False
-    
+    cfg.AS_SEG = False
+
     cfg.BONE_NUM = 16
     ## Loss for LBS
-    cfg.NOCS_LOSS = False
-    cfg.MASK_LOSS = False
-    
-    cfg.SKIN_LOSS = False
-    cfg.AS_SEG = False
-    
-    cfg.LOC_LOSS = False
-    cfg.LOC_MAP_LOSS = False
-    
-    cfg.POSE_LOSS = False
-    cfg.POSE_MAP_LOSS = False
+    cfg.NOCS_LOSS = 0
+    cfg.MASK_LOSS = 0
+    cfg.SKIN_LOSS = 0
+    cfg.LOC_LOSS = 0
+    cfg.LOC_MAP_LOSS = 0
+    cfg.POSE_LOSS = 0
+    cfg.POSE_MAP_LOSS = 0
 
     # for final pipeline
     cfg.STAGE_ONE = True
@@ -98,4 +95,5 @@ def get_default_cfg():
 
     # for optimizer
     cfg.WEIGHT_DECAY = 0.0
+
     return cfg

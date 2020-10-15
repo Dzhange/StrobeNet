@@ -5,14 +5,14 @@
 
 # DATASET_ROOT: '/workspace/Data/8_7_cut_BW_IF'
 # DATASET_ROOT: '/workspace/Data/SAPIEN/eyeglasses/pose_aa_IF'
-DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/5_2000_IF'
-OUTPUT_DIR: '/workspace/nrnocs_dev/output/laptop/'
+DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/laptop_1000_30_limit05_coco_IF'
+OUTPUT_DIR: '/workspace/dev_nrnocs/output/laptop'
 
 MODES: ['train','val']
 
 BATCHSIZE: 1
-DATALOADER_WORKERS: 2
-EPOCH_TOTAL: 200
+DATALOADER_WORKERS: 1
+EPOCH_TOTAL: 20
 
 LR: 1e-4
 
@@ -24,22 +24,26 @@ TARGETS: ["default"]
 TASK: "lnrnet"
 OUT_CHANNELS: 12 #4 + 1*8
 
-TEST_ON_TRAIN: True
+# TEST_ON_TRAIN: True
 
 MH: True
 BN: False
 
-NOCS_LOSS: True
-POSE_LOSS: True
-POSE_MAP_LOSS: True
-# LOC_LOSS: True
-# LOC_MAP_LOSS: True
-SKIN_LOSS: True
+NOCS_LOSS: 1
+# POSE_LOSS: 1
+# POSE_MAP_LOSS: 1
+# LOC_LOSS: 1
+# LOC_MAP_LOSS: 1
+# SKIN_LOSS: 1
+
 BONE_NUM: 1
 
-REPOSE: True
-# STAGE_ONE: False
+# REPOSE: False
+STAGE_ONE: True
 
-# EXPT_NAME: "5inst_debug"
-EXPT_NAME: "5inst_noloc"
-GPU: 0
+
+# EXPT_NAME: "25inst_14"
+EXPT_NAME: "25nox_l05"
+
+GPU: 3
+

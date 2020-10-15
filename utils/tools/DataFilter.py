@@ -73,7 +73,7 @@ class DataFilter:
                 os.mkdir(cur_out_dir)
             
             
-            if 0:
+            if 1:
                 self.mode = mode
             
                 all_color_imgs = glob.glob(os.path.join(self.inputDir, mode, '**/frame_*_view_*_color00.*'))
@@ -85,8 +85,8 @@ class DataFilter:
                 p = Pool(mp.cpu_count()>>3)            
                 p.map(self.processFrame, all_frames)
             else:
-                self.mode = "val"
-                self.processFrame("00048000")
+                self.mode = "train"
+                self.processFrame("00004000")
 
     def processFrame(self, Frame):
         out_dir = os.path.join(self.outputDir, self.mode, str(int(Frame) // self.frame_per_dir).zfill(4))
@@ -184,7 +184,7 @@ class DataFilter:
                  '_view_00_linkseg.png', "_pose.txt", '_wt_mesh.obj']
             for fix in suffixs:
                 f_name = frame_view + fix
-                print(f_name)
+                # print(f_name)
                 old_f = os.path.join(in_dir, f_name)                
                 new_f = os.path.join(out_dir, f_name)
                 if os.path.exists(old_f) and not os.path.exists(new_f):

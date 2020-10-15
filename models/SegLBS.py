@@ -60,20 +60,20 @@ class ModelSegLBS(ModelLBSNOCS):
         gt_bw = self.label2map(tar_seg)
         # print(np.unique(gt_bw))
         gt_seg = self.map2seg(gt_bw)
+
         zero_map = torch.zeros(gt_seg.size())
         gt_seg = torch.where(mask > 0.7, gt_seg, zero_map)
         gt_seg = torch2np(gt_seg)
 
-        pred_bw = output[0, 4+bone_num*6:4+bone_num*7, :, :]*255
-        
+        pred_bw = output[0, 4+bone_num*6:4+bone_num*7+2, :, :]*255
         pred_seg = self.map2seg(pred_bw)
         
         # print(np.unique(pred_seg.cpu().detach().numpy()))
         pred_seg = torch.where(mask > 0.7, pred_seg, zero_map)
         pred_seg = torch2np(pred_seg)
         
-        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_gt_seg.png').format(str(i).zfill(3)), gt_seg)
-        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_pred_seg.png').format(str(i).zfill(3)), pred_seg)
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_seg_gt.png').format(str(i).zfill(3)), gt_seg)
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_seg_pred.png').format(str(i).zfill(3)), pred_seg)
         
 
     def save_mask_(self, output, target, i):
