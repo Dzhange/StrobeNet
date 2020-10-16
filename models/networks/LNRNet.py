@@ -93,9 +93,6 @@ class LNRNet(nn.Module):
         pred_nocs = output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
         pred_mask = output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)        
 
-        if torch.isnan(pred_mask).any():
-            print("f NAN encountered")
-            
         pred_loc = output[:, self.mask_end:self.loc_end, :, :].clone().requires_grad_(True)
         pred_pose = output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
         pred_weight = output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
@@ -109,13 +106,20 @@ class LNRNet(nn.Module):
             # pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
             output = torch.cat((output, pnnocs_maps), dim=1)
 
-        # then: we transform the point cloud into occupancy(along with the features )
-        occupancies = self.voxelize(output, nocs_feature, transform)
-        # if self.vis == True:
-        # self.visualize(occupancies, inputs['translation'], inputs['scale'])
+        recon = None
+        if not self.config.STAGE_ONE:
+            # then: we transform the point cloud into occupancy(along with the features )
+            occupancies = self.voxelize(output, nocs_feature, transform)
+            
+            # if torch.isnan(pred_mask).any():
+            #     print("f NAN encountered")
 
-        # and then feed into IF-Net. The ground truth shouled be used in the back projection
-        recon = self.IFNet(grid_coords, occupancies)
+            # if self.vis == True:
+            # self.visualize(occupancies, inputs['translation'], inputs['scale'])
+
+            # and then feed into IF-Net. The ground truth shouled be used in the back projection
+            recon = self.IFNet(grid_coords, occupancies)
+        
 
         return output, recon
 
@@ -229,7 +233,6 @@ class LNRNet(nn.Module):
         pnnocs_maps = torch.stack(tuple(all_pnnocs))
         return pnnocs_maps
 
-
     def repose_pm_pred(self, pred_nocs, pred_loc_map, pred_pose_map, pred_seg, conf, pred_mask):
         """
         reposing function for partial mobility models
@@ -330,14 +333,14 @@ class LNRNet(nn.Module):
             .view(1, -1, 4, 4)
         pnnocs_pc = lbs_(NOX_pc.unsqueeze(0), T, dtype=NOX.dtype).to(device=NOX.device)
 
-        # re-normalize
-        low_bound = pnnocs_pc.min(axis=1)[0]
-        up_bound = pnnocs_pc.max(axis=1)[0]
-        scale = (up_bound - low_bound).max()
+        # # re-normalize
+        # low_bound = pnnocs_pc.min(axis=1)[0]
+        # up_bound = pnnocs_pc.max(axis=1)[0]
+        # scale = (up_bound - low_bound).max()
 
-        if scale != 0:
-            pnnocs_pc -= low_bound
-            pnnocs_pc /= scale
+        # if scale != 0:
+        #     pnnocs_pc -= low_bound
+        #     pnnocs_pc /= scale
 
         pnnocs_map = torch.zeros(NOX.size(), device=NOX.device)
         pnnocs_map[:, masked] = pnnocs_pc.transpose(2, 1)
@@ -404,7 +407,12 @@ class LNRNet(nn.Module):
                 point_cloud = point_cloud * transform['scale'][i]
 
             feature_cloud = upsampled_feature[i, :, masked]
+            # if torch.isnan(out_mask).any():
+            #     print("f NAN encountered")
             voxelized_feature = self.discretize(point_cloud, feature_cloud, self.resolution)
+            # if torch.isnan(out_mask).any():
+            #     print("f NAN encountered")
+            
             all_occupancies.append(voxelized_feature)
 
         all_occupancies = torch.stack(tuple(all_occupancies))
@@ -419,7 +427,7 @@ class LNRNet(nn.Module):
         point_cloud += 0.5
         
         voxels = torch.floor(point_cloud*Res)
-        # print(voxels.max(axis=1))
+        print(voxels.max(axis=1))
         index = voxels[0, :]*Res**2 + voxels[1, :]*Res + voxels[2, :]        
         index = index.unsqueeze(0).to(dtype=torch.long)
 

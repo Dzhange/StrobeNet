@@ -148,7 +148,6 @@ class DataVisualizer(object):
                 frame
             )            
 
-
     def nocs2pc(self, path):
         nocs_map = cv2.imread(path)
         nocs_map = cv2.cvtColor(nocs_map, cv2.COLOR_BGR2RGB)

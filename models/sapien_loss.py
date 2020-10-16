@@ -265,8 +265,9 @@ class PMLoss(nn.Module):
         segnet_output = output[0]
         loss = self.segnet_loss(segnet_output, target)
 
-        ifnet_output = output[1]
-        loss['recon_loss'] = self.recon_loss(ifnet_output, target)
+        if not self.config.STAGE_ONE:
+            ifnet_output = output[1]
+            loss['recon_loss'] = self.recon_loss(ifnet_output, target)
 
         all_loss = self.add_up(loss)
 

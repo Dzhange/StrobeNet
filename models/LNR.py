@@ -93,7 +93,9 @@ class ModelLNRNET(ModelSegLBS):
         targets['maps'] = data_to_device[1]
         targets['pose'] = data_to_device[2]
         targets['occupancies'] = data_to_device[3]['occupancies']
-        targets['mesh'] = data[4]
+        # targets['mesh'] = data[4]
+        targets['mesh'] = data[3]["mesh"]
+        
         return inputs, targets
 
     def LoadSegNetCheckpoint(self, train_device, TargetPath):
@@ -104,7 +106,7 @@ class ModelLNRNET(ModelSegLBS):
 
         if latest_checkpoint_dict is not None:
             # Make sure experiment names match
-            self.net.SegNet.load_state_dict(latest_checkpoint_dict['ModelStateDict'])
+            self.net.load_state_dict(latest_checkpoint_dict['ModelStateDict'])
 
     def validate(self, val_dataloader, objective, device):
 
@@ -216,6 +218,7 @@ class ModelLNRNET(ModelSegLBS):
 
         # Copy ground truth in the val results
         export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
+        print(target['mesh'][0])
         shutil.copyfile(target['mesh'][0], export_gt_path)
 
         # Get the transformation into val results

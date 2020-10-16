@@ -44,10 +44,12 @@ class Trainer:
                     net_input, target = self.model.preprocess(data, self.device)
                     output = self.model.net(net_input)
                     loss = self.objective(output, target)
+                    if loss > 50:
+                        print("[ ERROR ] strange loss encountered at ", target['mesh'])
                     # if self.config.TASK == "lnrnet":
                         # self.model.optim(loss)
                     # else:
-                    loss.backward()                        
+                    loss.backward()
                     self.model.optimizer.step()
                     ####################### START MONITOR ################################
                     epoch_losses.append(loss.item())

@@ -5,7 +5,7 @@
 
 # DATASET_ROOT: '/workspace/Data/8_7_cut_BW_IF'
 # DATASET_ROOT: '/workspace/Data/SAPIEN/eyeglasses/pose_aa_IF'
-DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/laptop_1015_1000_30_limit01_IF'
+DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/laptop_25_2000_IF'
 OUTPUT_DIR: '/workspace/dev_nrnocs/output/laptop'
 
 MODES: ['train','val']
@@ -16,7 +16,7 @@ EPOCH_TOTAL: 20
 
 LR: 1e-4
 
-SAVE_FREQ: 2
+SAVE_FREQ: 1
 DATA_LIMIT: 100 
 VAL_DATA_LIMIT: 1
 IMAGE_SIZE: (320,240)
@@ -29,8 +29,7 @@ OUT_CHANNELS: 12 #4 + 1*8
 MH: True
 BN: False
 
-# NOCS_LOSS: 10
-NOCS_LOSS: 1
+NOCS_LOSS: 10
 POSE_LOSS: 1
 POSE_MAP_LOSS: 1
 LOC_LOSS: 1
@@ -40,13 +39,13 @@ SKIN_LOSS: 1
 BONE_NUM: 1
 
 REPOSE: True
-
 STAGE_ONE: False
-# STAGE_ONE: True
 
 
-EXPT_NAME: "30_l01"
-# EXPT_NAME: "30_l01_stage1"
+EXPT_NAME: "25inst_loss_w_stg2"
 
-GPU: 7
+NRNET_PRETRAIN: True
+NRNET_PRETRAIN_PATH: "/workspace/dev_nrnocs/output/laptop/25inst_loss_w"
+
+GPU: 6
 

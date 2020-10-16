@@ -65,6 +65,7 @@ class ModelLBSNOCS(object):
                                 state[k] = v.to(TrainDevice)
             else:
                 print('[ INFO ]: Experiment names do not match. Training from scratch.')
+            
 
     def save_checkpoint(self, epoch, time_string='humanlocal', print_str='*'*3):
         checkpoint_dict = {

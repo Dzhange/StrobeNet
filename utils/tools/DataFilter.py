@@ -73,7 +73,7 @@ class DataFilter:
                 os.mkdir(cur_out_dir)
             
             
-            if 1:
+            if 0:
                 self.mode = mode
             
                 all_color_imgs = glob.glob(os.path.join(self.inputDir, mode, '**/frame_*_view_*_color00.*'))
@@ -86,7 +86,7 @@ class DataFilter:
                 p.map(self.processFrame, all_frames)
             else:
                 self.mode = "train"
-                self.processFrame("00004000")
+                self.processFrame("00004500")
 
     def processFrame(self, Frame):
         out_dir = os.path.join(self.outputDir, self.mode, str(int(Frame) // self.frame_per_dir).zfill(4))
