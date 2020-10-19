@@ -24,14 +24,18 @@ class SAPIENDataset(torch.utils.data.Dataset):
         5. Segmentation
         5. Occupancy
     """
-    def __init__(self, root, train=True, transform=None,
-                 img_size=(320, 240), limit=100, frame_load_str=None, required='color00', rel=False):
+    def __init__(self, config, train=True, required='color00'):
         
+        self.config = config                
         self.num_cameras = 10
+        root = config.DATASET_ROOT
+        limit = config.DATA_LIMIT if train else config.VAL_DATA_LIMIT
+        img_size = config.IMAGE_SIZE
+
         self.frame_load_str = ['color00', 'nox00', 'linkseg','pnnocs00'] \
-            if frame_load_str is None else frame_load_str
+            if "default" in config.TARGETS else config.TARGETS
         # print(self.frame_load_str)
-        self.init(root, train, transform, img_size, limit, self.frame_load_str, required, rel=rel)
+        self.init(root, train, img_size, limit, self.frame_load_str, required)
         # print(self.frame_load_str)
         self.load_data()
 
@@ -42,7 +46,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
         ##############################################
 
 
-    def init(self, root, train=True, transform=None,
+    def init(self, root, train=True, 
              img_size=(320, 240), limit=100, frame_load_str=None, required='VertexColors', rel=False):
         
         self.dataset_dir = root
@@ -54,8 +58,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
                 self.pose_num = configs['pose_num']
         else:
                 self.pose_num = 1
-        self.is_train_data = train
-        self.transform = transform
+        self.is_train_data = train        
         self.img_size = img_size
         self.required = required
         # self.frame_load_str = frame_load_str
@@ -194,7 +197,6 @@ class SAPIENDataset(torch.utils.data.Dataset):
 
         if self.projection:            
             cur_pose[:, 1] = 0
-            
 
         frame = {}
         has_mask = False
@@ -280,11 +282,6 @@ class SAPIENDataset(torch.utils.data.Dataset):
 
         index_of_frame = str(int(index_of_frame) // self.pose_num * self.pose_num).zfill(8)
 
-        transform_path = os.path.join(data_dir, "frame_" + index_of_frame + '_transform.npz')        
-        nocs_transform = {}
-        nocs_transform['translation'] = np.load(transform_path)['translation']
-        nocs_transform['scale'] = np.load(transform_path)['scale']
-
         points = []
         coords = []
         occupancies = []
@@ -304,17 +301,26 @@ class SAPIENDataset(torch.utils.data.Dataset):
         assert len(points) == self.num_sample_points
         assert len(occupancies) == self.num_sample_points
         assert len(coords) == self.num_sample_points
-        
+
         gt_mesh_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
-                                                    "isosurf_scaled.off")                                                            
+                                                    "isosurf_scaled.off")
+                        
         # None of the if-data would be needed if in validation mode
         if_data = {
             'grid_coords':np.array(coords, dtype=np.float32),
-            'occupancies': np.array(occupancies, dtype=np.float32),
-            'translation': nocs_transform['translation'],
-            'scale': nocs_transform['scale'],
+            'occupancies': np.array(occupancies, dtype=np.float32),            
             'mesh': gt_mesh_path
             }
+
+        if self.config.TRANSFORM:
+            transform_path = os.path.join(data_dir, "frame_" + index_of_frame + '_transform.npz')        
+            nocs_transform = {}
+            nocs_transform['translation'] = np.load(transform_path)['translation']
+            nocs_transform['scale'] = np.load(transform_path)['scale']
+            
+            if_data['translation'] = nocs_transform['translation']
+            if_data['scale'] = nocs_transform['scale']
+
         return if_data
 
     # def check_map(self, tar_joint_map, out_mask, tar_joints):

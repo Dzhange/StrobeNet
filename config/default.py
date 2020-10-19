@@ -15,6 +15,7 @@ def get_default_cfg():
     cfg.DATASET_CATES = []
     cfg.DATASET_INDEX = []
     cfg.PROPORTION = 1.0  # how many of the first K samples in the dataset list
+    cfg.TRANSFORM = True # if set too true, we use the dataset where all mesh/occupancy are transformed into [-0.5, 0.5]
 
     # fundamental setting
     cfg.ROOT_DIR = os.getcwd()
@@ -62,11 +63,14 @@ def get_default_cfg():
     cfg.VAL_DATA_LIMIT = 10
     cfg.IMAGE_SIZE = (320, 240)
     cfg.EXPT_NAME = "UNKNOWN"
+    
+    # DATASET PART
     cfg.TEST_ON_TRAIN = False
     cfg.OUT_CHANNELS = 4
     cfg.FEATURE_CHANNELS = 64
     cfg.TASK = "occupancy"
     cfg.TARGETS = ["nox00"]
+    
 
     cfg.NRNET_TYPE = "out_feature" # inter_feature
     cfg.NRNET_PRETRAIN = False
@@ -90,8 +94,8 @@ def get_default_cfg():
     cfg.POSE_MAP_LOSS = 0
 
     # for final pipeline
-    cfg.STAGE_ONE = True
-    cfg.REPOSE = True
+    cfg.STAGE_ONE = True # if set to true, we do not supervise the occupancy
+    cfg.REPOSE = True # if set to true, we calculate PNNOCS and use it for final reconstruction
 
     # for optimizer
     cfg.WEIGHT_DECAY = 0.0

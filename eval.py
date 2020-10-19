@@ -33,10 +33,14 @@ class evaluator():
         for i in range(self.data_num):            
             gt_path = self.gt_occ_paths[i]
             pred_path = self.pred_occ_paths[i]
+            if 1:
+                os.system("/workspace/Manifold/build/simplify -i {} -o {} -f {}".format(gt_path, gt_path, 5000))
+                os.system("/workspace/Manifold/build/simplify -i {} -o {} -f {}".format(pred_path, pred_path, 5000))
+
             # print("gt_path ", gt_path)
             gt_mesh = trimesh.load(gt_path, process=False)
             pred_mesh = trimesh.load(pred_path, process=False)
-
+            
             p2s = self.p2s_dis(gt_mesh, pred_mesh)
             p2s = np.sqrt(p2s)
             # print(p2s)

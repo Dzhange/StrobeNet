@@ -2,7 +2,7 @@
 # Oct 15
 
 
-DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/laptop_nocs_500_30_IF'
+DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/laptop_nocs_500_30_full_IF'
 OUTPUT_DIR: '/workspace/dev_nrnocs/output/laptop'
 
 MODES: ['train','val']
@@ -21,7 +21,7 @@ TARGETS: ["default"]
 TASK: "lnrnet"
 OUT_CHANNELS: 12 #4 + 1*8
 
-TEST_ON_TRAIN: True
+#TEST_ON_TRAIN: True
 
 MH: True
 BN: False
@@ -37,14 +37,14 @@ SKIN_LOSS: 1
 BONE_NUM: 1
 
 REPOSE: True
-STAGE_ONE: True
+# STAGE_ONE: True
+STAGE_ONE: False
 
-EXPT_NAME: "nocs_1"
+EXPT_NAME: "nocs_30_b2"
 
-# NRNET_PRETRAIN: True
-# NRNET_PRETRAIN_PATH: "/workspace/dev_nrnocs/output/laptop/30_l01_stg1"
+NRNET_PRETRAIN: True
+NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/nocs_30_b2_bkup"
 
-
-GPU: 6
+GPU: 5
 
 

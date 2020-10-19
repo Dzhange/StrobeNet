@@ -37,15 +37,16 @@ task = cfg.TASK
 
 def get_loaders(Dataset):
     for mode in cfg.MODES:
-        if "default" in cfg.TARGETS:
-            f_str = None
+  
+        if task == "lnrnet":
+            phase_dataset = Dataset(config=cfg, train=mode in ['train'] or cfg.TEST_ON_TRAIN)
         else:
-            f_str = cfg.TARGETS
-        phase_dataset = Dataset(root=cfg.DATASET_ROOT,
-                                train=mode in ['train'] or cfg.TEST_ON_TRAIN,
-                                limit=cfg.DATA_LIMIT if mode == 'train' else cfg.VAL_DATA_LIMIT,
-                                img_size=cfg.IMAGE_SIZE,
-                                frame_load_str=f_str)
+            phase_dataset = Dataset(root=cfg.DATASET_ROOT,
+                            train=mode in ['train'] or cfg.TEST_ON_TRAIN,
+                            limit=cfg.DATA_LIMIT if mode == 'train' else cfg.VAL_DATA_LIMIT,
+                            img_size=cfg.IMAGE_SIZE,
+                            frame_load_str=None if "default" in cfg.TARGETS else cfg.TARGETS)
+
 
         print("[ INFO ] {} dataset has {} elements.".format(mode, len(phase_dataset)))
         dataloader_dict[mode] = DataLoader(phase_dataset, batch_size=cfg.BATCHSIZE,

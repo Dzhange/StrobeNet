@@ -35,11 +35,14 @@ class LNRNet(nn.Module):
         self.SegNet.to(device)
         self.device = device
         self.IFNet = SVR(config, device)
+        
         self.resolution = 128
+        self.transform = self.config.TRANSFORM
         self.init_grids(self.resolution)
         self.UpdateSegNet = config.UPDATE_SEG
         self.use_pretrained = False
         self.init_hp()
+        
         # Freeze the SegNet part due to the bug
         # if self.FreezeSegNet:
         for param in self.SegNet.parameters():
@@ -62,8 +65,12 @@ class LNRNet(nn.Module):
         self.ft_end = self.conf_end + 64
 
     def init_grids(self, resolution):
-        bb_min = -0.5
-        bb_max = 0.5
+        if self.transform:
+            bb_min = -0.5
+            bb_max = 0.5
+        else:
+            bb_min = 0
+            bb_max = 1
 
         self.GridPoints = iw.create_grid_points_from_bounds(bb_min, bb_max, resolution)
         grid_points = iw.create_grid_points_from_bounds(bb_min, bb_max, resolution)
@@ -79,8 +86,12 @@ class LNRNet(nn.Module):
     
     def forward(self, inputs):
         color = inputs['RGB']
-        transform = {'translation': inputs['translation'],
+
+        if self.transform:
+            transform = {'translation': inputs['translation'],
                      'scale':inputs['scale']}
+        else:
+            transform = None
 
         # Grids, comes from boundary sampling during training and a boudary cube during vlidation
         # This operation is simply for the sake of training speed
@@ -98,8 +109,6 @@ class LNRNet(nn.Module):
         pred_weight = output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
         conf = output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
         nocs_feature = output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
-        
-        # pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
 
         if self.config.REPOSE:
             pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
@@ -110,13 +119,9 @@ class LNRNet(nn.Module):
         if not self.config.STAGE_ONE:
             # then: we transform the point cloud into occupancy(along with the features )
             occupancies = self.voxelize(output, nocs_feature, transform)
-            
-            # if torch.isnan(pred_mask).any():
-            #     print("f NAN encountered")
-
             # if self.vis == True:
-            # self.visualize(occupancies, inputs['translation'], inputs['scale'])
-
+            if 0:
+                self.visualize(occupancies)
             # and then feed into IF-Net. The ground truth shouled be used in the back projection
             recon = self.IFNet(grid_coords, occupancies)
         
@@ -387,10 +392,7 @@ class LNRNet(nn.Module):
             cur_mask = out_mask[i].squeeze()
             masked = cur_mask > threshold
             point_cloud = pred_nocs[i, :, masked]
-
-            point_cloud = torch.where(point_cloud < 0, torch.zeros(1, device=point_cloud.device), point_cloud)
-            point_cloud = torch.where(point_cloud > 1, torch.ones(1, device=point_cloud.device), point_cloud)
-
+            
             num_valid = point_cloud.shape[1]
             if num_valid == 0 or torch.isnan(point_cloud).any():
                 occ_empty = torch.ones(feature_dim, *(self.resolution,)*3).to(device=pred_nocs.device)
@@ -405,16 +407,11 @@ class LNRNet(nn.Module):
                 translation = transform['translation'][i].view(3, 1).float()
                 point_cloud = point_cloud + translation
                 point_cloud = point_cloud * transform['scale'][i]
+                point_cloud += 0.5
 
             feature_cloud = upsampled_feature[i, :, masked]
-            # if torch.isnan(out_mask).any():
-            #     print("f NAN encountered")
             voxelized_feature = self.discretize(point_cloud, feature_cloud, self.resolution)
-            # if torch.isnan(out_mask).any():
-            #     print("f NAN encountered")
-            
             all_occupancies.append(voxelized_feature)
-
         all_occupancies = torch.stack(tuple(all_occupancies))
         return all_occupancies
 
@@ -424,21 +421,37 @@ class LNRNet(nn.Module):
         feature_dim = FeatureCloud.shape[0]
         point_num = point_cloud.shape[1]
 
-        point_cloud += 0.5
-        
+        point_cloud = torch.where(point_cloud < 0, torch.zeros(1, device=point_cloud.device), point_cloud)
+        point_cloud = torch.where(point_cloud > 1, torch.ones(1, device=point_cloud.device), point_cloud)
+
         voxels = torch.floor(point_cloud*Res)
-        print(voxels.max(axis=1))
-        index = voxels[0, :]*Res**2 + voxels[1, :]*Res + voxels[2, :]        
+        index = voxels[0, :]*Res**2 + voxels[1, :]*Res + voxels[2, :]
         index = index.unsqueeze(0).to(dtype=torch.long)
 
         #TODO: replace the mean operation to pointnet
-        # print(FeatureCloud.shape)
         voxel_feature = torch_scatter.scatter(src=FeatureCloud, index=index)
         # VoxFeature = torch_scatter.segment_coo(src=FeatureCloud,index=Index,reduce='mean')
         pad_size = (0, Res**3 - voxel_feature.size(1))
         voxel_feature = F.pad(voxel_feature, pad_size, 'constant', 0)
         voxel_feature = voxel_feature.view(feature_dim, Res, Res, Res)
-        # print(VoxFeature.shape)
-        # exit()
 
         return voxel_feature
+
+    def visualize(self, FeatureVoxel):
+        feature_sample = FeatureVoxel[0]
+        voxel = (feature_sample != 0).sum(dim=0).to(dtype=torch.bool)
+        
+        self.debug_dir = os.path.join(self.config.OUTPUT_DIR, self.config.EXPT_NAME, "debug")
+        if not os.path.exists(self.debug_dir):
+            os.mkdir(self.debug_dir)
+        off_path = os.path.join(self.debug_dir, "mid.off")
+        # gt_path = "/workspace/dev_nrnocs/debug/gt.off"
+
+        VoxelGrid(voxel.cpu().detach(), (0, 0, 0), 1).to_mesh().export(off_path)
+
+        # mesh_path = "/workspace/Data/IF_PN_Aug13/train/0000/frame_00000000_isosurf_scaled.off"
+        # import trimesh
+        # mesh = trimesh.load(mesh_path)
+        # vox = VoxelGrid.from_mesh(mesh, 128, loc=[0, 0, 0], scale=1)
+        # vox.to_mesh().export(gt_path)
+        exit()

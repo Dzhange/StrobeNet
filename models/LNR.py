@@ -36,15 +36,18 @@ class ModelLNRNET(ModelSegLBS):
         self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr,
                                           betas=(self.config.ADAM_BETA1, self.config.ADAM_BETA2))
         if config.NRNET_PRETRAIN:
-            pretrained_dir = config.NRNET_PRETRAIN_PATH
-            self.LoadSegNetCheckpoint(device, pretrained_dir)
+            if config.NRNET_PRETRAIN_PATH.endswith('tar'):
+                self.LoadSegNetFromTar(device, config.NRNET_PRETRAIN_PATH)
+            else:
+                pretrained_dir = config.NRNET_PRETRAIN_PATH
+                self.LoadSegNetCheckpoint(device, pretrained_dir)
 
         # generation conifgs
         self.resolution = 128
         self.batch_points = 100000
         
-    @staticmethod
-    def preprocess(data, device):
+    # @staticmethod
+    def preprocess(self, data, device):
         """
         put data onto the right device
         data input:
@@ -86,8 +89,9 @@ class ModelLNRNET(ModelSegLBS):
         inputs = {}
         inputs['RGB'] = data_to_device[0]
         inputs['grid_coords'] = data_to_device[3]['grid_coords']
-        inputs['translation'] = data_to_device[3]['translation']
-        inputs['scale'] = data_to_device[3]['scale']
+        if self.config.TRANSFORM:
+            inputs['translation'] = data_to_device[3]['translation']
+            inputs['scale'] = data_to_device[3]['scale']
 
         targets = {}
         targets['maps'] = data_to_device[1]
@@ -107,6 +111,12 @@ class ModelLNRNET(ModelSegLBS):
         if latest_checkpoint_dict is not None:
             # Make sure experiment names match
             self.net.load_state_dict(latest_checkpoint_dict['ModelStateDict'])
+    
+    def LoadSegNetFromTar(self, train_device, TargetPath):
+        check_point_dict = loadPyTorchCheckpoint(TargetPath, train_device)
+        if check_point_dict is not None:
+            # Make sure experiment names match
+            self.net.load_state_dict(check_point_dict['ModelStateDict'])
 
     def validate(self, val_dataloader, objective, device):
 
@@ -173,7 +183,13 @@ class ModelLNRNET(ModelSegLBS):
                 self.save_single_img(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i)
 
                 self.gt_debug(target, "reposed_debug", i)
-                self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i)
+                if self.config.TRANSFORM:
+                    transform = {'translation': net_input['translation'],
+                     'scale':net_input['scale']}
+                else:
+                    transform = None
+
+                self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i, transform =transform)
 
             str_loc_diff = "avg loc diff is {:.6f} ".format(np.mean(np.asarray(loc_diff)))
             str_angle_diff = "avg diff is {:.6f} degree ".format(np.degrees(np.mean(np.asarray(pose_diff))))
@@ -218,15 +234,16 @@ class ModelLNRNET(ModelSegLBS):
 
         # Copy ground truth in the val results
         export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
-        print(target['mesh'][0])
+        # print(target['mesh'][0])
         shutil.copyfile(target['mesh'][0], export_gt_path)
 
-        # Get the transformation into val results
-        export_trans_path = os.path.join(self.output_dir, "frame_{}_trans.npz".format(str(i).zfill(3)))
-        trans_path = target['mesh'][0].replace("isosurf_scaled.off", "transform.npz")
-        shutil.copyfile(trans_path, export_trans_path)
+        if self.config.TRANSFORM:
+            # Get the transformation into val results
+            export_trans_path = os.path.join(self.output_dir, "frame_{}_trans.npz".format(str(i).zfill(3)))
+            trans_path = target['mesh'][0].replace("isosurf_scaled.off", "transform.npz")
+            shutil.copyfile(trans_path, export_trans_path)
     
-    def gen_NOCS_pc(self, pred_nocs_map, tar_nocs_map, mask, target_str, i):
+    def gen_NOCS_pc(self, pred_nocs_map, tar_nocs_map, mask, target_str, i, transform=None):
                 
         mask = sendToDevice(mask.detach(), 'cpu')
         pred_nocs_map = sendToDevice(pred_nocs_map.detach(), 'cpu')
@@ -239,19 +256,36 @@ class ModelLNRNET(ModelSegLBS):
 
         pred_nocs = pred_nocs_map[mask_prob > 0.75]
         tar_nocs = tar_nocs_map[mask_prob > 0.75]
-        
+
         tar_nocs_path = os.path.join(self.output_dir, 'frame_{}_{}_00gt.xyz').format(str(i).zfill(3), target_str)
         pred_nocs_path = os.path.join(self.output_dir, 'frame_{}_{}_01pred.xyz').format(str(i).zfill(3), target_str)
-        
         self.write(tar_nocs_path, tar_nocs)
         self.write(pred_nocs_path, pred_nocs)
 
-    @staticmethod
-    def mesh_from_logits(logits, resolution):
+
+        if transform is not None:
+            # print("HERE")
+            pred_nocs +=  transform['translation'][0].detach().cpu().numpy()
+            pred_nocs *= transform['scale'][0].detach().cpu().numpy()
+            tar_nocs +=  transform['translation'][0].detach().cpu().numpy()
+            tar_nocs *= transform['scale'][0].detach().cpu().numpy()
+
+            tar_nocs_path = os.path.join(self.output_dir, 'frame_{}_{}_trs_00gt.xyz').format(str(i).zfill(3), target_str)
+            pred_nocs_path = os.path.join(self.output_dir, 'frame_{}_{}_trs_01pred.xyz').format(str(i).zfill(3), target_str)
+            self.write(tar_nocs_path, tar_nocs)
+            self.write(pred_nocs_path, pred_nocs)
+
+        
+    # @staticmethod
+    def mesh_from_logits(self, logits, resolution):
         logits = np.reshape(logits, (resolution,) * 3)
         initThreshold = 0.5
-        pmax = 0.5
-        pmin = -0.5
+        if self.config.TRANSFORM:
+            pmax = 0.5
+            pmin = -0.5
+        else:
+            pmax = 1
+            pmin = 0
         # padding to ba able to retrieve object close to bounding box bondary
         logits = np.pad(logits, ((1, 1), (1, 1), (1, 1)), 'constant', constant_values=0)
         threshold = np.log(initThreshold) - np.log(1. - initThreshold)
@@ -280,14 +314,14 @@ class ModelLNRNET(ModelSegLBS):
         pn_path = os.path.join(self.output_dir, 'frame_{}_{}_00gt.xyz').format(str(i).zfill(3), target_str)
         nox_path = os.path.join(self.output_dir, 'frame_{}_{}_01orig.xyz').format(str(i).zfill(3), target_str)
 
-        nocs_pc = tar_nocs[:,  tar_mask>0.75].transpose(0, 1)
+        nocs_pc = tar_nocs[:,  tar_mask > 0.75].transpose(0, 1)
 
         write_off(pn_path, pnnocs_pc[0])
         write_off(nox_path, nocs_pc)
 
     def visualize_confidence(self, output, frame_id):
         
-        bone_num = self.bone_num
+        # bone_num = self.bone_num
         # H, W
         conf_map = output[:, self.net.skin_end:self.net.conf_end, :, :].sigmoid().cpu().detach().squeeze().numpy()        
         scale = conf_map.max() - conf_map.min()

@@ -12,7 +12,7 @@ import torch.nn as nn
 from utils.DataUtils import *
 from loaders.HandDataset import *
 import gc
-
+from time import time
 class Trainer:
     """
     this class does the training job
@@ -42,14 +42,18 @@ class Trainer:
                     ################### START WEIGHT UPDATE ################################
                     self.model.optimizer.zero_grad()
                     net_input, target = self.model.preprocess(data, self.device)
+                    # a = time()
                     output = self.model.net(net_input)
+                    # b = time()
+                    # print("forward time ",b-a)
                     loss = self.objective(output, target)
+                    # c = time()
+                    # print("calculate loss time ",c - b)
                     if loss > 50:
-                        print("[ ERROR ] strange loss encountered at ", target['mesh'])
-                    # if self.config.TASK == "lnrnet":
-                        # self.model.optim(loss)
-                    # else:
+                        print("[ ERROR ] strange loss encountered at ", target['mesh'])                                        
                     loss.backward()
+                    # d = time()
+                    # print("BP time ", d - c)
                     self.model.optimizer.step()
                     ####################### START MONITOR ################################
                     epoch_losses.append(loss.item())

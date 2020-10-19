@@ -2,7 +2,7 @@
 # Oct 15
 
 
-DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/laptop_nocs_500_30_IF'
+DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/laptop_nocs_500_30_full_IF'
 OUTPUT_DIR: '/workspace/dev_nrnocs/output/laptop'
 
 MODES: ['train','val']
@@ -17,11 +17,11 @@ SAVE_FREQ: 1
 DATA_LIMIT: 100 
 VAL_DATA_LIMIT: 5
 IMAGE_SIZE: (320,240)
-TARGETS: ["default"]
+TARGETS: ['color00', 'pnnocs00', 'linkseg','pnnocs00']
 TASK: "lnrnet"
 OUT_CHANNELS: 12 #4 + 1*8
 
-TEST_ON_TRAIN: True
+#TEST_ON_TRAIN: True
 
 MH: True
 BN: False
@@ -36,15 +36,12 @@ SKIN_LOSS: 1
 
 BONE_NUM: 1
 
-REPOSE: True
-STAGE_ONE: True
+REPOSE: False
+# STAGE_ONE: True
+STAGE_ONE: False
 
-EXPT_NAME: "nocs_1"
+EXPT_NAME: "pnnocs_30_b1"
 
-# NRNET_PRETRAIN: True
-# NRNET_PRETRAIN_PATH: "/workspace/dev_nrnocs/output/laptop/30_l01_stg1"
-
-
-GPU: 6
+GPU: 4
 
 

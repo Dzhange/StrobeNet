@@ -70,7 +70,10 @@ if "default" in cfg.TARGETS:
 else:
     f_str = cfg.TARGETS
 
-val_dataset = Dataset(root=cfg.DATASET_ROOT, train=cfg.TEST_ON_TRAIN,
+if task == "lnrnet":
+    val_dataset = Dataset(config=cfg, train=cfg.TEST_ON_TRAIN)
+else:
+    val_dataset = Dataset(root=cfg.DATASET_ROOT, train=cfg.TEST_ON_TRAIN,
                       limit=cfg.VAL_DATA_LIMIT, img_size=cfg.IMAGE_SIZE,
                       frame_load_str=f_str)
 
