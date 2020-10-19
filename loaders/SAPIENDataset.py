@@ -26,14 +26,14 @@ class SAPIENDataset(torch.utils.data.Dataset):
     """
     def __init__(self, config, train=True, required='color00'):
         
-        self.config = config                
-        self.num_cameras = 10
+        self.config = config
+        
         root = config.DATASET_ROOT
         limit = config.DATA_LIMIT if train else config.VAL_DATA_LIMIT
         img_size = config.IMAGE_SIZE
 
-        self.frame_load_str = ['color00', 'nox00', 'linkseg','pnnocs00'] \
-            if "default" in config.TARGETS else config.TARGETS        
+        self.frame_load_str = ['color00', 'nox00', 'linkseg', 'pnnocs00'] \
+            if "default" in config.TARGETS else config.TARGETS
         self.init(root, train, img_size, limit, self.frame_load_str, required)
         self.load_data()
         ##############################################
@@ -41,7 +41,6 @@ class SAPIENDataset(torch.utils.data.Dataset):
             print("\033[93m [ SERIOUS WARNING!!!!! ] SETTING ALL Y LOCATIONS INTO 0 \033[0m")
             self.projection = True
         ##############################################
-
 
     def init(self, root, train=True, 
              img_size=(320, 240), limit=100, frame_load_str=None, required='VertexColors', rel=False):
@@ -109,17 +108,17 @@ class SAPIENDataset(torch.utils.data.Dataset):
             file_path = os.path.join(self.dataset_dir, 'train/')
         else:
             file_path = os.path.join(self.dataset_dir, 'val/')
-        
+
         # Load index for data
         # camera_idx_str = '00'
         prepend_list = []
-        for i in self.frame_load_str:            
+        for i in self.frame_load_str:
             prepend_list.append(i)
 
-        prepend_list.append("sapien")        
+        prepend_list.append("sapien")
         glob_prepend = '_'.join(prepend_list)
         glob_cache = os.path.join(file_path, 'all_glob_' + glob_prepend + '.cache')
-                    
+
         if os.path.exists(glob_cache):
             # use pre-cached index
             print('[ INFO ]: Loading from glob cache:', glob_cache)
@@ -160,7 +159,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
                 sample_index.append(cur_idx)
                 cur_idx += step                                    
             print('[ INFO ]: Loading {} / {} items.'.format(len(sample_index), total_size))
-                        
+
             for K in self.frame_files:
                 self.frame_files[K] = [self.frame_files[K][i] for i in sample_index]
                 self.frame_files[K].sort()
