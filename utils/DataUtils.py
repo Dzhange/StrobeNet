@@ -15,7 +15,13 @@ from models.loss import L2MaskLoss
 import re
     
 def find_frame_num(path):
-    return re.findall(r'%s(\d+)' % "frame_",path)[0]
+    return re.findall(r'%s(\d+)' % "frame_", path)[0]
+
+def get_path_by_frame(frame_path, view_id, target_str, suffix):
+    return frame_path + "_view_{}_{}.{}".format(short_pad(view_id), target_str, suffix)
+
+def short_pad(n):
+    return str(int(n)).zfill(2)
 
 ################################ DATA RELATED UTILS ####################################
 def torch2np(ImageTorch):

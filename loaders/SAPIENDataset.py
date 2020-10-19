@@ -179,19 +179,6 @@ class SAPIENDataset(torch.utils.data.Dataset):
         """
         actual implementation of __getitem__
         """
-        typical_path = self.frame_files['color00'][idx]
-
-        curdir = os.path.dirname(typical_path)
-        file_name = os.path.basename(typical_path)
-        index_of_frame = find_frame_num(file_name)
-        cur_pose_path = os.path.join(curdir, "frame_" + index_of_frame + '_pose.txt')
-        cur_pose = torch.Tensor(np.loadtxt(cur_pose_path))
-        if len(cur_pose.shape) == 1:
-            cur_pose = cur_pose.unsqueeze(0)
-
-        if self.projection:
-            if "laptop" in self.dataset_dir:
-                cur_pose[:, 1] = 0
 
         frame = {}
         has_mask = False
@@ -233,36 +220,47 @@ class SAPIENDataset(torch.utils.data.Dataset):
             if len(concated) > 0:
                 load_tuple = load_tuple + (torch.cat(concated, 0), )
 
-        # faster!
-        img_shape = load_tuple[0].shape
-        joint_map = torch.Tensor(cur_pose.shape[0]*6, img_shape[1], img_shape[2])
+        # deal with poses
+        typical_path = self.frame_files['color00'][idx]
+        curdir = os.path.dirname(typical_path)
+        file_name = os.path.basename(typical_path)
+        index_of_frame = find_frame_num(file_name)
+        cur_pose_path = os.path.join(curdir, "frame_" + index_of_frame + '_pose.txt')
+        cur_pose = torch.Tensor(np.loadtxt(cur_pose_path))
+        if len(cur_pose.shape) == 1:
+            cur_pose = cur_pose.unsqueeze(0)
 
+        if self.projection:
+            if "laptop" in self.dataset_dir:
+                cur_pose[:, 1] = 0
+                
+        joint_map = self.gen_joint_map(cur_pose, self.img_size)
+        load_tuple = load_tuple + (joint_map, )
+
+        # Original order: 0: Color&NOCS; 1: Seg; 2: PNNOCS; 3: joint map
+        load_tuple = (load_tuple[0], load_tuple[3], load_tuple[1], load_tuple[2])
+        # Neww order: 0: Color&NOCS; 1: joint_map; 2: Seg; 3: PNNOCS
+
+        index_of_frame = str(int(index_of_frame) // self.pose_num * self.pose_num).zfill(8)
+        mesh_path = os.path.join(curdir, "frame_" + index_of_frame + '_wt_mesh.obj')
+        return frame['color00'], load_tuple, cur_pose, mesh_path
+
+    def gen_joint_map(self, cur_pose, img_shape):
+        joint_map = torch.Tensor(cur_pose.shape[0]*6, img_shape[1], img_shape[2])        
         cnt = 0
         # get locations
         for i in range(cur_pose.shape[0]):
             for j in range(3):
                 joint_map[cnt] = joint_map[cnt].fill_(cur_pose[i, j])
                 cnt += 1
-
         # get rotations
         for i in range(cur_pose.shape[0]):
             for j in range(3, 6):
                 joint_map[cnt] = joint_map[cnt].fill_(cur_pose[i, j])
                 cnt += 1
-
-        load_tuple = load_tuple + (joint_map, )
-        # print(len(load_tuple))
         
-        # 0: NOCS
-        # 1: Seg
-        # 2. PNNOCS
-        # 3: joint map
-        load_tuple = (load_tuple[0], load_tuple[3], load_tuple[1], load_tuple[2])
+        return joint_map
 
-        index_of_frame = str(int(index_of_frame) // self.pose_num * self.pose_num).zfill(8)
-        mesh_path = os.path.join(curdir, "frame_" + index_of_frame + '_wt_mesh.obj')
-        
-        return frame['color00'], load_tuple, cur_pose, mesh_path
 
     def load_occupancies(self, required_path):
         """

@@ -90,11 +90,6 @@ class DataFilter:
                 p = Pool(mp.cpu_count() >> 1)
                 p.map(self.processFrame, all_frames)
             else:
-                # 00004000
-                # 00005000
-                # 00013500
-                # 00014000
-                # 00014500
                 # self.mode = "train"
                 self.mode = "val"
                 self.processFrame("00014500")
