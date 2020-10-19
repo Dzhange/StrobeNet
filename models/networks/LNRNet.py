@@ -12,9 +12,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 import torch_scatter
-# import torchgeometry.angle_axis_to_rotation_matrix as aa2mat
-
-
 from models.networks.TripleHeadSegNet import THSegNet
 from models.networks.IFNet import SVR
 import utils.tools.implicit_waterproofing as iw
@@ -22,21 +19,16 @@ from utils.lbs import *
 from utils.tools.voxels import VoxelGrid
 from utils.tools.pc2voxel import voxelize as pc2vox
 
-from loaders.HandOccDataset import HandOccDataset
-
-
 class LNRNet(nn.Module):
 
     def __init__(self, config, device=torch.device("cpu"), is_unpooling=True, Args=None, pretrained=True, withSkipConnections=False, Sample=False):
         super().__init__()
         self.config = config
         self.joint_num = config.BONE_NUM
-        self.SegNet = THSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, bn=config.BN)
-        self.SegNet.to(device)
         self.device = device
-        self.IFNet = SVR(config, device)
         
-        self.resolution = 128
+        self.init_network()
+
         self.transform = self.config.TRANSFORM
         self.init_grids(self.resolution)
         self.UpdateSegNet = config.UPDATE_SEG
@@ -48,9 +40,15 @@ class LNRNet(nn.Module):
         for param in self.SegNet.parameters():
             param.requires_grad = self.UpdateSegNet
     
+    def init_network(self):
+        self.SegNet = THSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, bn=self.config.BN)
+        self.SegNet.to(self.device)
+        self.IFNet = SVR(self.config, self.device)
+
     def init_hp(self):
         self.sample = True        
         self.max_point = 30000
+        self.resolution = 128
 
         self.vis = False
         self.sigmoid = nn.Sigmoid()

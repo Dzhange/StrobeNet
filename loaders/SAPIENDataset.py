@@ -33,16 +33,13 @@ class SAPIENDataset(torch.utils.data.Dataset):
         img_size = config.IMAGE_SIZE
 
         self.frame_load_str = ['color00', 'nox00', 'linkseg','pnnocs00'] \
-            if "default" in config.TARGETS else config.TARGETS
-        # print(self.frame_load_str)
+            if "default" in config.TARGETS else config.TARGETS        
         self.init(root, train, img_size, limit, self.frame_load_str, required)
-        # print(self.frame_load_str)
         self.load_data()
-
         ##############################################
-
-        print("\033[93m [ SERIOUS WARNING!!!!! ] SETTING ALL Y LOCATIONS INTO 0 \033[0m")
-        self.projection = True
+        if "laptop" in self.dataset_dir:
+            print("\033[93m [ SERIOUS WARNING!!!!! ] SETTING ALL Y LOCATIONS INTO 0 \033[0m")
+            self.projection = True
         ##############################################
 
 
@@ -58,7 +55,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
                 self.pose_num = configs['pose_num']
         else:
                 self.pose_num = 1
-        self.is_train_data = train        
+        self.is_train_data = train
         self.img_size = img_size
         self.required = required
         # self.frame_load_str = frame_load_str
@@ -79,7 +76,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
             raise RuntimeError('frame_load_str should contain {}.'.format(self.required))
 
         ######### Add BoneWeights #########
-        self.bone_num = 16
+        self.bone_num = self.config.BONE_NUM
 
         ###### Change Boneweight into Segmentation map ######
         # self.as_seg = True
@@ -96,8 +93,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
         return len(self.frame_files[self.frame_load_str[0]])
 
     def __getitem__(self, idx):
-        required_path = self.frame_files[self.required][idx]
-        # print(required_path)
+        required_path = self.frame_files[self.required][idx]        
         RGB, target_imgs, pose, mesh_path = self.load_images(idx)
         load_imgs = torch.cat(target_imgs, 0)
         occ_data = self.load_occupancies(required_path)
@@ -113,7 +109,6 @@ class SAPIENDataset(torch.utils.data.Dataset):
             file_path = os.path.join(self.dataset_dir, 'train/')
         else:
             file_path = os.path.join(self.dataset_dir, 'val/')
-
         
         # Load index for data
         # camera_idx_str = '00'
@@ -135,7 +130,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
             # glob and save cache
             print('[ INFO ]: Saving to glob cache:', glob_cache)
             for string in self.frame_load_str:
-                self.frame_files[string] = glob.glob(file_path + '/**/frame_*_view_00_' + string + '.*')
+                self.frame_files[string] = glob.glob(file_path + '/**/frame_*_view_*_' + string + '.*')
                 self.frame_files[string].sort()
             with open(glob_cache, 'wb') as fp:
                 for string in self.frame_load_str:
@@ -169,7 +164,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
             for K in self.frame_files:
                 self.frame_files[K] = [self.frame_files[K][i] for i in sample_index]
                 self.frame_files[K].sort()
-        else:                
+        else:
             total_size = len(self)
             dataset_length = math.ceil((self.data_limit / 100) * total_size)
             print('[ INFO ]: Loading {} / {} items.'.format(dataset_length, total_size))
@@ -195,8 +190,9 @@ class SAPIENDataset(torch.utils.data.Dataset):
         if len(cur_pose.shape) == 1:
             cur_pose = cur_pose.unsqueeze(0)
 
-        if self.projection:            
-            cur_pose[:, 1] = 0
+        if self.projection:
+            if "laptop" in self.dataset_dir:
+                cur_pose[:, 1] = 0
 
         frame = {}
         has_mask = False

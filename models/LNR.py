@@ -1,7 +1,9 @@
 """
-This model is the baseline version
-We directly take the input from the pnnocs
-and feed it to the IFNet
+This model is the Linear blend skinning version
+We first predict NOCS map
+then predict pose and joint location, along with segmentation map
+We then pose the NOCS back into PNNOCS
+We feed the features with PNNOCS, then use IF-Net for final reconstruction
 """
 
 import os, sys

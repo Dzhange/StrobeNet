@@ -47,6 +47,8 @@ ERROR = -1
 class DataFilter:
 
     def __init__(self, args):
+        self.config = args
+        self.view_num = args.view_num        
         self.inputDir = args.input_dir
         self.outputDir = args.output_dir
         self.sapien = args.sapien
@@ -191,42 +193,28 @@ class DataFilter:
                                            2] = boundary_points[:, 2], boundary_points[:, 0]
 
             grid_coords = 2 * grid_coords
-
             occupancies = iw.implicit_waterproofing(mesh, boundary_points)[0]
-
             np.savez(out_file, points=boundary_points,
                      occupancies=occupancies, grid_coords=grid_coords)
-            # print('Finished {}'.format(mesh_path))
         except:
             print('Error with {}: {}'.format(
                 mesh_path, traceback.format_exc()))
 
-    def copyImgs(self, Frame):
+    def copyImgs(self, frame):
         in_dir = os.path.join(self.inputDir, self.mode, str(
-            int(Frame) // self.frame_per_dir).zfill(4))
+            int(frame) // self.frame_per_dir).zfill(4))
         out_dir = os.path.join(self.outputDir, self.mode, str(
-            int(Frame) // self.frame_per_dir).zfill(4))
+            int(frame) // self.frame_per_dir).zfill(4))
         if self.sapien:
-            view = 0
-            frame_view = "frame_" + Frame
-            suffixs = ['_view_00_color00.png', '_view_00_nox00.png', '_view_00_pnnocs00.png',
-                       '_view_00_linkseg.png', "_pose.txt", '_wt_mesh.obj']
-            for fix in suffixs:
-                f_name = frame_view + fix
-                # print(f_name)
-                old_f = os.path.join(in_dir, f_name)
-                new_f = os.path.join(out_dir, f_name)
-                if os.path.exists(old_f) and not os.path.exists(new_f):
-                    shutil.copy(old_f, new_f)
+            suffixs = suffixs = ['color00.png', 'nox00.png', 'pnnocs00.png',
+                                'linkseg.png', "pose.txt", 'wt_mesh.obj']
         else:
-            view_num = 10
-            for view in range(view_num):
-                frame_view = "frame_" + Frame + "_view_" + str(view).zfill(2)
-                suffixs = ['_color00.png', '_color01.png', '_nox00.png', '_nox01.png',
-                           '_pnnocs00.png', '_pnnocs01.png',
-                           '_normals00.png', '_normals01.png', '_uv00.png', '_uv01.png']
-                for fix in suffixs:
-                    f_name = frame_view + fix
+            suffixs = ['color00.png', 'color01.png', 'nox00.png', 'nox01.png',
+                           'pnnocs00.png', 'pnnocs01.png',
+                           'normals00.png', 'normals01.png', 'uv00.png', 'uv01.png']
+        for view in range(self.view_num):            
+            for suffix in suffixs:
+                    f_name = "frame_{}_view_{}_{}".format(frame, str(view).zfill(2), suffix)                    
                     old_f = os.path.join(in_dir, f_name)
                     new_f = os.path.join(out_dir, f_name)
                     if os.path.exists(old_f) and not os.path.exists(new_f):
@@ -240,24 +228,23 @@ class DataFilter:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='filter data for nrnet'
-    )    
+    )
     parser.add_argument('-o', '--output-dir', default='/ZG/meshedNOCS/IF_hand_dataset',
                         help='Provide the output directory where the processed Model')
     parser.add_argument('-i', '--input-dir', default='/ZG/meshedNOCS/hand_rig_dataset_v3/',
-                        help='the root of dataset as input for norcs')    
+                        help='the root of dataset as input for norcs')
     parser.add_argument('-p', '--pose_per_actor', type=int, required=True,
                         help="if use sapien, must specify number of poses")
-
+    parser.add_argument('-v', '--view_num', type=int, default=1,
+                        help="number of views per frame in the dataset")
 
     parser.add_argument('-s', '--sapien', default=False,
-                        type=ast.literal_eval, help="SAPIEN dataset is a little different")        
+                        type=ast.literal_eval, help="SAPIEN dataset is a little different")
     parser.add_argument('--write-over', default=False, type=ast.literal_eval,
                         help="Overwrite previous results if set to True")
-    parser.add_argument('-t', '--transform', default=False, type=ast.literal_eval,
+    parser.add_argument('-t', '--transform', default=True, type=ast.literal_eval,
                         help="if set to true, would normalize all instances to [-0.5, 0.5]")
-    
+
     args = parser.parse_args()
     df = DataFilter(args)
-    print(args.sapien)
-    print(args.transform)
     df.filter()

@@ -271,14 +271,11 @@ class HandRigDatasetV3(torch.utils.data.Dataset):
                 Concated = Concated + (Frame[FrameStr],)
             if len(Concated) > 0:
                 LoadTup = LoadTup + (torch.cat(Concated, 0), )
-
         # print(len(LoadTup))
         # print(LoadTup[0].size())
-
         return Frame['color00'], LoadTup, Frame['camera']
 
     def convertItem(self, idx, isMaskNOX=False):
         RGB, LoadTup, Pose = self.loadImages(idx)
         # RGB, Targets = self[idx]
-
         return self.convertData(RGB, LoadTup, isMaskNOX=isMaskNOX)
