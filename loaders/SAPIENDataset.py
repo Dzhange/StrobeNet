@@ -37,9 +37,9 @@ class SAPIENDataset(torch.utils.data.Dataset):
         self.init(root, train, img_size, limit, self.frame_load_str, required)
         self.load_data()
         ##############################################
-        if "laptop" in self.dataset_dir:
-            print("\033[93m [ SERIOUS WARNING!!!!! ] SETTING ALL Y LOCATIONS INTO 0 \033[0m")
-            self.projection = True
+        # if "laptop" in self.dataset_dir:
+        print("\033[93m [ SERIOUS WARNING!!!!! ] SETTING ALL Y LOCATIONS INTO 0 \033[0m")
+        self.projection = True
         ##############################################
 
     def init(self, root, train=True, 
@@ -179,7 +179,6 @@ class SAPIENDataset(torch.utils.data.Dataset):
         """
         actual implementation of __getitem__
         """
-
         frame = {}
         has_mask = False
         for k in self.frame_files:
@@ -226,14 +225,16 @@ class SAPIENDataset(torch.utils.data.Dataset):
         file_name = os.path.basename(typical_path)
         index_of_frame = find_frame_num(file_name)
         cur_pose_path = os.path.join(curdir, "frame_" + index_of_frame + '_pose.txt')
+        if not os.path.exists(cur_pose_path):
+            cur_pose_path = os.path.join(curdir, "frame_" + index_of_frame + '_view_00_pose.txt')
         cur_pose = torch.Tensor(np.loadtxt(cur_pose_path))
         if len(cur_pose.shape) == 1:
             cur_pose = cur_pose.unsqueeze(0)
 
         if self.projection:
-            if "laptop" in self.dataset_dir:
-                cur_pose[:, 1] = 0
-                
+            # if "laptop" in self.dataset_dir :
+            cur_pose[:, 1] = 0
+        # print(cur_pose)
         joint_map = self.gen_joint_map(cur_pose, self.img_size)
         load_tuple = load_tuple + (joint_map, )
 
@@ -246,7 +247,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
         return frame['color00'], load_tuple, cur_pose, mesh_path
 
     def gen_joint_map(self, cur_pose, img_shape):
-        joint_map = torch.Tensor(cur_pose.shape[0]*6, img_shape[1], img_shape[2])        
+        joint_map = torch.Tensor(cur_pose.shape[0]*6, img_shape[1], img_shape[0])        
         cnt = 0
         # get locations
         for i in range(cur_pose.shape[0]):

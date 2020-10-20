@@ -4,18 +4,17 @@ import torch
 from itertools import groupby
 FileDirPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(FileDirPath, '..'))
-from models.SAPIENDataset import SAPIENDataset
+from loaders.SAPIENDataset import SAPIENDataset
 from utils.DataUtils import *
 
 
 class MVSPDataset(SAPIENDataset):
 
-    def __init__(self,config):
-        super().__init__(config)
+    def __init__(self, config, train):
+        super().__init__(config, train)
         self.view_num = config.VIEW_NUM # number of cameras per frame
-
         
-    def load_data(self):
+    def load_data(self):    
         # we only load valid frameIDS, we do not record 
         # file names as the view num is not specified
         self.frame_ids = []
@@ -25,17 +24,17 @@ class MVSPDataset(SAPIENDataset):
         else:
             file_path = os.path.join(self.dataset_dir, 'val/')
 
-        glob_cache = os.path.join(file_path, 'all_glob_frames.cache')        
+        glob_cache = os.path.join(file_path, 'all_glob_frames.cache')
         if os.path.exists(glob_cache):
             # use pre-cached index
             print('[ INFO ]: Loading from glob cache:', glob_cache)
-            with open(glob_cache, 'rb') as fp:                
+            with open(glob_cache, 'rb') as fp:
                 self.frame_ids = pickle.load(fp)
         else:
             # glob and save cache
             print('[ INFO ]: Saving to glob cache:', glob_cache)
             all_color_imgs = glob.glob(os.path.join(file_path, '**/frame_*_color00.*'))
-            all_frames = [os.path.join(os.path.dirname(p), "frame_" + self.findFrameNum(p)) for p in all_color_imgs]
+            all_frames = [os.path.join(os.path.dirname(p), "frame_" + find_frame_num(p)) for p in all_color_imgs]
             all_frames = list(dict.fromkeys(all_frames)) # discard duplicated frame ids
             all_frames.sort()
             self.frame_ids = all_frames
@@ -43,6 +42,9 @@ class MVSPDataset(SAPIENDataset):
                 for string in self.frame_load_str:
                     pickle.dump(self.frame_ids, fp)
     
+    def __len__(self):
+        return len(self.frame_ids)
+
     def __getitem__(self, idx):
         
         data_list = []
@@ -59,8 +61,9 @@ class MVSPDataset(SAPIENDataset):
 
     def get_sv_data(self, frame_path, view):
         data = self.load_images(frame_path, view)
-        occ = self.load_occupancies(frame_path)        
-        data.update(occ)
+        # occ = self.load_occupancies(frame_path)
+        # data.update(occ)
+        # TODO: also include pair-wise consistency data
         return data
 
     def load_images(self, frame_path, view_id):
@@ -71,13 +74,13 @@ class MVSPDataset(SAPIENDataset):
         has_mask = False
         for k in self.frame_load_str:
             item_path = get_path_by_frame(frame_path, view_id, k, 'png')
-            if "linkseg" in k:                
+            if "linkseg" in k:
                 frame[k] = imread_gray_torch(item_path, Size=self.img_size)\
                     .type(torch.FloatTensor).unsqueeze(0) # other wise would all be zero # 1,W,H
                 continue # no need to be divided by 255
             else:
                 frame[k] = imread_rgb_torch(item_path, Size=self.img_size).type(torch.FloatTensor)
-            # we only create one mask create 
+            # we only create one mask create
             if (k == "nox00" or k == "pnnocs00") and not has_mask:
                 frame[k] = torch.cat((frame[k], createMask(frame[k])), 0).type(torch.FloatTensor)
                 has_mask = True
@@ -142,7 +145,7 @@ class MVSPDataset(SAPIENDataset):
         if_data = {
             'grid_coords':np.array(coords, dtype=np.float32),
             'occupancies': np.array(occupancies, dtype=np.float32),            
-            'mesh': gt_mesh_path
+            'iso_mesh': gt_mesh_path
             }
 
         if self.config.TRANSFORM:
@@ -156,4 +159,15 @@ class MVSPDataset(SAPIENDataset):
 
         return if_data
 
-
+if __name__ == '__main__':
+    import argparse
+    from config import get_cfg
+    # preparer configuration
+    cfg = get_cfg()
+    # f_str = ["color00", "nox00", "pnnocs00", "linkseg"]
+    f_str = None
+    Data = MVSPDataset(cfg, train=True)    
+    DataLoader = torch.utils.data.DataLoader(Data, batch_size=8, shuffle=True, num_workers=8)
+    for i, Data in enumerate(DataLoader, 0):  # Get each batch
+        print(Data['color00'][0].to(device="cuda:0"))
+        

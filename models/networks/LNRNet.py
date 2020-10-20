@@ -30,6 +30,8 @@ class LNRNet(nn.Module):
         self.init_network()
 
         self.transform = self.config.TRANSFORM
+        
+        self.resolution = 128
         self.init_grids(self.resolution)
         self.UpdateSegNet = config.UPDATE_SEG
         self.use_pretrained = False
@@ -48,8 +50,6 @@ class LNRNet(nn.Module):
     def init_hp(self):
         self.sample = True        
         self.max_point = 30000
-        self.resolution = 128
-
         self.vis = False
         self.sigmoid = nn.Sigmoid()
 
@@ -83,7 +83,7 @@ class LNRNet(nn.Module):
         # return grid_coords
     
     def forward(self, inputs):
-        color = inputs['RGB']
+        color = inputs['color00']
 
         if self.transform:
             transform = {'translation': inputs['translation'],

@@ -89,7 +89,7 @@ class ModelLNRNET(ModelSegLBS):
         inputs = data_to_device[0]
         # TODO: uncomment these when pipeline finished
         inputs = {}
-        inputs['RGB'] = data_to_device[0]
+        inputs['color00'] = data_to_device[0]
         inputs['grid_coords'] = data_to_device[3]['grid_coords']
         if self.config.TRANSFORM:
             inputs['translation'] = data_to_device[3]['translation']
@@ -161,7 +161,7 @@ class ModelLNRNET(ModelSegLBS):
                 self.gen_mesh(grid_points_split, data, i)
 
             segnet_output = output_recon[0]
-            self.save_img(net_input['RGB'], segnet_output[:, 0:4, :, :], target['maps'][:, 0:4, :, :], i)
+            self.save_img(net_input['color00'], segnet_output[:, 0:4, :, :], target['maps'][:, 0:4, :, :], i)
             self.gen_NOCS_pc(segnet_output[:, 0:3, :, :], target['maps'][:, 0:3, :, :], target['maps'][:, 3, :, :], "nocs", i)
 
             if self.config.SKIN_LOSS or self.config.TASK == "lbs_seg":

@@ -31,7 +31,8 @@ class MLNRNet(LNRNet):
 
     def forward(self, inputs):
         
-        color = inputs['RGB']
+        img_list = inputs['color00']
+
         if self.transform:
             transform = {'translation': inputs['translation'],
                      'scale':inputs['scale']}
@@ -42,31 +43,35 @@ class MLNRNet(LNRNet):
         grid_coords = inputs['grid_coords']
         # here we edit the intermediate output for the IF-Net stage
         # first lift them into 3D point cloud
-        output = self.SegNet(color)
-        pred_nocs = output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
-        pred_mask = output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)        
-        pred_loc = output[:, self.mask_end:self.loc_end, :, :].clone().requires_grad_(True)
-        pred_pose = output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
-        pred_weight = output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
-        conf = output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
-        nocs_feature = output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
-        if self.config.REPOSE:
-            pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
-            # pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
-            output = torch.cat((output, pnnocs_maps), dim=1)
-        recon = None
+        pred_list = self.SegNet(img_list)
+        occupancy_list = []
+        for i in range(len(img_list)):
+            
+            output = pred_list[i]
+            pred_nocs = output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
+            pred_mask = output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)        
+            pred_loc = output[:, self.mask_end:self.loc_end, :, :].clone().requires_grad_(True)
+            pred_pose = output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
+            pred_weight = output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
+            conf = output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
+            nocs_feature = output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
+            if self.config.REPOSE:
+                pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
+                # pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
+                output = torch.cat((output, pnnocs_maps), dim=1)
+            recon = None
+            if not self.config.STAGE_ONE:
+                # then: we transform the point cloud into occupancy(along with the features )
+                occupancies = self.voxelize(output, nocs_feature, transform)
+                occupancy_list.append(occupancies)
+                
+                if 0:
+                    self.visualize(occupancies)
+                # and then feed into IF-Net. The ground truth shouled be used in the back projection
 
-        if not self.config.STAGE_ONE:
-            # then: we transform the point cloud into occupancy(along with the features )
-            occupancies = self.voxelize(output, nocs_feature, transform)
-            if 0:
-                self.visualize(occupancies)
-            # and then feed into IF-Net. The ground truth shouled be used in the back projection
-        
-        
+
+
         recon = self.IFNet(grid_coords, occupancies)
-        
-
         return output, recon
         
 

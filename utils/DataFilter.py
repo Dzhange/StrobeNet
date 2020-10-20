@@ -209,11 +209,14 @@ class DataFilter:
                            'normals00.png', 'normals01.png', 'uv00.png', 'uv01.png']
         for view in range(self.view_num):            
             for suffix in suffixs:
-                    f_name = "frame_{}_view_{}_{}".format(frame, str(view).zfill(2), suffix)                    
-                    old_f = os.path.join(in_dir, f_name)
-                    new_f = os.path.join(out_dir, f_name)
-                    if os.path.exists(old_f) and not os.path.exists(new_f):
-                        shutil.copy(old_f, new_f)
+                # if "pose" in suffix:
+                #     f_name = "frame_{}_{}".format(frame, str(view).zfill(2), suffix)
+                # else:
+                f_name = "frame_{}_view_{}_{}".format(frame, str(view).zfill(2), suffix)
+                old_f = os.path.join(in_dir, f_name)
+                new_f = os.path.join(out_dir, f_name)
+                if os.path.exists(old_f) and not os.path.exists(new_f):
+                    shutil.copy(old_f, new_f)
 
     @staticmethod
     def findFrameNum(path):
