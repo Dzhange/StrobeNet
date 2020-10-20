@@ -19,6 +19,7 @@ class ModelMLNRNet(ModelLNRNET):
 
     def __init__(self, config):
         super().__init__(config)
+        self.view_num = config.VIEW_NUM
     
     def preprocess(self, data, device):
         """

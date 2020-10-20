@@ -118,17 +118,15 @@ class LNRNet(nn.Module):
             # then: we transform the point cloud into occupancy(along with the features)            
             point_cloud_list, feature_cloud_list = self.lift(output, nocs_feature, transform)
             occupancy_list = []
-            for i in range(batch_size):
+            for i in range(batch_size): 
                 occupancy = self.discretize(point_cloud_list[i], feature_cloud_list[i], self.resolution)
                 occupancy_list.append(occupancy)
-            occupancies= torch.stack(tuple(occupancy_list))
+            occupancies = torch.stack(tuple(occupancy_list))
             # if self.vis == True:
             if 0:
                 self.visualize(occupancies)
             # and then feed into IF-Net. The ground truth shouled be used in the back projection
             recon = self.IFNet(grid_coords, occupancies)
-        
-
         return output, recon
 
     def vote(self, pred_joint_map, pred_joint_score, out_mask):
@@ -403,12 +401,9 @@ class LNRNet(nn.Module):
             if num_valid == 0 or torch.isnan(point_cloud).any():
                 point_cloud_list.append(None)
                 feature_cloud_list.append(None)
-                # occ_empty = torch.ones(feature_dim, *(self.resolution,)*3).to(device=pred_nocs.device)
-                # print("empty", occ_empty.shape)
-                # all_occupancies.append(occ_empty)
                 continue
 
-            if self.sample and num_valid > self.max_point:                
+            if self.sample and num_valid > self.max_point:
                 pass
 
             if transform is not None:
