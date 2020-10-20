@@ -69,8 +69,6 @@ class MLNRNet(LNRNet):
                     self.visualize(occupancies)
                 # and then feed into IF-Net. The ground truth shouled be used in the back projection
 
-
-
         recon = self.IFNet(grid_coords, occupancies)
         return output, recon
         

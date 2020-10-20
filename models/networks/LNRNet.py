@@ -98,7 +98,8 @@ class LNRNet(nn.Module):
         # here we edit the intermediate output for the IF-Net stage
         # first lift them into 3D point cloud
         output = self.SegNet(color)
-        
+        batch_size = output.shape[0]
+
         pred_nocs = output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
         pred_mask = output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)        
 
@@ -109,14 +110,18 @@ class LNRNet(nn.Module):
         nocs_feature = output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
 
         if self.config.REPOSE:
-            pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
-            # pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
+            pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)        
             output = torch.cat((output, pnnocs_maps), dim=1)
 
         recon = None
         if not self.config.STAGE_ONE:
-            # then: we transform the point cloud into occupancy(along with the features )
-            occupancies = self.voxelize(output, nocs_feature, transform)
+            # then: we transform the point cloud into occupancy(along with the features)            
+            point_cloud_list, feature_cloud_list = self.lift(output, nocs_feature, transform)
+            occupancy_list = []
+            for i in range(batch_size):
+                occupancy = self.discretize(point_cloud_list[i], feature_cloud_list[i], self.resolution)
+                occupancy_list.append(occupancy)
+            occupancies= torch.stack(tuple(occupancy_list))
             # if self.vis == True:
             if 0:
                 self.visualize(occupancies)
@@ -367,7 +372,7 @@ class LNRNet(nn.Module):
         pnnocs = lbs_(nocs_pc, T, dtype=nocs_pc.dtype)
         return pnnocs
 
-    def voxelize(self, output, feature, transform):
+    def lift(self, output, feature, transform):
         batch_size = output.size(0)
         img_size = (output.size(2), output.size(3))
 
@@ -385,7 +390,10 @@ class LNRNet(nn.Module):
 
         # get upsampeld feature
         upsampled_feature = F.interpolate(feature, size=img_size)
-        all_occupancies = []
+        # all_occupancies = []
+        
+        point_cloud_list = []
+        feature_cloud_list = []
         for i in range(batch_size):
             cur_mask = out_mask[i].squeeze()
             masked = cur_mask > threshold
@@ -393,12 +401,14 @@ class LNRNet(nn.Module):
             
             num_valid = point_cloud.shape[1]
             if num_valid == 0 or torch.isnan(point_cloud).any():
-                occ_empty = torch.ones(feature_dim, *(self.resolution,)*3).to(device=pred_nocs.device)
+                point_cloud_list.append(None)
+                feature_cloud_list.append(None)
+                # occ_empty = torch.ones(feature_dim, *(self.resolution,)*3).to(device=pred_nocs.device)
                 # print("empty", occ_empty.shape)
-                all_occupancies.append(occ_empty)
+                # all_occupancies.append(occ_empty)
                 continue
 
-            if self.sample and num_valid > self.max_point:
+            if self.sample and num_valid > self.max_point:                
                 pass
 
             if transform is not None:
@@ -408,14 +418,23 @@ class LNRNet(nn.Module):
                 point_cloud += 0.5
 
             feature_cloud = upsampled_feature[i, :, masked]
-            voxelized_feature = self.discretize(point_cloud, feature_cloud, self.resolution)
-            all_occupancies.append(voxelized_feature)
-        all_occupancies = torch.stack(tuple(all_occupancies))
-        return all_occupancies
+            
+            point_cloud_list.append(point_cloud)
+            feature_cloud_list.append(feature_cloud)
+
+            # voxelized_feature = self.discretize(point_cloud, feature_cloud, self.resolution)
+            # all_occupancies.append(voxelized_feature)
+        
+        return point_cloud_list, feature_cloud_list
+        # all_occupancies = torch.stack(tuple(all_occupancies))
+        # return all_occupancies
 
     def discretize(self, point_cloud, FeatureCloud, Res):
         # input: N*3 pointcloud
         # output: 128**3 * F
+        if point_cloud is None:
+            feature_dim = self.SegNet.feature_channels
+            return torch.ones(feature_dim, *(self.resolution,)*3).to(device=pred_nocs.device)        
         feature_dim = FeatureCloud.shape[0]
         point_num = point_cloud.shape[1]
 
