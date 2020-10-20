@@ -61,8 +61,8 @@ class MVSPDataset(SAPIENDataset):
 
     def get_sv_data(self, frame_path, view):
         data = self.load_images(frame_path, view)
-        # occ = self.load_occupancies(frame_path)
-        # data.update(occ)
+        occ = self.load_occupancies(frame_path)
+        data.update(occ)
         # TODO: also include pair-wise consistency data
         return data
 

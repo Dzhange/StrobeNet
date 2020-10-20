@@ -21,13 +21,18 @@ class ModelLBSNOCS(object):
         self.lr = config.LR # set learning rate
         # self.net = new_SegNet(input_channels=3, output_channels=config.OUT_CHANNELS)
         self.bone_num = config.BONE_NUM
-
         self.loss_history = []
         self.val_loss_history = []
         self.start_epoch = 0
         self.expt_dir_path = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME)
         if os.path.exists(self.expt_dir_path) == False:
-            os.makedirs(self.expt_dir_path)        
+            os.makedirs(self.expt_dir_path)
+
+        self.init_net(device=None)
+    
+    def init_net(self, device=None):
+        print("LBS init")
+        config = self.config
         if config.MH:
             # self.net = MHSegNet(bn=False)
             self.net = MHSegNet(bn=False, pose_channels=self.bone_num*(3+3+1+1)+2)
@@ -37,6 +42,7 @@ class ModelLBSNOCS(object):
                                         betas=(self.config.ADAM_BETA1, self.config.ADAM_BETA2),
                                         weight_decay=config.WEIGHT_DECAY
                                         )
+
 
     def setup_checkpoint(self, TrainDevice):
         latest_checkpoint_dict = None
@@ -66,7 +72,6 @@ class ModelLBSNOCS(object):
             else:
                 print('[ INFO ]: Experiment names do not match. Training from scratch.')
             
-
     def save_checkpoint(self, epoch, time_string='humanlocal', print_str='*'*3):
         checkpoint_dict = {
             'Name': self.config.EXPT_NAME,

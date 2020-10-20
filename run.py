@@ -10,6 +10,7 @@ from loaders.HandDataset import HandDataset
 from loaders.HandDatasetLBS import HandDatasetLBS
 from loaders.HandOccDataset import HandOccDataset
 from loaders.SAPIENDataset import SAPIENDataset
+from loaders.MVSAPIENDataset import MVSPDataset
 
 # from inout.logger import get_logger
 from models.NOCS import ModelNOCS
@@ -18,7 +19,7 @@ from models.LBS import ModelLBSNOCS
 from models.SegLBS import ModelSegLBS
 from models.PMLBS import PMLBS
 from models.LNR import ModelLNRNET
-
+from models.MLNR import ModelMLNRNet
 from models.loss import *
 from models.sapien_loss import *
 # from core.coach import Coach
@@ -38,7 +39,7 @@ task = cfg.TASK
 def get_loaders(Dataset):
     for mode in cfg.MODES:
   
-        if task == "lnrnet":
+        if task in ["lnrnet", 'mlnrnet']:
             phase_dataset = Dataset(config=cfg, train=mode in ['train'] or cfg.TEST_ON_TRAIN)
         else:
             phase_dataset = Dataset(root=cfg.DATASET_ROOT,
@@ -80,10 +81,14 @@ if task == "lnrnet":
     # objective = PMLBSLoss(cfg)
     objective = PMLoss(cfg)    
     Model = ModelLNRNET(cfg)
+if task == "mlnrnet":
+    Dataset = MVSPDataset
+    objective = MVPMLoss(cfg)
+    Model = ModelMLNRNet(cfg)
 else:
     Dataset = HandDataset
     Model = ModelNOCS(cfg)
-
+    
 
 
 get_loaders(Dataset)

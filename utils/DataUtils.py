@@ -23,6 +23,21 @@ def get_path_by_frame(frame_path, view_id, target_str, suffix):
 def short_pad(n):
     return str(int(n)).zfill(2)
 
+
+def DL2LD(DL):
+    """
+    from dict of list to list of dict
+    """
+    LD = [dict(zip(DL, t)) for t in zip(*DL.values())]
+    return LD
+
+def LD2DL(LD):
+    """
+    from list of dict to dict of list
+    """
+    DL = {k: [dic[k] for dic in LD] for k in LD[0]}
+    return DL
+
 ################################ DATA RELATED UTILS ####################################
 def torch2np(ImageTorch):
     # OpenCV does [height, width, channels]

@@ -2,6 +2,7 @@ import os
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
+from utils.DataUtils import DL2LD, LD2DL
 from models.loss import *
 
 class PMloss(LBSLoss):
@@ -273,15 +274,14 @@ class PMLoss(nn.Module):
 
         return all_loss
 
-    def recon_loss(self, recon, target):
-
+    @staticmethod
+    def recon_loss(recon, target):
         occ = target['occupancies'].to(device=recon.device)
         # out = (B,num_points) by componentwise comparing vecots of size num_samples :)
         occ_loss = nn.functional.binary_cross_entropy_with_logits(
                 recon, occ, reduction='none')
         num_sample = occ_loss.shape[1]
         occ_loss = occ_loss.sum(-1).mean() / num_sample
-
         return occ_loss
     
     
@@ -306,3 +306,37 @@ class PMLoss(nn.Module):
         #     print("error, outlier")
         return all_loss
     
+class MVPMLoss(PMLoss):
+
+    def __init__(self, config):
+        super().__init__(config)
+    
+    def forward(self, output, target):
+        
+        target_list = DL2LD(target)
+        segnet_output = output[0]
+        view_num = len(segnet_output)
+
+        mv_loss = {}
+        for v in range(view_num):
+            sv_output = segnet_output[v]
+            sv_target = target_list[v]
+            sv_loss = self.segnet_loss(sv_output, sv_target)
+            if len(mv_loss) == 0:
+                mv_loss = sv_loss
+            else:
+                for k in sv_loss:
+                    mv_loss[k] += sv_loss[k]
+
+        for k in mv_loss:
+            mv_loss[k] /= view_num
+
+        if not self.config.STAGE_ONE:
+            ifnet_output = output[1]
+            mv_loss['recon_loss'] = self.recon_loss(ifnet_output, target)
+        
+        mv_loss = self.add_up(mv_loss)
+
+        return mv_loss
+
+

@@ -27,14 +27,25 @@ class ModelLNRNET(ModelSegLBS):
         self.config = config
         self.lr = config.LR
         device = torch.device(config.GPU)
+        # self.init_net(device)
         # self.net = NRNet(config, device=device)
-        self.net = LNRNet(config, device=device)
+        
         self.loss_history = []
         self.val_loss_history = []
         self.start_epoch = 0
         self.expt_dir_path = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME)        
         if os.path.exists(self.expt_dir_path) == False:
             os.makedirs(self.expt_dir_path)
+                
+        # generation conifgs
+        self.resolution = 128
+        self.batch_points = 100000
+
+    
+    def init_net(self, device):
+        print("LNR init")
+        config = self.config
+        self.net = LNRNet(config, device=device)
         self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr,
                                           betas=(self.config.ADAM_BETA1, self.config.ADAM_BETA2))
         if config.NRNET_PRETRAIN:
@@ -44,10 +55,7 @@ class ModelLNRNET(ModelSegLBS):
                 pretrained_dir = config.NRNET_PRETRAIN_PATH
                 self.LoadSegNetCheckpoint(device, pretrained_dir)
 
-        # generation conifgs
-        self.resolution = 128
-        self.batch_points = 100000
-        
+
     # @staticmethod
     def preprocess(self, data, device):
         """

@@ -141,7 +141,7 @@ class DataFilter:
         try:
             mesh = trimesh.load(orig_mesh_path, process=False)
             if self.transform:
-                print("WRONG!!")
+                # print("WRONG!!")
                 total_size = (mesh.bounds[1] - mesh.bounds[0]).max()
                 centers = (mesh.bounds[1] + mesh.bounds[0]) / 2
                 translation = -centers
@@ -201,7 +201,7 @@ class DataFilter:
         out_dir = os.path.join(self.outputDir, self.mode, str(
             int(frame) // self.frame_per_dir).zfill(4))
         if self.sapien:
-            suffixs = suffixs = ['color00.png', 'nox00.png', 'pnnocs00.png',
+            suffixs = ['color00.png', 'nox00.png', 'pnnocs00.png',
                                 'linkseg.png', "pose.txt", 'wt_mesh.obj']
         else:
             suffixs = ['color00.png', 'color01.png', 'nox00.png', 'nox01.png',
@@ -212,8 +212,12 @@ class DataFilter:
                 # if "pose" in suffix:
                 #     f_name = "frame_{}_{}".format(frame, str(view).zfill(2), suffix)
                 # else:
-                f_name = "frame_{}_view_{}_{}".format(frame, str(view).zfill(2), suffix)
+                f_name = "frame_{}_view_{}_{}".format(frame, str(view).zfill(2), suffix)                
                 old_f = os.path.join(in_dir, f_name)
+                if "pose" in suffix and not os.path.exists(old_f):
+                    f_name = "frame_{}_{}".format(frame, str(view).zfill(2), suffix)
+                    old_f = os.path.join(in_dir, f_name)
+                
                 new_f = os.path.join(out_dir, f_name)
                 if os.path.exists(old_f) and not os.path.exists(new_f):
                     shutil.copy(old_f, new_f)

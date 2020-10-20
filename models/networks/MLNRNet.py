@@ -20,8 +20,8 @@ from utils.tools.pc2voxel import voxelize as pc2vox
 
 class MLNRNet(LNRNet):
 
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, device):
+        super().__init__(config, device=device)
         self.aggr_scatter = config.AGGR_SCATTER
         self.view_num = config.VIEW_NUM
 
@@ -70,11 +70,12 @@ class MLNRNet(LNRNet):
             if not self.config.STAGE_ONE:
                 # then: we transform the point cloud into occupancy(along with the features )
                 sv_pc_list, sv_feature_list = self.lift(output, nocs_feature, transform)
-
                 if self.aggr_scatter:
-                    # this list is batch wise                
-                    mv_pc_list.append(sv_pc_list)
-                    mv_feature_list.append(sv_feature_list)
+                    # this list is batch wise
+                    if sv_feature_list is not None:
+                        mv_pc_list.append(sv_pc_list)
+                    if mv_feature_list is not None:
+                        mv_feature_list.append(sv_feature_list)
                 else:
                     b_sv_occupancy_list = []
                     for i in range(batch_size): 
@@ -92,6 +93,7 @@ class MLNRNet(LNRNet):
                 batch_pc_list = []
                 batch_feature_list = []
                 for view in range(self.view_num):
+                    print(mv_pc_list)
                     batch_pc_list.extend(mv_pc_list[view][i])
                     batch_feature_list.extend(mv_feature_list[view][i])
                 batch_pc = torch.stack(tuple(batch_pc_list))

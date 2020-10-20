@@ -79,6 +79,7 @@ def get_default_cfg():
     cfg.UPDATE_SEG = True
     cfg.IF_BN = False
     cfg.BN = False
+    cfg.AGGR_SCATTER = False
 
     cfg.MH = False
     cfg.AS_SEG = False

@@ -21,7 +21,7 @@ from utils.tools.pc2voxel import voxelize as pc2vox
 
 class LNRNet(nn.Module):
 
-    def __init__(self, config, device=torch.device("cpu"), is_unpooling=True, Args=None, pretrained=True, withSkipConnections=False, Sample=False):
+    def __init__(self, config, device=torch.device("cpu")):
         super().__init__()
         self.config = config
         self.joint_num = config.BONE_NUM
