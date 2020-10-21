@@ -42,18 +42,15 @@ class Trainer:
                     ################### START WEIGHT UPDATE ################################
                     self.model.optimizer.zero_grad()
                     net_input, target = self.model.preprocess(data, self.device)
-                    # a = time()
+                    time_a = time()
                     output = self.model.net(net_input)
-                    # b = time()
-                    # print("forward time ",b-a)
+                    time_b = time()``
                     loss = self.objective(output, target)
-                    # c = time()
-                    # print("calculate loss time ",c - b)
+                    time_c = time()                    
                     if loss > 50:
                         print("[ ERROR ] strange loss encountered at ", target['mesh'])                                        
                     loss.backward()
-                    # d = time()
-                    # print("BP time ", d - c)
+                    time_d = time()                    
                     self.model.optimizer.step()
                     ####################### START MONITOR ################################
                     epoch_losses.append(loss.item())
@@ -65,15 +62,18 @@ class Trainer:
                     time_per_batch = (toc - all_tic) / ((cur_epoch * len(self.train_data_loader)) + (i+1)) # Time per batch
                     ETA = math.floor(time_per_batch * self.config.EPOCH_TOTAL * len(self.train_data_loader) * 1e-6)
                     
-                    progress_str = ('\r[{}>{}] epoch - {}/{}, train loss - {:.8f} | epoch - {}, total - {} ETA - {} |')\
+                    progress_str = ('\r[{}>{}] epoch - {}/{}, {}th step train loss - {:.8f} | epoch - {}, total - {} ETA - {} |')\
                                             .format('=' * done, '-' * (30 - done),
                                                     self.model.start_epoch + cur_epoch + 1,
                                                     self.model.start_epoch + self.config.EPOCH_TOTAL,
+                                                    i,
                                                     np.mean(np.asarray(epoch_losses)),
                                                     getTimeDur(elapsed),
                                                     getTimeDur(total_elapsed),
                                                     getTimeDur(ETA-total_elapsed))
-
+                    show_time = False
+                    if show_time:
+                        progress_str += "forward time {}, calculate loss time {}, BP time {}".format(time_b - time_a, time_c - time_b, time_d - time_c)
                     sys.stdout.write(progress_str.ljust(100))
                     sys.stdout.flush()
                     # if i % 100 == 0:

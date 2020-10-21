@@ -110,7 +110,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
             file_path = os.path.join(self.dataset_dir, 'val/')
 
         # Load index for data
-        # camera_idx_str = '00'
+        camera_idx = '00'
         prepend_list = []
         for i in self.frame_load_str:
             prepend_list.append(i)
@@ -129,7 +129,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
             # glob and save cache
             print('[ INFO ]: Saving to glob cache:', glob_cache)
             for string in self.frame_load_str:
-                self.frame_files[string] = glob.glob(file_path + '/**/frame_*_view_*_' + string + '.*')
+                self.frame_files[string] = glob.glob(file_path + '/**/frame_*_view_'+ camera_idx +'_' + string + '.*')
                 self.frame_files[string].sort()
             with open(glob_cache, 'wb') as fp:
                 for string in self.frame_load_str:
@@ -224,9 +224,11 @@ class SAPIENDataset(torch.utils.data.Dataset):
         curdir = os.path.dirname(typical_path)
         file_name = os.path.basename(typical_path)
         index_of_frame = find_frame_num(file_name)
+        
         cur_pose_path = os.path.join(curdir, "frame_" + index_of_frame + '_pose.txt')
         if not os.path.exists(cur_pose_path):
             cur_pose_path = os.path.join(curdir, "frame_" + index_of_frame + '_view_00_pose.txt')
+
         cur_pose = torch.Tensor(np.loadtxt(cur_pose_path))
         if len(cur_pose.shape) == 1:
             cur_pose = cur_pose.unsqueeze(0)

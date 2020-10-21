@@ -27,8 +27,7 @@ class ModelLNRNET(ModelSegLBS):
         self.config = config
         self.lr = config.LR
         # device = torch.device(config.GPU)
-        # self.init_net(device)
-        # self.net = NRNet(config, device=device)
+        # self.init_net(device)        
         
         self.loss_history = []
         self.val_loss_history = []

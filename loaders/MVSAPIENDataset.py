@@ -88,17 +88,20 @@ class MVSPDataset(SAPIENDataset):
         ##################################################################
         # deal with poses        
         cur_pose_path = get_path_by_frame(frame_path, view_id, "pose", "txt")
+        if not os.path.exists(cur_pose_path):
+            cur_pose_path = frame_path + '_pose.txt'
         cur_pose = torch.Tensor(np.loadtxt(cur_pose_path))
         # extend dimension in case of single joint case
         if len(cur_pose.shape) == 1:
             cur_pose = cur_pose.unsqueeze(0)
+
         # project the joint location to eliminate unnecessary joint variation
         if self.projection:
             if "laptop" in self.dataset_dir:
-                cur_pose[:, 1] = 0                
+                cur_pose[:, 1] = 0
         # Create map for pixel-wise supervisoin of pose        
         joint_map = self.gen_joint_map(cur_pose, self.img_size)
-        
+
         frame['joint_map'] = joint_map
         frame['pose'] = cur_pose
         

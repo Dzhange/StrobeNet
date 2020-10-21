@@ -57,7 +57,6 @@ class MLNRNet(LNRNet):
         b_mv_occupancy_list = [] # occupancy stored in it are batch wise
 
         for i in range(len(img_list)):
-            
             sv_output = pred_list[i]
             pred_nocs = sv_output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
             pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)        
@@ -82,48 +81,51 @@ class MLNRNet(LNRNet):
                         mv_feature_list.append(sv_feature_list)
                 else:
                     b_sv_occupancy_list = []
-                    for i in range(batch_size): 
+                    for i in range(batch_size):
                         occupancy = self.discretize(sv_pc_list[i], sv_feature_list[i], self.resolution)
                         b_sv_occupancy_list.append(occupancy)
                     b_sv_occupancy = torch.stack(tuple(b_sv_occupancy_list))
                     b_mv_occupancy_list.append(b_sv_occupancy)
 
         ##### aggregation #####
+        recon = None
+        if not self.config.STAGE_ONE:
+            if self.aggr_scatter:
+                occupancy_list = []
+                for i in range(batch_size):
+                    # we aggregate for each item in the batch
+                    batch_pc_list = []
+                    batch_feature_list = []
+
+                    valid_view_num = min(len(mv_pc_list), len(mv_feature_list))
+
+                    for view in range(valid_view_num):
+                        cur_pc = mv_pc_list[view][i]
+                        cur_feature = mv_feature_list[view][i]
+                        if cur_pc is not None:                    
+                            batch_pc_list.append(cur_pc)
+                        if cur_feature is not None:                    
+                            batch_feature_list.append(cur_feature)
+                    
+                    if len(batch_pc_list) == 0 or len(batch_feature_list) == 0:
+                        batch_pc = None
+                        batch_feature = None                        
+                    else:
+                        batch_pc = torch.cat(tuple(batch_pc_list), dim=1)
+                        batch_feature = torch.cat(tuple(batch_feature_list), dim=1)
+                    occupancy = self.discretize(batch_pc, batch_feature, self.resolution)
+                    occupancy_list.append(occupancy)
+                occupancies = torch.stack(tuple(occupancy_list))
+            else:
+                mv_occupancy = torch.stack(tuple(b_mv_occupancy_list), dim=1)
+                mv_occupancy = self.avgpool_grids(mv_occupancy)
+
+
+            # and then feed into IF-Net. The ground truth shouled be used in the back projection
+            recon = self.IFNet(grid_coords, occupancies)
         
-        if self.aggr_scatter:
-            occupancy_list = []
-            for i in range(batch_size):
-                # we aggregate for each item in the batch
-                batch_pc_list = []
-                batch_feature_list = []
-
-                valid_view_num = min(len(mv_pc_list), len(mv_feature_list))
-
-                for view in range(valid_view_num):
-                    cur_pc = mv_pc_list[view][i]
-                    cur_feature = mv_feature_list[view][i]
-                    if cur_pc is not None:                    
-                        batch_pc_list.append(cur_pc)
-                    if cur_feature is not None:                    
-                        batch_feature_list.append(cur_feature)
-                
-                if len(batch_pc_list) == 0 or len(batch_feature_list) == 0:
-                    batch_pc = None
-                    batch_feature = None                        
-                else:
-                    batch_pc = torch.cat(tuple(batch_pc_list), dim=1)
-                    batch_feature = torch.cat(tuple(batch_feature_list), dim=1)
-                occupancy = self.discretize(batch_pc, batch_feature, self.resolution)
-                occupancy_list.append(occupancy)
-            occupancies = torch.stack(tuple(occupancy_list))
-        else:
-            mv_occupancy = torch.stack(tuple(b_mv_occupancy_list), dim=1)
-            mv_occupancy = self.avgpool_grids(mv_occupancy)
-
-
-        # and then feed into IF-Net. The ground truth shouled be used in the back projection
-        recon = self.IFNet(grid_coords, occupancies)
         return pred_list, recon
+        
     
     def avgpool_grids(self, feature_grids):
         """
