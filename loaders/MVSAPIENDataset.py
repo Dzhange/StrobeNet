@@ -103,7 +103,9 @@ class MVSPDataset(SAPIENDataset):
         frame['pose'] = cur_pose
         
         mesh_path = frame_path + '_wt_mesh.obj'
-        frame['mesh'] = mesh_path
+        
+        if not self.is_train_data:        
+            frame['mesh'] = mesh_path
         
         return frame
         
@@ -144,9 +146,10 @@ class MVSPDataset(SAPIENDataset):
         # None of the if-data would be needed if in validation mode
         if_data = {
             'grid_coords':np.array(coords, dtype=np.float32),
-            'occupancies': np.array(occupancies, dtype=np.float32),            
-            'iso_mesh': gt_mesh_path
+            'occupancies': np.array(occupancies, dtype=np.float32),                        
             }
+        if not self.is_train_data:
+            if_data['iso_mesh'] = gt_mesh_path
 
         if self.config.TRANSFORM:
             transform_path = os.path.join(data_dir, "frame_" + index_of_frame + '_transform.npz')        
@@ -166,8 +169,9 @@ if __name__ == '__main__':
     cfg = get_cfg()
     # f_str = ["color00", "nox00", "pnnocs00", "linkseg"]
     f_str = None
-    Data = MVSPDataset(cfg, train=True)    
-    DataLoader = torch.utils.data.DataLoader(Data, batch_size=8, shuffle=True, num_workers=8)
+    Data = MVSPDataset(cfg, train=False)    
+    DataLoader = torch.utils.data.DataLoader(Data, batch_size=1, shuffle=True, num_workers=4)
     for i, Data in enumerate(DataLoader, 0):  # Get each batch
-        print(Data['color00'][0].to(device="cuda:0"))
+        # print(Data['color00'][0].to(device="cuda:0"))
+        print("\r {}".format(i))
         

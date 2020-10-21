@@ -74,7 +74,6 @@ class PMLBSLoss(nn.Module):
         self.frame_id = 0
 
     def forward(self, output, target):
-        
         loss = {}
         
         bone_num = self.bone_num
@@ -108,7 +107,9 @@ class PMLBSLoss(nn.Module):
         pred_seg = pred_skin_seg.transpose(1, 2).transpose(2, 3).contiguous().view(-1, bone_num+2)
         tar_seg = tar_skin_seg.long().squeeze(1).view(-1)
         
+        # print(torch.unique(tar_seg))
         skin_loss = self.seg_loss(pred_seg, tar_seg)
+        # print(target_mask.max())
         loc_map_loss = self.l2_loss(pred_loc_map, tar_loc_map, target_mask)
         rot_map_loss = self.l2_loss(pred_rot_map, tar_rot_map, target_mask)
                 
@@ -137,7 +138,8 @@ class PMLBSLoss(nn.Module):
         loss['rot_map_loss'] = rot_map_loss
         loss['skin_loss'] = skin_loss
         
-        if output.shape[1] > 64 + 4+bone_num*8+2:
+        # if output.shape[1] > 64 + 4+bone_num*8+2:
+        if self.cfg.REPOSE:
             pred_pnnocs = output[:, -3:, :, :].clone().requires_grad_(True)            
             tar_pnnocs = tar_maps[:, -3:, :, :]
             pnnocs_loss = self.masked_l2_loss(pred_pnnocs, tar_pnnocs, target_mask)            
@@ -311,8 +313,7 @@ class MVPMLoss(PMLoss):
     def __init__(self, config):
         super().__init__(config)
     
-    def forward(self, output, target):
-        
+    def forward(self, output, target):        
         target_list = DL2LD(target)
         segnet_output = output[0]
         view_num = len(segnet_output)
@@ -321,7 +322,16 @@ class MVPMLoss(PMLoss):
         for v in range(view_num):
             sv_output = segnet_output[v]
             sv_target = target_list[v]
-            sv_loss = self.segnet_loss(sv_output, sv_target)
+            
+            tar = {}
+            tar_maps = []
+            for k in ['nox00', 'joint_map', 'linkseg']:
+                tar_maps.append(sv_target[k])
+            tar['maps'] = torch.cat(tuple(tar_maps), dim=1)
+            tar['pose'] = sv_target['pose']
+
+            sv_loss = self.segnet_loss(sv_output, tar)
+
             if len(mv_loss) == 0:
                 mv_loss = sv_loss
             else:
@@ -333,7 +343,7 @@ class MVPMLoss(PMLoss):
 
         if not self.config.STAGE_ONE:
             ifnet_output = output[1]
-            mv_loss['recon_loss'] = self.recon_loss(ifnet_output, target)
+            mv_loss['recon_loss'] = self.recon_loss(ifnet_output, target_list[0])
         
         mv_loss = self.add_up(mv_loss)
 

@@ -26,7 +26,7 @@ class ModelLNRNET(ModelSegLBS):
         super().__init__(config)
         self.config = config
         self.lr = config.LR
-        device = torch.device(config.GPU)
+        # device = torch.device(config.GPU)
         # self.init_net(device)
         # self.net = NRNet(config, device=device)
         
@@ -43,7 +43,6 @@ class ModelLNRNET(ModelSegLBS):
 
     
     def init_net(self, device):
-        print("LNR init")
         config = self.config
         self.net = LNRNet(config, device=device)
         self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr,

@@ -85,9 +85,9 @@ if task == "mlnrnet":
     Dataset = MVSPDataset
     objective = MVPMLoss(cfg)
     Model = ModelMLNRNet(cfg)
-else:
-    Dataset = HandDataset
-    Model = ModelNOCS(cfg)
+# else:
+#     Dataset = HandDataset
+#     Model = ModelNOCS(cfg)
     
 
 

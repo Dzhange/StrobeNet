@@ -7,7 +7,7 @@ OUTPUT_DIR: '/workspace/dev_nrnocs/output/dishwasher'
 
 MODES: ['train','val']
 
-BATCHSIZE: 1
+BATCHSIZE: 2
 DATALOADER_WORKERS: 4
 EPOCH_TOTAL: 20
 

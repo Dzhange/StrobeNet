@@ -34,7 +34,6 @@ class ModelMLNRNet(ModelLNRNET):
                 pretrained_dir = config.NRNET_PRETRAIN_PATH
                 self.LoadSegNetCheckpoint(device, pretrained_dir)
 
-
     def preprocess(self, data, device):
         """
         put data onto the right device
@@ -57,13 +56,12 @@ class ModelMLNRNet(ModelLNRNET):
         """
         no_compute_item = ['mesh', 'iso_mesh']
         input_items = ['color00', 'grid_coords', 'translation', 'scale']
-        target_items = ['nox00', 'pnnocs00', 'joint_map', 'linkseg', 'occupancies']
+        target_items = ['nox00', 'pnnocs00', 'joint_map', 'linkseg', 'occupancies', 'pose']
         
         inputs = {}
         targets = {}
 
-        for k in data:
-            print(k)
+        for k in data:        
             if k in no_compute_item:                
                 targets[k] = data[k][0] # data['mesh] = [('p1','p2')]
             else:

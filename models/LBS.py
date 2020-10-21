@@ -28,10 +28,10 @@ class ModelLBSNOCS(object):
         if os.path.exists(self.expt_dir_path) == False:
             os.makedirs(self.expt_dir_path)
 
-        self.init_net(device=None)
+        device = torch.device(config.GPU)
+        self.init_net(device=device)
     
-    def init_net(self, device=None):
-        print("LBS init")
+    def init_net(self, device=None):        
         config = self.config
         if config.MH:
             # self.net = MHSegNet(bn=False)

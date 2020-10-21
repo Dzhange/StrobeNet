@@ -43,7 +43,6 @@ import ast
 
 ERROR = -1
 
-
 class DataFilter:
 
     def __init__(self, args):

@@ -87,6 +87,7 @@ def imread_rgb_torch(Path, Size=None, interp=cv2.INTER_NEAREST): # Use only for 
 
 def imread_gray_torch(Path, Size=None, interp=cv2.INTER_NEAREST): # Use only for loading RGB images
     ImageCV = cv2.imread(Path, -1)
+    # print(ImageCV.shape)
     # Discard 4th channel since we are loading as RGB
     if ImageCV.shape[-1] != 3:
         ImageCV = ImageCV[:, :, :3]

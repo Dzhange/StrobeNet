@@ -19,6 +19,7 @@ from utils.lbs import *
 from utils.tools.voxels import VoxelGrid
 from utils.tools.pc2voxel import voxelize as pc2vox
 
+
 class LNRNet(nn.Module):
 
     def __init__(self, config, device=torch.device("cpu")):
@@ -87,7 +88,7 @@ class LNRNet(nn.Module):
 
         if self.transform:
             transform = {'translation': inputs['translation'],
-                     'scale':inputs['scale']}
+                     'scale':inputs['scale']}            
         else:
             transform = None
 
@@ -429,7 +430,7 @@ class LNRNet(nn.Module):
         # output: 128**3 * F
         if point_cloud is None:
             feature_dim = self.SegNet.feature_channels
-            return torch.ones(feature_dim, *(self.resolution,)*3).to(device=pred_nocs.device)        
+            return torch.ones(feature_dim, *(self.resolution,)*3).to(device=self.device)        
         feature_dim = FeatureCloud.shape[0]
         point_num = point_cloud.shape[1]
 

@@ -17,6 +17,7 @@ import utils.tools.implicit_waterproofing as iw
 from utils.lbs import *
 from utils.tools.voxels import VoxelGrid
 from utils.tools.pc2voxel import voxelize as pc2vox
+from utils.DataUtils import DL2LD, LD2DL
 
 class MLNRNet(LNRNet):
 
@@ -37,11 +38,14 @@ class MLNRNet(LNRNet):
         if self.transform:
             transform = {'translation': inputs['translation'],
                      'scale':inputs['scale']}
+            transform_list = DL2LD(transform)
         else:
-            transform = None
+            transform_list = None
         # Grids, comes from boundary sampling during training and a boudary cube during vlidation
         # This operation is simply for the sake of training speed
-        grid_coords = inputs['grid_coords']
+        
+        grid_coords = inputs['grid_coords'][0] # grid coords should be identical among all views
+        
         # here we edit the intermediate output for the IF-Net stage
         # first lift them into 3D point cloud
         pred_list = self.SegNet(img_list)
@@ -54,22 +58,22 @@ class MLNRNet(LNRNet):
 
         for i in range(len(img_list)):
             
-            output = pred_list[i]
-            pred_nocs = output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
-            pred_mask = output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)        
-            pred_loc = output[:, self.mask_end:self.loc_end, :, :].clone().requires_grad_(True)
-            pred_pose = output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
-            pred_weight = output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
-            conf = output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
-            nocs_feature = output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
+            sv_output = pred_list[i]
+            pred_nocs = sv_output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
+            pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)        
+            pred_loc = sv_output[:, self.mask_end:self.loc_end, :, :].clone().requires_grad_(True)
+            pred_pose = sv_output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
+            pred_weight = sv_output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
+            conf = sv_output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
+            nocs_feature = sv_output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
             if self.config.REPOSE:
                 pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
                 # pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
-                output = torch.cat((output, pnnocs_maps), dim=1)
+                sv_output = torch.cat((sv_output, pnnocs_maps), dim=1)
             recon = None
             if not self.config.STAGE_ONE:
                 # then: we transform the point cloud into occupancy(along with the features )
-                sv_pc_list, sv_feature_list = self.lift(output, nocs_feature, transform)
+                sv_pc_list, sv_feature_list = self.lift(sv_output, nocs_feature, transform_list[i])
                 if self.aggr_scatter:
                     # this list is batch wise
                     if sv_feature_list is not None:
@@ -92,13 +96,23 @@ class MLNRNet(LNRNet):
                 # we aggregate for each item in the batch
                 batch_pc_list = []
                 batch_feature_list = []
-                for view in range(self.view_num):
-                    print(mv_pc_list)
-                    batch_pc_list.extend(mv_pc_list[view][i])
-                    batch_feature_list.extend(mv_feature_list[view][i])
-                batch_pc = torch.stack(tuple(batch_pc_list))
-                batch_feature = torch.stack(tuple(batch_feature_list))
 
+                valid_view_num = min(len(mv_pc_list), len(mv_feature_list))
+
+                for view in range(valid_view_num):
+                    cur_pc = mv_pc_list[view][i]
+                    cur_feature = mv_feature_list[view][i]
+                    if cur_pc is not None:                    
+                        batch_pc_list.append(cur_pc)
+                    if cur_feature is not None:                    
+                        batch_feature_list.append(cur_feature)
+                
+                if len(batch_pc_list) == 0 or len(batch_feature_list) == 0:
+                    batch_pc = None
+                    batch_feature = None                        
+                else:
+                    batch_pc = torch.cat(tuple(batch_pc_list), dim=1)
+                    batch_feature = torch.cat(tuple(batch_feature_list), dim=1)
                 occupancy = self.discretize(batch_pc, batch_feature, self.resolution)
                 occupancy_list.append(occupancy)
             occupancies = torch.stack(tuple(occupancy_list))
@@ -106,9 +120,10 @@ class MLNRNet(LNRNet):
             mv_occupancy = torch.stack(tuple(b_mv_occupancy_list), dim=1)
             mv_occupancy = self.avgpool_grids(mv_occupancy)
 
+
         # and then feed into IF-Net. The ground truth shouled be used in the back projection
         recon = self.IFNet(grid_coords, occupancies)
-        return output, recon
+        return pred_list, recon
     
     def avgpool_grids(self, feature_grids):
         """
