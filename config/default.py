@@ -93,7 +93,9 @@ def get_default_cfg():
     cfg.LOC_MAP_LOSS = 0
     cfg.POSE_LOSS = 0
     cfg.POSE_MAP_LOSS = 0
-
+    
+    cfg.CONSISTENCCY = 0
+    
     # for final pipeline
     cfg.STAGE_ONE = True # if set to true, we do not supervise the occupancy
     cfg.REPOSE = True # if set to true, we calculate PNNOCS and use it for final reconstruction

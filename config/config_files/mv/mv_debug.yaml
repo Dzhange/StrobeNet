@@ -1,4 +1,0 @@
-DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/mv_laptop_500_4'
-OUTPUT_DIR: '/workspace/dev_nrnocs/output/laptop'
-
-TARGETS: ['default']

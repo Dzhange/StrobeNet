@@ -159,11 +159,12 @@ class ModelLNRNET(ModelSegLBS):
             # first pass generate loss
             net_input, target = self.preprocess(data, device)
             output_recon = self.net(net_input)
-            loss = objective(output_recon, target)
+            loss = objective(output_recon, target)            
             epoch_losses.append(loss.item())
-            
+
             if not self.config.STAGE_ONE:
                 self.gen_mesh(grid_points_split, data, i)
+
 
             segnet_output = output_recon[0]
             self.save_img(net_input['color00'], segnet_output[:, 0:4, :, :], target['maps'][:, 0:4, :, :], i)
@@ -281,7 +282,6 @@ class ModelLNRNET(ModelSegLBS):
             pred_nocs_path = os.path.join(self.output_dir, 'frame_{}_{}_trs_01pred.xyz').format(str(i).zfill(3), target_str)
             self.write(tar_nocs_path, tar_nocs)
             self.write(pred_nocs_path, pred_nocs)
-
         
     # @staticmethod
     def mesh_from_logits(self, logits, resolution):

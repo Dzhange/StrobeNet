@@ -85,15 +85,7 @@ class LNRNet(nn.Module):
     
     def forward(self, inputs):
         color = inputs['color00']
-
-
-
-        # Grids, comes from boundary sampling during training and a boudary cube during vlidation
-        # This operation is simply for the sake of training speed
         
-
-        # here we edit the intermediate output for the IF-Net stage
-        # first lift them into 3D point cloud
         output = self.SegNet(color)
         batch_size = output.shape[0]
 

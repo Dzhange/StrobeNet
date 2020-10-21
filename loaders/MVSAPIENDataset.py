@@ -2,6 +2,8 @@ import os, sys, argparse, zipfile, glob, random, pickle, math
 import numpy as np
 import torch
 from itertools import groupby
+from sklearn.neighbors import NearestNeighbors
+
 FileDirPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(FileDirPath, '..'))
 from loaders.SAPIENDataset import SAPIENDataset
@@ -13,6 +15,9 @@ class MVSPDataset(SAPIENDataset):
     def __init__(self, config, train):
         super().__init__(config, train)
         self.view_num = config.VIEW_NUM # number of cameras per frame
+        
+        # same set up as from jiahui's code 
+        self.supervision_cap = 9102 # maximum correspondence, bigger than most cases
         
     def load_data(self):    
         # we only load valid frameIDS, we do not record 
@@ -57,13 +62,16 @@ class MVSPDataset(SAPIENDataset):
         for k in data_list[0].keys():
             batch[k] = [item[k] for item in data_list]
 
+        # TODO: also include pair-wise consistency data
+        crr = self.get_crr(batch)
+        data.update(crr)
+
         return batch
 
     def get_sv_data(self, frame_path, view):
         data = self.load_images(frame_path, view)
         occ = self.load_occupancies(frame_path)
         data.update(occ)
-        # TODO: also include pair-wise consistency data
         return data
 
     def load_images(self, frame_path, view_id):
@@ -145,7 +153,6 @@ class MVSPDataset(SAPIENDataset):
 
         gt_mesh_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
                                                     "isosurf_scaled.off")
-                        
         # None of the if-data would be needed if in validation mode
         if_data = {
             'grid_coords':np.array(coords, dtype=np.float32),
@@ -165,6 +172,94 @@ class MVSPDataset(SAPIENDataset):
 
         return if_data
 
+    def get_crr(self, batch):
+        # ADDITIONAL OPERATION: FIND CORRESPONDENCE BETWEEN NEAR VIEWS
+        # crr-idx-mtx is a triangular matrix RIGHT, each row corresponds to the base
+        # (which pc the index saved in this row indicate) and each column corresponds to query (aligned with which pc)
+        # WARNING! THE CORRESPONDENCE ONLY WORKS FOR NOCS-V
+        # batch = {}
+        crr_idx_mtx, crr_mask_mtx, crr_min_d_mtx = list(), list(), list()
+        pair_count = 0
+        for view_id in range(self.view_num - 1):
+            query_nox_list = batch['nox00'][view_id + 1:]
+            query_mask_list = [nox[3] for nox in query_nox_list]
+            idx_list, mask_list, mind_list = self.find_correspondence_list(
+                # query_pc_list=batch['uv-xyz-v'][view_id + 1:], query_mask_list=batch['uv-mask-v'][view_id + 1:],
+                query_pc_list=batch['pnnocs00'][view_id + 1:], query_mask_list=query_mask_list,
+                base_pc=batch['pnnocs00'][view_id], base_mask=batch['nox00'][view_id][3]
+            )
+            crr_idx_mtx.append(idx_list)
+            crr_mask_mtx.append(mask_list)
+            crr_min_d_mtx.append(mind_list)
+            for mask in mask_list:
+                pair_count += mask.sum()
+        ave_crr_per_view = int(pair_count / self.view_num)
+        batch['crr-idx-mtx'] = crr_idx_mtx
+        batch['crr-mask-mtx'] = crr_mask_mtx
+        return batch
+
+    def find_correspondence_list(self, query_pc_list, base_pc, query_mask_list, base_mask, th=1e-3):
+        """
+        For each pc in query_pc_list, find correspondence point in base pc,
+        if no correspondent point in base, mask this position with 0 in mask
+        :param query_pc_list: the returned element is aligned with this list [N1*d, N2*d, ...]
+        :param base_pc: the search base
+        :param query_mask_list: whether each point is really valid in this sample
+        :param base_mask:
+        :param th: it the minimal distance is smaller than this, correspondence is found for the pair
+        :return:
+            index_list: aligned with query_pc_list, for each element in the list, the values at each position indicate
+                        which position in the base pc that this position point in query pc corresponds to;
+                        i.e values of index means the index in base pc
+            mask_list: aligned with index_list, whether on this position, a pair is found
+            mind_list: the min_distance of
+        """
+
+        # cur_mask = out_mask[i].squeeze()
+        # masked = cur_mask > threshold
+        # point_cloud = pred_nocs[i, :, masked]
+                
+        q_pc_list = [query_view[:, query_mask.squeeze() > 0].permute(1, 0).numpy()
+                     for query_view, query_mask in zip(query_pc_list, query_mask_list)]
+        b_pc = base_pc[:, base_mask.squeeze() > 0].permute(1, 0).numpy()
+
+        neigh = NearestNeighbors(n_neighbors=1)
+        neigh.fit(b_pc)
+        index_list, mask_list, min_dis_list = list(), list(), list()
+        for q_pc in q_pc_list:
+            assert q_pc.shape[1] == b_pc.shape[1]
+            distance, indices = neigh.kneighbors(q_pc, return_distance=True)
+            _min_d = distance.ravel()
+            _idx = indices.ravel()
+            _mask = (_min_d < th).astype(np.float)
+            # make sure the output is in the same size
+            index = np.zeros((self.supervision_cap, 1))
+            mask = np.zeros((self.supervision_cap, 1)).astype(np.float)
+            min_d = np.zeros((self.supervision_cap, 1)).astype(np.float)
+
+            crr_idx = np.where(_min_d < th)[0]
+            
+            if crr_idx.shape[0] > self.supervision_cap:
+                samples = np.random.choice(crr_idx.shape[0], self.supervision_cap, replace=False)
+                crr_idx = crr_idx[samples]
+            num_crr = len(crr_idx)
+            
+            _idx = _idx[crr_idx]
+            _mask = _mask[crr_idx]
+            _min_d = _min_d[crr_idx]
+            
+            # # for current use we choose uniform sample
+            # sampled_idx = crr_idx[random_index]
+            print(num_crr)
+            index[:num_crr, 0] = _idx
+            mask[:num_crr, 0] = _mask
+            min_d[:num_crr, 0] = _min_d
+            index_list.append(index.astype(np.int))
+            mask_list.append(mask.astype(np.float))
+            min_dis_list.append(min_d.astype(np.float))
+
+        return index_list, mask_list, min_dis_list
+
 if __name__ == '__main__':
     import argparse
     from config import get_cfg
@@ -176,5 +271,6 @@ if __name__ == '__main__':
     DataLoader = torch.utils.data.DataLoader(Data, batch_size=1, shuffle=True, num_workers=4)
     for i, Data in enumerate(DataLoader, 0):  # Get each batch
         # print(Data['color00'][0].to(device="cuda:0"))
-        print("\r {}".format(i))
+        # print("\r {}".format(i))
+        pass
         

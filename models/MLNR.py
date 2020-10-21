@@ -70,7 +70,3 @@ class ModelMLNRNet(ModelLNRNET):
                 if k in target_items:
                     targets[k] = ondevice_data
         return inputs, targets
-
-
-
-

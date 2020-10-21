@@ -10,6 +10,8 @@ from loaders.HandDataset import HandDataset
 from loaders.HandDatasetLBS import HandDatasetLBS
 from loaders.HandOccDataset import HandOccDataset
 from loaders.SAPIENDataset import SAPIENDataset
+from loaders.MVSAPIENDataset import MVSPDataset
+
 # from inout.logger import get_logger
 from models.NOCS import ModelNOCS
 from models.Baseline import ModelIFNOCS
@@ -17,6 +19,7 @@ from models.LBS import ModelLBSNOCS
 from models.SegLBS import ModelSegLBS
 from models.PMLBS import PMLBS
 from models.LNR import ModelLNRNET
+from models.MLNR import ModelMLNRNet
 
 
 from models.loss import *
@@ -59,6 +62,10 @@ if task == "lnrnet":
     # objective = PMLBSLoss(cfg)
     objective = PMLoss(cfg)
     Model = ModelLNRNET(cfg)
+if task == "mlnrnet":
+    Dataset = MVSPDataset
+    objective = MVPMLoss(cfg)
+    Model = ModelMLNRNet(cfg)
 # prepare dataset
 # DatasetClass = get_dataset(cfg.DATASET)
 dataloader_dict = dict()
@@ -70,7 +77,7 @@ if "default" in cfg.TARGETS:
 else:
     f_str = cfg.TARGETS
 
-if task == "lnrnet":
+if task in ["lnrnet", 'mlnrnet']:
     val_dataset = Dataset(config=cfg, train=cfg.TEST_ON_TRAIN)
 else:
     val_dataset = Dataset(root=cfg.DATASET_ROOT, train=cfg.TEST_ON_TRAIN,

@@ -48,9 +48,9 @@ class Trainer:
                     loss = self.objective(output, target)
                     time_c = time()                    
                     if loss > 50:
-                        print("[ ERROR ] strange loss encountered at ", target['mesh'])                                        
+                        print("[ ERROR ] strange loss encountered at ", target['mesh'])
                     loss.backward()
-                    time_d = time()                    
+                    time_d = time()
                     self.model.optimizer.step()
                     ####################### START MONITOR ################################
                     epoch_losses.append(loss.item())
@@ -76,10 +76,10 @@ class Trainer:
                         progress_str += "forward time {}, calculate loss time {}, BP time {}".format(time_b - time_a, time_c - time_b, time_d - time_c)
                     sys.stdout.write(progress_str.ljust(100))
                     sys.stdout.flush()
-                    if i == 1000:
-                        exit()
+                    # if i == 1000:
+                    #     exit()
                     # torch.cuda.empty_cache()
-                    # gc.collect() 
+                    # gc.collect()
 
                 sys.stdout.write('\n')
                 gc.collect()
