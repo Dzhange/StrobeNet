@@ -141,8 +141,11 @@ class PMLBSLoss(nn.Module):
         # if output.shape[1] > 64 + 4+bone_num*8+2:
         if self.cfg.REPOSE:
             pred_pnnocs = output[:, -3:, :, :].clone().requires_grad_(True)            
+            # pred_pnnocs = output[:, 4+bone_num*8+2:4+bone_num*8+5, :, :].clone().requires_grad_(True)            
             tar_pnnocs = tar_maps[:, -3:, :, :]
-            pnnocs_loss = self.masked_l2_loss(pred_pnnocs, tar_pnnocs, target_mask)            
+            # tar_pnnocs = tar_maps[:, 4+bone_num*6+1:4+bone_num*6+4, :, :] #
+            # assert (tar_pnnocs == tar_pnnocs_).all()
+            pnnocs_loss = self.masked_l2_loss(pred_pnnocs, tar_pnnocs, target_mask)
             # loss += pnnocs_loss
             loss['pnnocs_loss'] = pnnocs_loss
         # print("[ DIFF ] map_loss is {:5f}; loc_loss is {:5f}".format(loc_map_loss, joint_loc_loss))
@@ -313,19 +316,23 @@ class MVPMLoss(PMLoss):
     def __init__(self, config):
         super().__init__(config)
     
-    def forward(self, output, target):        
+    def forward(self, output, target):
         target_list = DL2LD(target)
         segnet_output = output[0]
-        view_num = len(segnet_output)
 
         mv_loss = {}
+        view_num = self.config.VIEW_NUM
         for v in range(view_num):
-            sv_output = segnet_output[v]
+            if isinstance(segnet_output, list):
+                sv_output = segnet_output[v]
+            else:
+                sv_output = segnet_output
+                
             sv_target = target_list[v]
-            
+
             tar = {}
             tar_maps = []
-            for k in ['nox00', 'joint_map', 'linkseg']:
+            for k in ['nox00', 'joint_map', 'linkseg', 'pnnocs00']:
                 tar_maps.append(sv_target[k])
             tar['maps'] = torch.cat(tuple(tar_maps), dim=1)
             tar['pose'] = sv_target['pose']

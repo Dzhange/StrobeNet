@@ -21,8 +21,7 @@ class ModelMLNRNet(ModelLNRNET):
         super().__init__(config)
         self.view_num = config.VIEW_NUM
     
-    def init_net(self, device):
-        print("MLNR init")
+    def init_net(self, device):        
         config = self.config
         self.net = MLNRNet(config, device=device)
         self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr,

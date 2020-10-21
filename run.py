@@ -5,6 +5,7 @@ Jiahui @ March,2019
 """
 from torch.utils.data import DataLoader
 import torch
+import numpy as np
 # from loaders import get_dataset
 from loaders.HandDataset import HandDataset
 from loaders.HandDatasetLBS import HandDatasetLBS
@@ -56,45 +57,46 @@ def get_loaders(Dataset):
 Dataset = None
 Model = None
 
-if task == "lbs":
-    Dataset = HandDatasetLBS
-    objective = LBSLoss(cfg)
-    Model = ModelLBSNOCS(cfg)
-if task == "lbs_seg":
-    Dataset = HandDatasetLBS # set as seg = true
-    objective = LBSSegLoss(cfg)
-    Model = ModelSegLBS(cfg)
-if task == "occupancy":
-    Dataset = HandOccDataset
-    objective = MixLoss()
-    Model = ModelIFNOCS(cfg)
-if task == "pretrain":
-    objective = L2MaskLoss_wtFeature()
-if task == "nocs":
-    objective = L2MaskLoss()
-if task == "sapien_lbs":
-    Dataset = SAPIENDataset
-    objective = PMLBSLoss(cfg)
-    Model = PMLBS(cfg)
-if task == "lnrnet":
-    Dataset = SAPIENDataset
-    # objective = PMLBSLoss(cfg)
-    objective = PMLoss(cfg)    
-    Model = ModelLNRNET(cfg)
-if task == "mlnrnet":
-    Dataset = MVSPDataset
-    objective = MVPMLoss(cfg)
-    Model = ModelMLNRNet(cfg)
-# else:
-#     Dataset = HandDataset
-#     Model = ModelNOCS(cfg)
+if __name__ == "__main__":
+
+    torch.manual_seed(0)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(0)
+
+    if task == "lbs":
+        Dataset = HandDatasetLBS
+        objective = LBSLoss(cfg)
+        Model = ModelLBSNOCS(cfg)
+    if task == "lbs_seg":
+        Dataset = HandDatasetLBS # set as seg = true
+        objective = LBSSegLoss(cfg)
+        Model = ModelSegLBS(cfg)
+    if task == "occupancy":
+        Dataset = HandOccDataset
+        objective = MixLoss()
+        Model = ModelIFNOCS(cfg)
+    if task == "pretrain":
+        objective = L2MaskLoss_wtFeature()
+    if task == "nocs":
+        objective = L2MaskLoss()
+    if task == "sapien_lbs":
+        Dataset = SAPIENDataset
+        objective = PMLBSLoss(cfg)
+        Model = PMLBS(cfg)
+    if task == "lnrnet":
+        Dataset = SAPIENDataset
+        # objective = PMLBSLoss(cfg)
+        objective = PMLoss(cfg)    
+        Model = ModelLNRNET(cfg)
+    if task == "mlnrnet":
+        Dataset = MVSPDataset
+        objective = MVPMLoss(cfg)
+        Model = ModelMLNRNet(cfg)
     
-
-
-get_loaders(Dataset)
-
-device = torch.device(cfg.GPU)
-print("[ INFO ] Running on device ", device)
-trainer = Trainer(cfg, Model, dataloader_dict, objective, device)
-# start
-trainer.train()
+    get_loaders(Dataset)
+    device = torch.device(cfg.GPU)
+    print("[ INFO ] Running on device ", device)
+    trainer = Trainer(cfg, Model, dataloader_dict, objective, device)
+    # start
+    trainer.train()

@@ -40,7 +40,6 @@ class ModelLNRNET(ModelSegLBS):
         self.resolution = 128
         self.batch_points = 100000
 
-    
     def init_net(self, device):
         config = self.config
         self.net = LNRNet(config, device=device)

@@ -10,6 +10,7 @@ import torch.optim as optim
 
 import torch_scatter
 from models.networks.MVTHSegNet import MVTHSegNet
+from models.networks.TripleHeadSegNet import THSegNet
 from models.networks.IFNet import SVR
 from models.networks.LNRNet import LNRNet
 
@@ -28,38 +29,41 @@ class MLNRNet(LNRNet):
 
     def init_network(self):
         self.SegNet = MVTHSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, bn=self.config.BN)
+        # self.SegNet = THSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, bn=self.config.BN)
         self.SegNet.to(self.device)
         self.IFNet = SVR(self.config, self.device)
 
     def forward(self, inputs):
-        
+
         img_list = inputs['color00']
         batch_size = self.config.BATCHSIZE
+
+        # DEBUG: try old network
+        if isinstance(self.SegNet, MVTHSegNet):
+            pred_list = self.SegNet(img_list)
+        else:
+            sv_output = self.SegNet(img_list[0])
+
+        mv_pc_list = []
+        mv_feature_list = []
+        b_mv_occupancy_list = [] # occupancy stored in it are batch wise
+
         if self.transform:
             transform = {'translation': inputs['translation'],
                      'scale':inputs['scale']}
             transform_list = DL2LD(transform)
         else:
             transform_list = None
-        # Grids, comes from boundary sampling during training and a boudary cube during vlidation
-        # This operation is simply for the sake of training speed
-        
-        grid_coords = inputs['grid_coords'][0] # grid coords should be identical among all views
-        
-        # here we edit the intermediate output for the IF-Net stage
-        # first lift them into 3D point cloud
-        pred_list = self.SegNet(img_list)
 
-        mv_pc_list = []
-        mv_feature_list = []
-        
-        
-        b_mv_occupancy_list = [] # occupancy stored in it are batch wise
+        output_list = []
 
         for i in range(len(img_list)):
-            sv_output = pred_list[i]
+            if isinstance(self.SegNet, MVTHSegNet):
+                sv_output = pred_list[i]
+            # else:
+                # sv_output = pred_item
             pred_nocs = sv_output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
-            pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)        
+            pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
             pred_loc = sv_output[:, self.mask_end:self.loc_end, :, :].clone().requires_grad_(True)
             pred_pose = sv_output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
             pred_weight = sv_output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
@@ -69,7 +73,8 @@ class MLNRNet(LNRNet):
                 pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
                 # pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
                 sv_output = torch.cat((sv_output, pnnocs_maps), dim=1)
-            recon = None
+            output_list.append(sv_output)
+
             if not self.config.STAGE_ONE:
                 # then: we transform the point cloud into occupancy(along with the features )
                 sv_pc_list, sv_feature_list = self.lift(sv_output, nocs_feature, transform_list[i])
@@ -89,6 +94,7 @@ class MLNRNet(LNRNet):
 
         ##### aggregation #####
         recon = None
+        grid_coords = inputs['grid_coords'][0] # grid coords should be identical among all views
         if not self.config.STAGE_ONE:
             if self.aggr_scatter:
                 occupancy_list = []
@@ -123,10 +129,13 @@ class MLNRNet(LNRNet):
 
             # and then feed into IF-Net. The ground truth shouled be used in the back projection
             recon = self.IFNet(grid_coords, occupancies)
-        
-        return pred_list, recon
-        
-    
+
+        # return output_list, recon
+        if isinstance(self.SegNet, MVTHSegNet):
+            return output_list, recon
+        else:
+            return sv_output, recon
+
     def avgpool_grids(self, feature_grids):
         """
         Copied from Srinath

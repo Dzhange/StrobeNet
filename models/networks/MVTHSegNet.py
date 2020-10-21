@@ -21,13 +21,16 @@ class MVTHSegNet(THSegNet):
                         feature_channels=feature_channels,
                         pretrained=pretrained, withSkipConnections=withSkipConnections, bn=bn)
     
-    def forward(self, inputs, return_code=False, share_feature=False):
+    def forward(self, inputs):
         """
         From jiahui's implementation in https://github.com/JiahuiLei/Pix2Surf
         inputs: list of rgb images
         output: prediction's cated in order of :
             NOCS, POSE, Features
         """
+        return_code=False
+        share_feature=False
+        
         l1, l2, l3, l4, l5 = [], [], [], [], []
         l5_feature = []
         for rgb in inputs:

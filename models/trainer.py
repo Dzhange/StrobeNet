@@ -44,7 +44,7 @@ class Trainer:
                     net_input, target = self.model.preprocess(data, self.device)
                     time_a = time()
                     output = self.model.net(net_input)
-                    time_b = time()``
+                    time_b = time()
                     loss = self.objective(output, target)
                     time_c = time()                    
                     if loss > 50:
@@ -76,7 +76,8 @@ class Trainer:
                         progress_str += "forward time {}, calculate loss time {}, BP time {}".format(time_b - time_a, time_c - time_b, time_d - time_c)
                     sys.stdout.write(progress_str.ljust(100))
                     sys.stdout.flush()
-                    # if i % 100 == 0:
+                    if i == 1000:
+                        exit()
                     # torch.cuda.empty_cache()
                     # gc.collect() 
 
