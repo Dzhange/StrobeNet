@@ -74,6 +74,7 @@ class DataFilter:
             f.close()
 
         for mode in ['train', 'val']:
+        # for mode in ['val']:
             cur_out_dir = os.path.join(self.outputDir, mode)
             if not os.path.exists(cur_out_dir):
                 os.mkdir(cur_out_dir)

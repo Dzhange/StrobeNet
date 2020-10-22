@@ -48,7 +48,7 @@ class Trainer:
                     loss = self.objective(output, target)
                     time_c = time()                    
                     if loss > 50:
-                        print("[ ERROR ] strange loss encountered at ", target['mesh'])
+                        print("[ ERROR ] strange loss encountered at ", target['iso_mesh'])
                     loss.backward()
                     time_d = time()
                     self.model.optimizer.step()

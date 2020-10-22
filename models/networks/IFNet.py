@@ -15,15 +15,14 @@ import torch.nn.functional as F
 # ----------------------------------------------------------------------------------------------------
 class SVR(nn.Module):
 
-
     def __init__(self, config, device, hidden_dim=256):
         super(SVR, self).__init__()
 
         self.config = config
         input_dim = config.FEATURE_CHANNELS
 
-        self.conv_in = nn.Conv3d(input_dim, 16, 3, padding=1, padding_mode='replicate')  # out: 256 ->m.p. 128
-        self.conv_0 = nn.Conv3d(16, 32, 3, padding=1, padding_mode='replicate')  # out: 128
+        self.conv_in = nn.Conv3d(input_dim, self.config.IF_IN_DIM, 3, padding=1, padding_mode='replicate')  # out: 256 ->m.p. 128
+        self.conv_0 = nn.Conv3d(self.config.IF_IN_DIM, 32, 3, padding=1, padding_mode='replicate')  # out: 128
         self.conv_0_1 = nn.Conv3d(32, 32, 3, padding=1, padding_mode='replicate')  # out: 128 ->m.p. 64
         self.conv_1 = nn.Conv3d(32, 64, 3, padding=1, padding_mode='replicate')  # out: 64
         self.conv_1_1 = nn.Conv3d(64, 64, 3, padding=1, padding_mode='replicate')  # out: 64 -> mp 32
@@ -34,7 +33,7 @@ class SVR(nn.Module):
         self.conv_4 = nn.Conv3d(128, 128, 3, padding=1, padding_mode='replicate')  # out: 8
         self.conv_4_1 = nn.Conv3d(128, 128, 3, padding=1, padding_mode='replicate')  # out: 8
 
-        feature_size = (input_dim +  16 + 32 + 64 + 128 + 128 + 128) * 7 + 3
+        feature_size = (input_dim +  self.config.IF_IN_DIM + 32 + 64 + 128 + 128 + 128) * 7 + 3
         self.fc_0 = nn.Conv1d(feature_size, hidden_dim * 2, 1)
         self.fc_1 = nn.Conv1d(hidden_dim *2, hidden_dim, 1)
         self.fc_2 = nn.Conv1d(hidden_dim , hidden_dim, 1)
@@ -46,8 +45,9 @@ class SVR(nn.Module):
         ## try not using bn
         self.use_bn = self.config.IF_BN
         if self.use_bn:
+            print("we should not be here")
             track_stats = True
-            self.conv_in_bn = nn.BatchNorm3d(16, track_running_stats=track_stats)
+            self.conv_in_bn = nn.BatchNorm3d(self.config.IF_IN_DIM, track_running_stats=track_stats)
             self.conv0_1_bn = nn.BatchNorm3d(32, track_running_stats=track_stats)
             self.conv1_1_bn = nn.BatchNorm3d(64, track_running_stats=track_stats)
             self.conv2_1_bn = nn.BatchNorm3d(128, track_running_stats=track_stats)

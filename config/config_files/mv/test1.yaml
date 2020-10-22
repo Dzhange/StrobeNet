@@ -11,7 +11,7 @@ MODES: ['train','val']
 # MODES: ['val']
 
 BATCHSIZE: 1
-DATALOADER_WORKERS: 1
+DATALOADER_WORKERS: 4
 EPOCH_TOTAL: 20
 
 LR: 1e-4
@@ -23,14 +23,14 @@ IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
 TASK: "mlnrnet"
-EXPT_NAME: "crr"
-CONSISTENCY: 1
+EXPT_NAME: "test1"
 
 # TASK: "lnrnet"
 # EXPT_NAME: "debug"
 
 OUT_CHANNELS: 12 #4 + 1*8
 
+# TEST_ON_TRAIN: True
 TEST_ON_TRAIN: False
 
 MH: True
@@ -49,7 +49,9 @@ BONE_NUM: 1
 REPOSE: True
 STAGE_ONE: True
 # STAGE_ONE: False
+
 AGGR_SCATTER: True
+
 # NRNET_PRETRAIN: True
 # NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/nocs_30_b2_bkup"
 

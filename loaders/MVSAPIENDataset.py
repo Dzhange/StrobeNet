@@ -15,10 +15,10 @@ class MVSPDataset(SAPIENDataset):
     def __init__(self, config, train):
         super().__init__(config, train)
         self.view_num = config.VIEW_NUM # number of cameras per frame
-        
+
         # same set up as from jiahui's code 
         self.supervision_cap = 9102 # maximum correspondence, bigger than most cases
-        
+
     def load_data(self):    
         # we only load valid frameIDS, we do not record 
         # file names as the view num is not specified
@@ -46,7 +46,37 @@ class MVSPDataset(SAPIENDataset):
             with open(glob_cache, 'wb') as fp:
                 for string in self.frame_load_str:
                     pickle.dump(self.frame_ids, fp)
-    
+
+        if self.shuffle_in_limit:
+            total_size = len(self)
+            dataset_length = math.ceil((self.data_limit / 100) * total_size)
+            # DatasetLength = 10
+            step = int(np.floor(100 / self.data_limit))
+            sample_index = []
+            cur_idx = 0
+            while True:
+                if len(sample_index) >= dataset_length or cur_idx >= total_size:
+                    break
+                sample_index.append(cur_idx)
+                cur_idx += step                                    
+            print('[ INFO ]: Loading {} / {} items.'.format(len(sample_index), total_size))
+
+            
+            self.frame_ids = [self.frame_ids[i] for i in sample_index]
+            self.frame_ids.sort()
+        else:
+            total_size = len(self)
+            dataset_length = math.ceil((self.data_limit / 100) * total_size)
+            print('[ INFO ]: Loading {} / {} items.'.format(dataset_length, total_size))
+
+        
+            if self.data_limit > 10:
+                self.frame_ids = self.frame_ids[:dataset_length]
+            else:
+                # offset only works for overfitting task
+                self.frame_ids = self.frame_ids[self.data_offset:self.data_offset+dataset_length]
+
+
     def __len__(self):
         return len(self.frame_ids)
 
@@ -63,8 +93,9 @@ class MVSPDataset(SAPIENDataset):
             batch[k] = [item[k] for item in data_list]
 
         # TODO: also include pair-wise consistency data
-        crr = self.get_crr(batch)
-        data.update(crr)
+        if self.config.CONSISTENCY != 0:
+            crr = self.get_crr(batch)
+            data.update(crr)
 
         return batch
 
@@ -158,8 +189,8 @@ class MVSPDataset(SAPIENDataset):
             'grid_coords':np.array(coords, dtype=np.float32),
             'occupancies': np.array(occupancies, dtype=np.float32),                        
             }
-        if not self.is_train_data:
-            if_data['iso_mesh'] = gt_mesh_path
+        # if not self.is_train_data:
+        if_data['iso_mesh'] = gt_mesh_path
 
         if self.config.TRANSFORM:
             transform_path = os.path.join(data_dir, "frame_" + index_of_frame + '_transform.npz')        
@@ -196,6 +227,7 @@ class MVSPDataset(SAPIENDataset):
         ave_crr_per_view = int(pair_count / self.view_num)
         batch['crr-idx-mtx'] = crr_idx_mtx
         batch['crr-mask-mtx'] = crr_mask_mtx
+
         return batch
 
     def find_correspondence_list(self, query_pc_list, base_pc, query_mask_list, base_mask, th=1e-3):
@@ -238,19 +270,20 @@ class MVSPDataset(SAPIENDataset):
             min_d = np.zeros((self.supervision_cap, 1)).astype(np.float)
 
             crr_idx = np.where(_min_d < th)[0]
-            
+
             if crr_idx.shape[0] > self.supervision_cap:
                 samples = np.random.choice(crr_idx.shape[0], self.supervision_cap, replace=False)
                 crr_idx = crr_idx[samples]
-            num_crr = len(crr_idx)
-            
+
+            num_crr = len(crr_idx)            
+
+            # here we store no more than self.cap pairs
             _idx = _idx[crr_idx]
             _mask = _mask[crr_idx]
             _min_d = _min_d[crr_idx]
             
             # # for current use we choose uniform sample
-            # sampled_idx = crr_idx[random_index]
-            print(num_crr)
+            # sampled_idx = crr_idx[random_index]            
             index[:num_crr, 0] = _idx
             mask[:num_crr, 0] = _mask
             min_d[:num_crr, 0] = _min_d

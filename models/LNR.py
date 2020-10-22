@@ -18,7 +18,7 @@ from models.SegLBS import ModelSegLBS
 from utils.DataUtils import *
 from utils.lbs import *
 import trimesh, mcubes
-
+from collections import OrderedDict
 
 class ModelLNRNET(ModelSegLBS):
 
@@ -105,7 +105,7 @@ class ModelLNRNET(ModelSegLBS):
         targets['pose'] = data_to_device[2]
         targets['occupancies'] = data_to_device[3]['occupancies']
         # targets['mesh'] = data[4]
-        targets['mesh'] = data[3]["mesh"]
+        targets['iso_mesh'] = data[3]["iso_mesh"]
         
         return inputs, targets
 
@@ -123,7 +123,17 @@ class ModelLNRNET(ModelSegLBS):
         check_point_dict = loadPyTorchCheckpoint(TargetPath, train_device)
         if check_point_dict is not None:
             # Make sure experiment names match
-            self.net.load_state_dict(check_point_dict['ModelStateDict'])
+            keys = check_point_dict['ModelStateDict'].keys()
+            # model_dict = check_point_dict['ModelStateDict'].copy()
+            model_dict = OrderedDict()
+            
+            for k in keys:
+                if "IFNet" in k:
+                    continue
+                elif "SegNet" in k:
+                    new_k = k.replace("SegNet.", "")
+                    model_dict[new_k] = check_point_dict['ModelStateDict'][k]
+            self.net.SegNet.load_state_dict(model_dict)
 
     def validate(self, val_dataloader, objective, device):
 
@@ -233,7 +243,7 @@ class ModelLNRNET(ModelSegLBS):
                 output = self.net(net_input)
                 # self.save_img(net_input['RGB'], output[0], target['NOCS'], i)
                 logits_list.append(output[1].squeeze(0).detach().cpu())
-        
+
         # generate predicted mesh from occupancy and save
         logits = torch.cat(logits_list, dim=0).numpy()
         mesh = self.mesh_from_logits(logits, self.resolution)
@@ -243,14 +253,14 @@ class ModelLNRNET(ModelSegLBS):
         # Copy ground truth in the val results
         export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
         # print(target['mesh'][0])
-        shutil.copyfile(target['mesh'][0], export_gt_path)
+        shutil.copyfile(target['iso_mesh'][0], export_gt_path)
 
         if self.config.TRANSFORM:
             # Get the transformation into val results
             export_trans_path = os.path.join(self.output_dir, "frame_{}_trans.npz".format(str(i).zfill(3)))
-            trans_path = target['mesh'][0].replace("isosurf_scaled.off", "transform.npz")
+            trans_path = target['iso_mesh'][0].replace("isosurf_scaled.off", "transform.npz")
             shutil.copyfile(trans_path, export_trans_path)
-    
+
     def gen_NOCS_pc(self, pred_nocs_map, tar_nocs_map, mask, target_str, i, transform=None):
                 
         mask = sendToDevice(mask.detach(), 'cpu')

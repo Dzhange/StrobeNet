@@ -32,9 +32,6 @@ from config import get_cfg
 cfg = get_cfg()
 
 
-Dataset = HandDataset
-Model = ModelNOCS(cfg)
-
 task = cfg.TASK
 
 if task == "lbs":

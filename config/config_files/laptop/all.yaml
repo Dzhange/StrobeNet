@@ -1,17 +1,14 @@
 ##################################################################################################
-# Oct 20
-# DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/laptop_nocs_500_30_full_IF'
-# this mode runs good! let's just see how it perform
+# Oct 15
 
 
-DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/mv_laptop_500_4_IF'
-OUTPUT_DIR: '/workspace/dev_nrnocs/output/mv'
-VIEW_NUM: 2
+DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/laptop_all_200_IF'
+OUTPUT_DIR: '/workspace/dev_nrnocs/output/laptop'
+
 MODES: ['train','val']
-# MODES: ['val']
 
 BATCHSIZE: 1
-DATALOADER_WORKERS: 1
+DATALOADER_WORKERS: 4
 EPOCH_TOTAL: 20
 
 LR: 1e-4
@@ -21,17 +18,10 @@ DATA_LIMIT: 100
 VAL_DATA_LIMIT: 5
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
-
-TASK: "mlnrnet"
-EXPT_NAME: "crr"
-CONSISTENCY: 1
-
-# TASK: "lnrnet"
-# EXPT_NAME: "debug"
-
+TASK: "lnrnet"
 OUT_CHANNELS: 12 #4 + 1*8
 
-TEST_ON_TRAIN: False
+#TEST_ON_TRAIN: True
 
 MH: True
 BN: False
@@ -49,8 +39,12 @@ BONE_NUM: 1
 REPOSE: True
 STAGE_ONE: True
 # STAGE_ONE: False
-AGGR_SCATTER: True
+
+EXPT_NAME: "all"
+
 # NRNET_PRETRAIN: True
 # NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/nocs_30_b2_bkup"
 
-GPU: 3
+GPU: 6
+
+

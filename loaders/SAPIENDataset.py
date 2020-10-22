@@ -305,7 +305,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
         if_data = {
             'grid_coords':np.array(coords, dtype=np.float32),
             'occupancies': np.array(occupancies, dtype=np.float32),            
-            'mesh': gt_mesh_path
+            'iso_mesh': gt_mesh_path
             }
 
         if self.config.TRANSFORM:

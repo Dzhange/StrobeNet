@@ -6,28 +6,27 @@
 
 DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/mv_laptop_500_4_IF'
 OUTPUT_DIR: '/workspace/dev_nrnocs/output/mv'
-VIEW_NUM: 2
+VIEW_NUM: 1
 MODES: ['train','val']
 # MODES: ['val']
 
 BATCHSIZE: 1
-DATALOADER_WORKERS: 1
+DATALOADER_WORKERS: 4
 EPOCH_TOTAL: 20
 
 LR: 1e-4
 
 SAVE_FREQ: 1
 DATA_LIMIT: 100 
-VAL_DATA_LIMIT: 5
+VAL_DATA_LIMIT: 1
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
-TASK: "mlnrnet"
-EXPT_NAME: "crr"
-CONSISTENCY: 1
+# TASK: "mlnrnet"
+# EXPT_NAME: "mv_debug"
 
-# TASK: "lnrnet"
-# EXPT_NAME: "debug"
+TASK: "lnrnet"
+EXPT_NAME: "sv_if"
 
 OUT_CHANNELS: 12 #4 + 1*8
 
@@ -47,10 +46,15 @@ SKIN_LOSS: 1
 BONE_NUM: 1
 
 REPOSE: True
-STAGE_ONE: True
-# STAGE_ONE: False
-AGGR_SCATTER: True
-# NRNET_PRETRAIN: True
-# NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/nocs_30_b2_bkup"
+# STAGE_ONE: True
+STAGE_ONE: False
 
-GPU: 3
+
+AGGR_SCATTER: True
+
+NRNET_PRETRAIN: True
+NRNET_PRETRAIN_PATH: "/workspace/dev_nrnocs/output/mv/sv_stg1/sv_check_9999-12-31T23-59-59.tar"
+
+GPU: 5
+
+

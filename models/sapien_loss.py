@@ -96,6 +96,9 @@ class PMLBSLoss(nn.Module):
         tar_rot_map = self.sigmoid(tar_maps[:, 4+bone_num*3:4+bone_num*6, :, :]) # rotation, angle axis
         tar_skin_seg = tar_maps[:, 4+bone_num*6:4+bone_num*6+1, :, :]
 
+        nocs_pc = pred_nocs[0, :, target_mask.squeeze() > 0].permute(1, 0)
+        
+
         tar_pose = target['pose']
         tar_loc = self.sigmoid(tar_pose[:, :, 0:3])
         tar_rot = self.sigmoid(tar_pose[:, :, 3:6])
@@ -317,8 +320,13 @@ class MVPMLoss(PMLoss):
         super().__init__(config)
     
     def forward(self, output, target):
+        
         target.pop('mesh', None)
         target.pop('iso_mesh', None)
+        
+        crr = {}
+        crr['crr-idx-mtx'] = target.pop('crr-idx-mtx', None)
+        crr['crr-mask-mtx'] = target.pop('crr-mask-mtx', None)
 
         target_list = DL2LD(target)
         segnet_output = output[0]
@@ -361,22 +369,20 @@ class MVPMLoss(PMLoss):
 
 
 
+#  _p1_list, _p2_list, _m_list = [], [], []
 
+# for base_view_id in range(len(pack['crr-idx-mtx'])):
+#     for query_view_id in range(len(pack['crr-idx-mtx'][base_view_id])):
+#         base_pc = pred_xyz_list[base_view_id]
+#         query_pc = pred_xyz_list[base_view_id + query_view_id + 1]
 
- _p1_list, _p2_list, _m_list = [], [], []
+#         pair_idx = pack['crr-idx-mtx'][base_view_id][query_view_id].squeeze(3)
+#         paired_pc_from_base_to_query = torch.gather(base_pc.squeeze(3), dim=2,
+#                                                     index=pair_idx.repeat(1, 3, 1)).unsqueeze(3)
+#         _p1_list.append(paired_pc_from_base_to_query)
+#         _p2_list.append(query_pc)
+#         _m_list.append(pack['crr-mask-mtx'][base_view_id][query_view_id])
 
-for base_view_id in range(len(pack['crr-idx-mtx'])):
-    for query_view_id in range(len(pack['crr-idx-mtx'][base_view_id])):
-        base_pc = pred_xyz_list[base_view_id]
-        query_pc = pred_xyz_list[base_view_id + query_view_id + 1]
-        
-        pair_idx = pack['crr-idx-mtx'][base_view_id][query_view_id].squeeze(3)
-        paired_pc_from_base_to_query = torch.gather(base_pc.squeeze(3), dim=2,
-                                                    index=pair_idx.repeat(1, 3, 1)).unsqueeze(3)
-        _p1_list.append(paired_pc_from_base_to_query)
-        _p2_list.append(query_pc)
-        _m_list.append(pack['crr-mask-mtx'][base_view_id][query_view_id])
-
-crr_xyz_loss = self.ml2_criterion(torch.cat(_p1_list, dim=2).contiguous(),
-                                    torch.cat(_p2_list, dim=2).contiguous(),
-                                    torch.cat(_m_list, dim=2).contiguous(), detach=False)
+# crr_xyz_loss = self.ml2_criterion(torch.cat(_p1_list, dim=2).contiguous(),
+#                                     torch.cat(_p2_list, dim=2).contiguous(),
+#                                     torch.cat(_m_list, dim=2).contiguous(), detach=False)

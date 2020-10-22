@@ -19,20 +19,24 @@ class evaluator():
         self.gt_occ_paths = glob.glob(
             os.path.join(self.input_dir, "*" + self.gt_occ_postfix)
         )
+        self.gt_occ_paths.sort()
         self.pred_occ_paths = glob.glob(
             os.path.join(self.input_dir, "*" + self.pred_occ_postfix)
-        )        
+        )       
+        self.pred_occ_paths.sort()
+
         assert len(self.gt_occ_paths) == len(self.pred_occ_paths)
         self.data_num = len(self.gt_occ_paths)
 
     def eval(self):
 
-        p2s_dis_list = []
-        chamfer_dis_list = []
+        p2s_dis_list = [0]
+        chamfer_dis_list = [0]
         iou_list = []
         for i in range(self.data_num):            
             gt_path = self.gt_occ_paths[i]
             pred_path = self.pred_occ_paths[i]
+            print(pred_path)
             if 1:
                 os.system("/workspace/Manifold/build/simplify -i {} -o {} -f {}".format(gt_path, gt_path, 5000))
                 os.system("/workspace/Manifold/build/simplify -i {} -o {} -f {}".format(pred_path, pred_path, 5000))
@@ -41,17 +45,18 @@ class evaluator():
             gt_mesh = trimesh.load(gt_path, process=False)
             pred_mesh = trimesh.load(pred_path, process=False)
             
-            p2s = self.p2s_dis(gt_mesh, pred_mesh)
-            p2s = np.sqrt(p2s)
-            # print(p2s)
-            p2s_dis_list.append(p2s)
+            # p2s = self.p2s_dis(gt_mesh, pred_mesh)
+            # p2s = np.sqrt(p2s)
+            # # print(p2s)
+            # p2s_dis_list.append(p2s)
             
-            chamfer = self.chamfer_dis(gt_mesh, pred_mesh)
-            chamfer = np.sqrt(chamfer)
-            chamfer_dis_list.append(chamfer)
+            # chamfer = self.chamfer_dis(gt_mesh, pred_mesh)
+            # chamfer = np.sqrt(chamfer)
+            # chamfer_dis_list.append(chamfer)
             # print(chamfer)
             
             iou = self.iou(gt_mesh, pred_mesh)
+            print("current iou ", iou)
             iou_list.append(iou)
 
 

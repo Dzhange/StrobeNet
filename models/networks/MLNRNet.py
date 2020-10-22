@@ -12,6 +12,7 @@ import torch_scatter
 from models.networks.MVTHSegNet import MVTHSegNet
 from models.networks.TripleHeadSegNet import THSegNet
 from models.networks.IFNet import SVR
+from models.networks.ShallowIFNet import ShallowSVR
 from models.networks.LNRNet import LNRNet
 
 import utils.tools.implicit_waterproofing as iw
@@ -31,7 +32,10 @@ class MLNRNet(LNRNet):
         self.SegNet = MVTHSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, bn=self.config.BN)
         # self.SegNet = THSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, bn=self.config.BN)
         self.SegNet.to(self.device)
-        self.IFNet = SVR(self.config, self.device)
+        if self.config.IF_SHALLOW:
+            self.IFNet = ShallowSVR(self.config, self.device)
+        else:
+            self.IFNet = SVR(self.config, self.device)
 
     def forward(self, inputs):
 
@@ -76,13 +80,12 @@ class MLNRNet(LNRNet):
             output_list.append(sv_output)
 
             if not self.config.STAGE_ONE:
-                # then: we transform the point cloud into occupancy(along with the features )
+                # sv_pc_list, sv_feature_list contrains pc from the same view_id in all batches
                 sv_pc_list, sv_feature_list = self.lift(sv_output, nocs_feature, transform_list[i])
                 if self.aggr_scatter:
                     # this list is batch wise
-                    if sv_feature_list is not None:
+                    if sv_pc_list is not None and mv_feature_list is not None:
                         mv_pc_list.append(sv_pc_list)
-                    if mv_feature_list is not None:
                         mv_feature_list.append(sv_feature_list)
                 else:
                     b_sv_occupancy_list = []
@@ -94,7 +97,11 @@ class MLNRNet(LNRNet):
 
         ##### aggregation #####
         recon = None
-        grid_coords = inputs['grid_coords'][0] # grid coords should be identical among all views
+        if isinstance(inputs['grid_coords'], list):
+            grid_coords = inputs['grid_coords'][0] # grid coords should be identical among all views
+        else:
+            grid_coords = inputs['grid_coords'] # some times(in validation time, we feed it with one tensor)
+
         if not self.config.STAGE_ONE:
             if self.aggr_scatter:
                 occupancy_list = []
@@ -102,20 +109,16 @@ class MLNRNet(LNRNet):
                     # we aggregate for each item in the batch
                     batch_pc_list = []
                     batch_feature_list = []
-
-                    valid_view_num = min(len(mv_pc_list), len(mv_feature_list))
-
+                    valid_view_num = len(mv_pc_list)
                     for view in range(valid_view_num):
                         cur_pc = mv_pc_list[view][i]
                         cur_feature = mv_feature_list[view][i]
-                        if cur_pc is not None:                    
+                        if cur_pc is not None and cur_feature is not None:
                             batch_pc_list.append(cur_pc)
-                        if cur_feature is not None:                    
                             batch_feature_list.append(cur_feature)
-                    
                     if len(batch_pc_list) == 0 or len(batch_feature_list) == 0:
                         batch_pc = None
-                        batch_feature = None                        
+                        batch_feature = None
                     else:
                         batch_pc = torch.cat(tuple(batch_pc_list), dim=1)
                         batch_feature = torch.cat(tuple(batch_feature_list), dim=1)
@@ -126,7 +129,7 @@ class MLNRNet(LNRNet):
                 mv_occupancy = torch.stack(tuple(b_mv_occupancy_list), dim=1)
                 mv_occupancy = self.avgpool_grids(mv_occupancy)
 
-
+            # self.visualize(occupancies)
             # and then feed into IF-Net. The ground truth shouled be used in the back projection
             recon = self.IFNet(grid_coords, occupancies)
 

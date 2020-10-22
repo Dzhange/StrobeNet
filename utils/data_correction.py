@@ -20,8 +20,9 @@ cnt = 0
 
 
 def recolor(frame_path):    
-    for view in ['00', '01', '02', '03']:
-        item_path = frame_path + '_view_' + view +  '_linkseg.png'
+    # for view in ['00', '01', '02', '03']:
+    # for view in ['00']:
+        item_path = frame_path
         # print(item_path)
         img = cv2.imread(item_path, -1)
         if img.shape[-1] == 3:
@@ -32,8 +33,9 @@ def recolor(frame_path):
 
 
 if __name__ == "__main__":    
-    with open(cache_path, 'rb') as fp:
-        frames = pickle.load(fp)
-
+    # with open(cache_path, 'rb') as fp:
+        # frames = pickle.load(fp)
+    import glob
+    frames = glob.glob("/workspace/Data/SAPIEN/laptop/laptop_all_200_IF/*/*/*linkseg.png")      
     p = Pool(mp.cpu_count())
     p.map(recolor, frames)

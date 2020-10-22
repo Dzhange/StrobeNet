@@ -343,7 +343,6 @@ class ModelLBSNOCS(object):
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_pose_comp.png').format(str(frame_id).zfill(3)),
                             cv2.cvtColor(big_img, cv2.COLOR_BGR2RGB))
 
-
     def write(self, path, joint):
         if os.path.exists(path):
             os.remove(path)
