@@ -25,6 +25,7 @@ class ShallowSVR(nn.Module):
         self.conv_in = nn.Conv3d(input_dim, self.config.IF_IN_DIM, 3, padding=1, padding_mode='replicate')  # out: 256 ->m.p. 128
         self.conv_0 = nn.Conv3d(self.config.IF_IN_DIM, 128, 3, padding=1, padding_mode='replicate')  # out: 128
         self.conv_0_1 = nn.Conv3d(128, 128, 3, padding=1, padding_mode='replicate')  # out: 128 ->m.p. 64
+        
 
         feature_size = (input_dim + self.config.IF_IN_DIM + 128) * 7 + 3
         self.fc_0 = nn.Conv1d(feature_size, hidden_dim * 2, 1)

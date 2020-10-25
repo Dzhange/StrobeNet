@@ -113,6 +113,7 @@ class MVSPDataset(SAPIENDataset):
         has_mask = False
         for k in self.frame_load_str:
             item_path = get_path_by_frame(frame_path, view_id, k, 'png')
+            # print(item_path)
             if "linkseg" in k:
                 frame[k] = imread_gray_torch(item_path, Size=self.img_size)\
                     .type(torch.FloatTensor).unsqueeze(0) # other wise would all be zero # 1,W,H

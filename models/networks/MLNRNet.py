@@ -14,7 +14,7 @@ from models.networks.TripleHeadSegNet import THSegNet
 from models.networks.IFNet import SVR
 from models.networks.ShallowIFNet import ShallowSVR
 from models.networks.LNRNet import LNRNet
-
+from time import time
 import utils.tools.implicit_waterproofing as iw
 from utils.lbs import *
 from utils.tools.voxels import VoxelGrid
@@ -29,13 +29,17 @@ class MLNRNet(LNRNet):
         self.view_num = config.VIEW_NUM
 
     def init_network(self):
-        self.SegNet = MVTHSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, bn=self.config.BN)
+        self.SegNet = MVTHSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, \
+            feature_channels=self.config.FEATURE_CHANNELS, pred_feature=self.config.PRED_FEATURE,\
+            bn=self.config.BN)
         # self.SegNet = THSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, bn=self.config.BN)
         self.SegNet.to(self.device)
         if self.config.IF_SHALLOW:
             self.IFNet = ShallowSVR(self.config, self.device)
         else:
             self.IFNet = SVR(self.config, self.device)
+        # if not self.config.PRED_FEATURE:
+            # torch.backends.cudnn.enabled = False
 
     def forward(self, inputs):
 
@@ -43,11 +47,11 @@ class MLNRNet(LNRNet):
         batch_size = self.config.BATCHSIZE
 
         # DEBUG: try old network
+        
         if isinstance(self.SegNet, MVTHSegNet):
             pred_list = self.SegNet(img_list)
         else:
             sv_output = self.SegNet(img_list[0])
-
         mv_pc_list = []
         mv_feature_list = []
         b_mv_occupancy_list = [] # occupancy stored in it are batch wise
@@ -61,6 +65,7 @@ class MLNRNet(LNRNet):
 
         output_list = []
 
+        
         for i in range(len(img_list)):
             if isinstance(self.SegNet, MVTHSegNet):
                 sv_output = pred_list[i]
@@ -73,8 +78,11 @@ class MLNRNet(LNRNet):
             pred_weight = sv_output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
             conf = sv_output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
             nocs_feature = sv_output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
+            
             if self.config.REPOSE:
+                # b_f = time()
                 pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
+                # print("function time ", time() - b_f)
                 # pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
                 sv_output = torch.cat((sv_output, pnnocs_maps), dim=1)
             output_list.append(sv_output)
@@ -94,14 +102,13 @@ class MLNRNet(LNRNet):
                         b_sv_occupancy_list.append(occupancy)
                     b_sv_occupancy = torch.stack(tuple(b_sv_occupancy_list))
                     b_mv_occupancy_list.append(b_sv_occupancy)
-
+        
         ##### aggregation #####
         recon = None
         if isinstance(inputs['grid_coords'], list):
             grid_coords = inputs['grid_coords'][0] # grid coords should be identical among all views
         else:
             grid_coords = inputs['grid_coords'] # some times(in validation time, we feed it with one tensor)
-
         if not self.config.STAGE_ONE:
             if self.aggr_scatter:
                 occupancy_list = []
@@ -132,7 +139,7 @@ class MLNRNet(LNRNet):
             # self.visualize(occupancies)
             # and then feed into IF-Net. The ground truth shouled be used in the back projection
             recon = self.IFNet(grid_coords, occupancies)
-
+        
         # return output_list, recon
         if isinstance(self.SegNet, MVTHSegNet):
             return output_list, recon

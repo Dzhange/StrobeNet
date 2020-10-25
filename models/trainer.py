@@ -48,7 +48,7 @@ class Trainer:
                     loss = self.objective(output, target)
                     time_c = time()                    
                     if loss > 50:
-                        print("[ ERROR ] strange loss encountered at ", target['iso_mesh'])
+                        print("[ ERROR ] strange loss encountered")
                     loss.backward()
                     time_d = time()
                     self.model.optimizer.step()
@@ -71,9 +71,9 @@ class Trainer:
                                                     getTimeDur(elapsed),
                                                     getTimeDur(total_elapsed),
                                                     getTimeDur(ETA-total_elapsed))
-                    show_time = False
+                    show_time = 0
                     if show_time:
-                        progress_str += "forward time {}, calculate loss time {}, BP time {}".format(time_b - time_a, time_c - time_b, time_d - time_c)
+                        progress_str += "forward: {:.5f}s, loss: {:.5f}s, BP: {:.5f}s, total:{:5f}".format(time_b - time_a, time_c - time_b, time_d - time_c, time_d - time_a)
                     sys.stdout.write(progress_str.ljust(100))
                     sys.stdout.flush()
                     # if i == 1000:
@@ -88,7 +88,7 @@ class Trainer:
                 val_losses = self.validate()
                 self.model.val_loss_history.append(np.mean(np.asarray(val_losses)))
                 ########################## SAVE CHECKPOINT ##############################
-                if (cur_epoch + 1) % self.config.SAVE_FREQ == 0 and cur_epoch > 0:
+                if (cur_epoch + 1) % self.config.SAVE_FREQ == 0:
                     
                     print("[ INFO ]: Save checkpoint for epoch {}.".format(cur_epoch + 1))
                     self.model.save_checkpoint(cur_epoch, print_str='~'*3)                        

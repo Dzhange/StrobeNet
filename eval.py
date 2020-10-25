@@ -45,15 +45,15 @@ class evaluator():
             gt_mesh = trimesh.load(gt_path, process=False)
             pred_mesh = trimesh.load(pred_path, process=False)
             
-            # p2s = self.p2s_dis(gt_mesh, pred_mesh)
-            # p2s = np.sqrt(p2s)
-            # # print(p2s)
-            # p2s_dis_list.append(p2s)
+            p2s = self.p2s_dis(gt_mesh, pred_mesh)
+            p2s = np.sqrt(p2s)
+            print(p2s)
+            p2s_dis_list.append(p2s)
             
-            # chamfer = self.chamfer_dis(gt_mesh, pred_mesh)
-            # chamfer = np.sqrt(chamfer)
-            # chamfer_dis_list.append(chamfer)
-            # print(chamfer)
+            chamfer = self.chamfer_dis(gt_mesh, pred_mesh)
+            chamfer = np.sqrt(chamfer)
+            chamfer_dis_list.append(chamfer)
+            print(chamfer)
             
             iou = self.iou(gt_mesh, pred_mesh)
             print("current iou ", iou)

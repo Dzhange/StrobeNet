@@ -1,33 +1,40 @@
 ##################################################################################################
-# Oct 15
+# Oct 20
+# DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/laptop_nocs_500_30_full_IF'
+# this mode runs good! let's just see how it perform
 
 
-DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/laptop_all_200_IF'
-OUTPUT_DIR: '/workspace/dev_nrnocs/output/laptop'
-
+DATASET_ROOT: '/workspace/Data/SAPIEN/oven/bm_aug_30_IF'
+OUTPUT_DIR: '/workspace/dev_nrnocs/output/oven'
+VIEW_NUM: 2
 MODES: ['train','val']
+# MODES: ['val']
 
 BATCHSIZE: 1
-DATALOADER_WORKERS: 4
+DATALOADER_WORKERS: 1
 EPOCH_TOTAL: 20
 
 LR: 1e-4
 
 SAVE_FREQ: 1
-DATA_LIMIT: 100 
-VAL_DATA_LIMIT: 5
+DATA_LIMIT: 100
+VAL_DATA_LIMIT: 20
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
-TASK: "lnrnet"
+
+TASK: "mlnrnet"
+EXPT_NAME: "fnocs"
+
 OUT_CHANNELS: 12 #4 + 1*8
 
-#TEST_ON_TRAIN: True
+# TEST_ON_TRAIN: True
+TEST_ON_TRAIN: False
 
 MH: True
 BN: False
 
 # NOCS_LOSS: 10
-NOCS_LOSS: 1
+NOCS_LOSS: 5
 POSE_LOSS: 1
 POSE_MAP_LOSS: 1
 LOC_LOSS: 1
@@ -37,14 +44,12 @@ SKIN_LOSS: 1
 BONE_NUM: 1
 
 REPOSE: True
-#STAGE_ONE: True
+# STAGE_ONE: True
 STAGE_ONE: False
 
-EXPT_NAME: "all"
+AGGR_SCATTER: True
 
 # NRNET_PRETRAIN: True
 # NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/nocs_30_b2_bkup"
 
-GPU: 6
-
-
+GPU: 7

@@ -184,8 +184,7 @@ class DataFilter:
             boundary_points = points + sigma * \
                 np.random.randn(self.SampleNum, 3)
             grid_coords = boundary_points.copy()
-            grid_coords[:, 0], grid_coords[:,
-                                           2] = boundary_points[:, 2], boundary_points[:, 0]
+            grid_coords[:, 0], grid_coords[:, 2] = boundary_points[:, 2], boundary_points[:, 0]
 
             grid_coords = 2 * grid_coords
             occupancies = iw.implicit_waterproofing(mesh, boundary_points)[0]

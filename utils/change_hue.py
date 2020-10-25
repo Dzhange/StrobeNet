@@ -30,7 +30,7 @@ def colorize(image, hue):
 if __name__ == "__main__":
     img_path = "/workspace/Data/SAPIEN/laptop/mv_laptop_500_4_IF/val/manual/frame_00000000_view_00_color00.png"
     img = Image.open(img_path)
-    img.save("test_origin.png")
-    hue = 20
+    # img.save("test_origin.png")
+    hue = 120
     img = colorize(img, hue)
-    img.save("test_hue{}.png".format(hue))
+    img.save(img_path)

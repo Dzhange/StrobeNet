@@ -3,6 +3,8 @@ import numpy as np
 import pickle
 import multiprocessing as mp
 from multiprocessing import Pool
+import re
+import os
 
 cache_path = '/workspace/Data/SAPIEN/laptop/mv_laptop_500_4_IF/val/all_glob_frames.cache'
 cnt = 0
@@ -32,6 +34,10 @@ def recolor(frame_path):
         cv2.imwrite(item_path, cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
 
 
+def move_unwanted_frames(path):
+    frame_num = re.findall(r'%s(\d+)' % "frame_", path)[0]
+    if int(frame_nunm) > 1000:
+        os.remove(path)
 if __name__ == "__main__":    
     # with open(cache_path, 'rb') as fp:
         # frames = pickle.load(fp)

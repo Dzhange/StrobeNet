@@ -9,13 +9,15 @@ from models.networks.modules import *
 class THSegNet(nn.Module):
     def __init__(self, nocs_channels=4, pose_channels=48+48+16+16,
                  input_channels=3,
-                 feature_channels=64,
+                 feature_channels=64, pred_feature=True, 
                  pretrained=True, withSkipConnections=True, bn=True):
 
         super().__init__()
         self.in_channels = input_channels
         self.feature_channels = feature_channels
         self.withSkipConnections = withSkipConnections
+        self.pred_feature = pred_feature
+
         self.down1 = segnetDown2(self.in_channels, 64, withFeatureMap=self.withSkipConnections, bn=bn)
         self.down2 = segnetDown2(64, 128, withFeatureMap=self.withSkipConnections, bn=bn)
         self.down3 = segnetDown3(128, 256, withFeatureMap=self.withSkipConnections, bn=bn)
@@ -29,7 +31,8 @@ class THSegNet(nn.Module):
 
         self.nocs_head = segnetUp2(64, nocs_channels, last_layer=True, withSkipConnections=self.withSkipConnections, bn=bn)
         self.pose_head = segnetUp2(64, pose_channels, last_layer=True, withSkipConnections=self.withSkipConnections, bn=bn)
-        self.feature_head = segnetUp2(64, feature_channels, last_layer=True, withSkipConnections=self.withSkipConnections, bn=bn)
+        if self.pred_feature:
+            self.feature_head = segnetUp2(64, feature_channels, last_layer=True, withSkipConnections=self.withSkipConnections, bn=bn)
 
         if pretrained:
             vgg16 = models.vgg16(pretrained=True)
@@ -53,9 +56,12 @@ class THSegNet(nn.Module):
 
         nocs_output = self.nocs_head(up2, indices_1, unpool_shape1, SkipFeatureMap=FM1)
         pose_output = self.pose_head(up2, indices_1, unpool_shape1, SkipFeatureMap=FM1)
-        feature_output = self.feature_head(up2, indices_1, unpool_shape1, SkipFeatureMap=FM1)
-
-        output = torch.cat((nocs_output, pose_output, feature_output), dim=1)
+        if self.pred_feature:
+            feature_output = self.feature_head(up2, indices_1, unpool_shape1, SkipFeatureMap=FM1)
+            output = torch.cat((nocs_output, pose_output, feature_output), dim=1)
+        else:
+            multi_scale_feature = torch.cat((down1, down2, down3, down4, down5), dim=1)            
+            output = torch.cat((nocs_output, pose_output, multi_scale_feature), dim=1)
         return output
 
     def init_vgg16_params(self, vgg16):

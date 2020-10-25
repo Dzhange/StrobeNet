@@ -135,7 +135,7 @@ class ModelMLNRNet(ModelLNRNET):
 
                 # self.visualize_confidence(segnet_output, i)
 
-                # if segnet_output.shape[1] > 64 + 4+self.config.BONE_NUM*8+2:
+                # if self.config.REPOSE:
                 #     pred_pnnocs = segnet_output[:, -3:, :, :]
                 #     mask = target['maps'][:, 3, :, :]
                 #     tar_pnnocs = target['maps'][:, -3:, :, :]

@@ -66,8 +66,7 @@ def get_default_cfg():
     
     # DATASET PART
     cfg.TEST_ON_TRAIN = False
-    cfg.OUT_CHANNELS = 4
-    cfg.FEATURE_CHANNELS = 64
+    cfg.OUT_CHANNELS = 4    
     cfg.TASK = "occupancy"
     cfg.TARGETS = ["nox00"]
     
@@ -80,6 +79,10 @@ def get_default_cfg():
     cfg.IF_BN = False
     cfg.BN = False
     cfg.AGGR_SCATTER = False
+    cfg.RESOLUTION = 128
+
+    cfg.PRED_FEATURE = True
+    cfg.FEATURE_CHANNELS = 64
 
     cfg.MH = False
     cfg.AS_SEG = False

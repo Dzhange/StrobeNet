@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
+from time import time
 import torch_scatter
 from models.networks.TripleHeadSegNet import THSegNet
 from models.networks.IFNet import SVR
@@ -32,7 +32,7 @@ class LNRNet(nn.Module):
 
         self.transform = self.config.TRANSFORM
         
-        self.resolution = 128
+        self.resolution = self.config.RESOLUTION
         self.init_grids(self.resolution)
         self.UpdateSegNet = config.UPDATE_SEG
         self.use_pretrained = False
@@ -44,7 +44,9 @@ class LNRNet(nn.Module):
             param.requires_grad = self.UpdateSegNet
     
     def init_network(self):
-        self.SegNet = THSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, bn=self.config.BN)
+        self.SegNet = THSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, \
+            feature_channels=self.config.FEATURE_CHANNELS, pred_feature=self.config.PRED_FEATURE,\
+            bn=self.config.BN)            
         self.SegNet.to(self.device)
         self.IFNet = SVR(self.config, self.device)
 
@@ -61,7 +63,7 @@ class LNRNet(nn.Module):
         self.pose_end = self.loc_end + self.joint_num*3
         self.skin_end = self.pose_end + self.joint_num + 2 # for segmentation
         self.conf_end = self.skin_end + self.joint_num
-        self.ft_end = self.conf_end + 64
+        self.ft_end = self.conf_end + self.config.FEATURE_CHANNELS
 
     def init_grids(self, resolution):
         if self.transform:
@@ -237,11 +239,12 @@ class LNRNet(nn.Module):
     def repose_pm_pred(self, pred_nocs, pred_loc_map, pred_pose_map, pred_seg, conf, pred_mask):
         """
         reposing function for partial mobility models
-        """
-        sigmoid = nn.Sigmoid()
-        pred_mask = sigmoid(pred_mask).squeeze(1)        
+        """        
+        
+        pred_mask = pred_mask.sigmoid().squeeze(1)
         pred_loc = self.vote(pred_loc_map, conf, pred_mask)
-        pred_rot = self.vote(pred_pose_map, conf, pred_mask) # axis-angle representation for the joint
+        pred_rot = self.vote(pred_pose_map, conf, pred_mask) # axis-angle representation for the joint        
+        
         all_pnnocs = []
         batch_size = pred_mask.shape[0]
         for i in range(batch_size):
@@ -250,14 +253,17 @@ class LNRNet(nn.Module):
             rot = pred_rot[i].clone().requires_grad_(True)
             seg = pred_seg[i].clone().requires_grad_(True)
             mask = pred_mask[i].clone().requires_grad_(True)
-            if torch.isnan(nocs).any() or torch.isnan(seg).any() or torch.isnan(mask).any():
+          
+            # empty = torch.isnan(nocs).any() or torch.isnan(seg).any() or torch.isnan(mask).any()        
+            if 0:
                 all_pnnocs.append(torch.zeros(pred_nocs[0].size()).to(device=pred_nocs.device))
-            else:
-                pnnocs, pnnocs_map = self.repose_pm_core(nocs, loc, rot, seg, mask, self.joint_num)
+            else:                
+                pnnocs, pnnocs_map = self.repose_pm_core(nocs, loc, rot, seg, mask, self.joint_num)                    
                 if pnnocs is None:
                     all_pnnocs.append(torch.zeros(pred_nocs[0].size()).to(device=pred_nocs.device))
                 else:
                     all_pnnocs.append(pnnocs_map)
+        # print("func time: ", time() - start_func)
         pnnocs_maps = torch.stack(tuple(all_pnnocs))
         return pnnocs_maps
 
@@ -271,11 +277,18 @@ class LNRNet(nn.Module):
             seg: N+2, H, W
             mask: H, W
         """
+        
         thresh = 0.75
         masked = mask > thresh
-        NOX_pc = NOX[:, masked].transpose(0, 1)
-        seg_pc = seg[:, masked].transpose(0, 1)
-
+        # t1 = time()        
+        NOX_pc = NOX[:, masked]
+        seg_pc = seg[:, masked]
+        # t2 = time()
+        NOX_pc = NOX_pc.transpose(0, 1)
+        seg_pc = seg_pc.transpose(0, 1)
+        # t3 = time()                        
+        # print(t2-t1, t3-t2)    
+        
         num_valid = NOX_pc.shape[0]
         if num_valid == 0:
             # No valid point at all. This will cut off the gradient flow
@@ -283,13 +296,15 @@ class LNRNet(nn.Module):
         to_cat = ()
         # using max_idx to confirm the segmentation
         _, max_idx = seg_pc.max(dim=1, keepdim=True)        
+        
+        start_rp = time()
         seg_flags = range(1, joint_num+2) # 0 is background
         for flag in seg_flags:
             part = (max_idx == flag)
             link = torch.where(part, torch.ones(1, device=NOX.device), torch.zeros(1, device=NOX.device))
-            to_cat = to_cat + (link, )
+            to_cat = to_cat + (link, )        
+        
         seg_pc = torch.cat(to_cat, dim=1)
-
         loc = loc.unsqueeze(0)
         rot = rot.unsqueeze(0)
 
@@ -301,6 +316,7 @@ class LNRNet(nn.Module):
         # we will add the base joint, it's identical
         joint_num = joint_num + 1
 
+        
         # rotation
         rodrigues = batch_rodrigues(
                 -rot.view(-1, 3),
@@ -330,6 +346,8 @@ class LNRNet(nn.Module):
                         trslt_mat,
                         torch.matmul(rot_mats, back_trslt_mat)
                         )
+            
+        
         T = torch.matmul(seg_pc, repose_mat.view(1, joint_num, 16))\
             .view(1, -1, 4, 4)
         pnnocs_pc = lbs_(NOX_pc.unsqueeze(0), T, dtype=NOX.dtype).to(device=NOX.device)

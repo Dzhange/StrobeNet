@@ -35,6 +35,7 @@ class Validater:
         # else:
         self.model.validate(self.val_dataloader, self.objective, self.device)
 
+    ############ DISCARDED #############
 
     def validate_nocs(self):
         self.model.setup_checkpoint(self.device)

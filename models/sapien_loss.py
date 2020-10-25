@@ -77,6 +77,7 @@ class PMLBSLoss(nn.Module):
         loss = {}
         
         bone_num = self.bone_num
+        batch_size = output.shape[0]
         # loss = torch.Tensor([0]).to(device=output.device)
 
         pred_nocs = output[:, 0:3, :, :].clone().requires_grad_(True)
@@ -95,10 +96,9 @@ class PMLBSLoss(nn.Module):
         tar_loc_map = self.sigmoid(tar_maps[:, 4:4+bone_num*3, :, :]) # location
         tar_rot_map = self.sigmoid(tar_maps[:, 4+bone_num*3:4+bone_num*6, :, :]) # rotation, angle axis
         tar_skin_seg = tar_maps[:, 4+bone_num*6:4+bone_num*6+1, :, :]
-
-        nocs_pc = pred_nocs[0, :, target_mask.squeeze() > 0].permute(1, 0)
         
-
+        # nocs_pc = pred_nocs[0, :, target_mask.squeeze() > 0].permute(1, 0)
+        
         tar_pose = target['pose']
         tar_loc = self.sigmoid(tar_pose[:, :, 0:3])
         tar_rot = self.sigmoid(tar_pose[:, :, 3:6])
@@ -112,6 +112,7 @@ class PMLBSLoss(nn.Module):
         
         # print(torch.unique(tar_seg))
         skin_loss = self.seg_loss(pred_seg, tar_seg)
+        # print(skin_loss)
         # print(target_mask.max())
         loc_map_loss = self.l2_loss(pred_loc_map, tar_loc_map, target_mask)
         rot_map_loss = self.l2_loss(pred_rot_map, tar_rot_map, target_mask)
@@ -140,8 +141,7 @@ class PMLBSLoss(nn.Module):
         loss['rot_loss'] = rot_loss
         loss['rot_map_loss'] = rot_map_loss
         loss['skin_loss'] = skin_loss
-        
-        # if output.shape[1] > 64 + 4+bone_num*8+2:
+                
         if self.cfg.REPOSE:
             pred_pnnocs = output[:, -3:, :, :].clone().requires_grad_(True)            
             # pred_pnnocs = output[:, 4+bone_num*8+2:4+bone_num*8+5, :, :].clone().requires_grad_(True)            
@@ -171,6 +171,7 @@ class PMLBSLoss(nn.Module):
                 l2_loss += torch.sum(masked_diff_norm[i]) / num_non_zero
             else:
                 l2_loss += torch.mean(diff_norm[i])
+        l2_loss /= batch_size
 
         return l2_loss
 
@@ -291,8 +292,7 @@ class PMLoss(nn.Module):
         num_sample = occ_loss.shape[1]
         occ_loss = occ_loss.sum(-1).mean() / num_sample
         return occ_loss
-    
-    
+        
     def add_up(self, loss):
         
         all_loss = torch.zeros(1, device=loss['nox_loss'].device)
@@ -305,7 +305,7 @@ class PMLoss(nn.Module):
             + cfg.SKIN_LOSS * loss['skin_loss']\
 
         if cfg.REPOSE == True:
-            all_loss += loss['pnnocs_loss']
+            all_loss += cfg.NOCS_LOSS * loss['pnnocs_loss']
         if cfg.STAGE_ONE == False:
             all_loss += loss['recon_loss']
 

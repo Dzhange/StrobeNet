@@ -339,8 +339,7 @@ class LBSLoss(nn.Module):
 
     def masked_l2_loss(self, out, tar, mask):
 
-        batch_size = out.shape[0]
-
+        batch_size = out.shape[0]        
         out = out.clone().requires_grad_(True)
         diff = out - tar
         diff_norm = torch.norm(diff, 2, dim=1)
@@ -353,6 +352,8 @@ class LBSLoss(nn.Module):
                 l2_loss += torch.sum(masked_diff_norm[i]) / num_non_zero
             else:
                 l2_loss += torch.mean(diff_norm[i])
+        
+        l2_loss /= batch_size
 
         return l2_loss
 

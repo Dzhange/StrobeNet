@@ -2,8 +2,8 @@
 # Oct 15
 
 
-DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/laptop_all_200_IF'
-OUTPUT_DIR: '/workspace/dev_nrnocs/output/laptop'
+DATASET_ROOT: '/workspace/Data/SAPIEN/oven/oven_s2m_IF'
+OUTPUT_DIR: '/workspace/dev_nrnocs/output/oven'
 
 MODES: ['train','val']
 
@@ -15,7 +15,7 @@ LR: 1e-4
 
 SAVE_FREQ: 1
 DATA_LIMIT: 100 
-VAL_DATA_LIMIT: 5
+VAL_DATA_LIMIT: 1
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 TASK: "lnrnet"
@@ -40,11 +40,11 @@ REPOSE: True
 #STAGE_ONE: True
 STAGE_ONE: False
 
-EXPT_NAME: "all"
+EXPT_NAME: "s2m1"
 
 # NRNET_PRETRAIN: True
 # NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/nocs_30_b2_bkup"
 
-GPU: 6
+GPU: 7
 
 
