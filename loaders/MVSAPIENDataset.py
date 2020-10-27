@@ -50,7 +50,7 @@ class MVSPDataset(SAPIENDataset):
         if self.shuffle_in_limit:
             total_size = len(self)
             dataset_length = math.ceil((self.data_limit / 100) * total_size)
-            # DatasetLength = 10
+            # dataset_length = 20
             step = int(np.floor(100 / self.data_limit))
             sample_index = []
             cur_idx = 0

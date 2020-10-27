@@ -37,7 +37,7 @@ class ModelLNRNET(ModelSegLBS):
             os.makedirs(self.expt_dir_path)
                 
         # generation conifgs
-        self.resolution = 128
+        # self.resolution = 128
         self.batch_points = 100000
 
     def init_net(self, device):
@@ -246,7 +246,7 @@ class ModelLNRNET(ModelSegLBS):
 
         # generate predicted mesh from occupancy and save
         logits = torch.cat(logits_list, dim=0).numpy()
-        mesh = self.mesh_from_logits(logits, self.resolution)
+        mesh = self.mesh_from_logits(logits, self.net.resolution)
         export_pred_path = os.path.join(self.output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
         mesh.export(export_pred_path)
 
@@ -323,27 +323,33 @@ class ModelLNRNET(ModelSegLBS):
         tar_mask = target['maps'][:, 3, :, :].squeeze() # mask
         tar_loc = tar_pose[:, :, 0:3].squeeze(0)
         tar_rot = tar_pose[:, :, 3:6].squeeze(0)
-        tar_loc[:, 1] = 0
+        # tar_loc[:, 1] = 0
         tar_skin_seg = target['maps'][:, 4+self.bone_num*6:4+self.bone_num*6+1, :, :]
         tar_skin_seg = self.label2map(tar_skin_seg.squeeze(0))
 
         pnnocs_pc, _ = self.net.repose_pm_core(tar_nocs, tar_loc, tar_rot, tar_skin_seg, tar_mask, self.bone_num)
+        # pnnocs_pc, _ = self.net.repose_pm_fast(tar_nocs, tar_loc, tar_rot, tar_skin_seg, tar_mask, self.bone_num, True)
+    
         pn_path = os.path.join(self.output_dir, 'frame_{}_{}_00gt.xyz').format(str(i).zfill(3), target_str)
         nox_path = os.path.join(self.output_dir, 'frame_{}_{}_01orig.xyz').format(str(i).zfill(3), target_str)
 
         nocs_pc = tar_nocs[:,  tar_mask > 0.75].transpose(0, 1)
 
         write_off(pn_path, pnnocs_pc[0])
+        # write_off(pn_path, pnnocs_pc)
         write_off(nox_path, nocs_pc)
 
     def visualize_confidence(self, output, frame_id):
         
         # bone_num = self.bone_num
         # H, W
-        conf_map = output[:, self.net.skin_end:self.net.conf_end, :, :].sigmoid().cpu().detach().squeeze().numpy()        
-        scale = conf_map.max() - conf_map.min()
-        # print(conf_map.max(), conf_map.min())
-        if scale != 0:
-            conf_map /= scale
-        conf_map *= 255
-        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_conf.png').format(str(frame_id).zfill(3)), conf_map)
+        conf_maps = output[:, self.net.skin_end:self.net.conf_end, :, :].sigmoid().cpu().detach().squeeze().numpy()        
+
+        for i in range(self.bone_num):
+            conf_map = conf_maps[:, i]
+            scale = conf_map.max() - conf_map.min()
+            # print(conf_map.max(), conf_map.min())
+            if scale != 0:
+                conf_map /= scale
+            conf_map *= 255
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_conf.png').format(str(frame_id).zfill(3)), conf_map)

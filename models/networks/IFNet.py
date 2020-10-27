@@ -32,8 +32,8 @@ class SVR(nn.Module):
         self.conv_3_1 = nn.Conv3d(128, 128, 3, padding=1, padding_mode='replicate')  # out: 16 -> mp 8
         self.conv_4 = nn.Conv3d(128, 128, 3, padding=1, padding_mode='replicate')  # out: 8
         self.conv_4_1 = nn.Conv3d(128, 128, 3, padding=1, padding_mode='replicate')  # out: 8
-
-        feature_size = (input_dim +  self.config.IF_IN_DIM + 32 + 64 + 128 + 128 + 128) * 7 + 3
+        
+        feature_size = (input_dim + self.config.IF_IN_DIM + 32 + 64 + 128 + 128 + 128) * 7 + 3
         self.fc_0 = nn.Conv1d(feature_size, hidden_dim * 2, 1)
         self.fc_1 = nn.Conv1d(hidden_dim *2, hidden_dim, 1)
         self.fc_2 = nn.Conv1d(hidden_dim , hidden_dim, 1)

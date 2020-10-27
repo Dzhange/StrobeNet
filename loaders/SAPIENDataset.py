@@ -37,8 +37,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
         self.init(root, train, img_size, limit, self.frame_load_str, required)
         self.load_data()
         ##############################################
-        # if "laptop" in self.dataset_dir:
-        print("\033[93m [ SERIOUS WARNING!!!!! ] SETTING ALL Y LOCATIONS INTO 0 \033[0m")
+        # if "laptop" in self.dataset_dir:        
         self.projection = True
         ##############################################
 
@@ -51,6 +50,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
         if os.path.exists(config_path):
             with open(config_path, 'r') as f:
                 configs = json.load(f)
+                self.dataset_config = configs
                 self.pose_num = configs['pose_num']
         else:
                 self.pose_num = 1
@@ -235,7 +235,17 @@ class SAPIENDataset(torch.utils.data.Dataset):
 
         if self.projection:
             # if "laptop" in self.dataset_dir :
-            cur_pose[:, 1] = 0
+            if "category" in self.dataset_config.keys():
+                if self.dataset_config['category'] == "glasses":
+                    pass
+                else:
+                    print("projection not defined, exit")
+                    exit()
+            else:
+                print("\033[93m [ SERIOUS WARNING!!!!! ] SETTING ALL Y LOCATIONS INTO 0 \033[0m")
+                # works for oven and laptop
+                cur_pose[:, 1] = 0
+
         # print(cur_pose)
         joint_map = self.gen_joint_map(cur_pose, self.img_size)
         load_tuple = load_tuple + (joint_map, )

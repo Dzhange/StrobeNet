@@ -161,18 +161,21 @@ class PMLBSLoss(nn.Module):
 
         out = out.clone().requires_grad_(True)
         diff = out - tar
+        
         diff_norm = torch.norm(diff, 2, dim=1)
         masked_diff_norm = torch.where(mask > self.Thresh, diff_norm,
                                         torch.zeros(diff_norm.size(), device=diff_norm.device))
+        
         l2_loss = 0
         for i in range(0, batch_size):
             num_non_zero = torch.nonzero(masked_diff_norm[i]).size(0)
+            # print("num non zero", num_non_zero)
             if num_non_zero > 0:
                 l2_loss += torch.sum(masked_diff_norm[i]) / num_non_zero
             else:
                 l2_loss += torch.mean(diff_norm[i])
         l2_loss /= batch_size
-
+        # print("l2 loss ", l2_loss)
         return l2_loss
 
     def pose_nocs_loss(self, pred_joint_map, pred_joint_score, out_mask, tar_joints):
@@ -307,7 +310,7 @@ class PMLoss(nn.Module):
         if cfg.REPOSE == True:
             all_loss += cfg.NOCS_LOSS * loss['pnnocs_loss']
         if cfg.STAGE_ONE == False:
-            all_loss += loss['recon_loss']
+            all_loss += cfg.RECON_LOSS * loss['recon_loss']
 
         # print("all loss is ", all_loss)
         # if all_loss > 3:
@@ -366,7 +369,6 @@ class MVPMLoss(PMLoss):
         mv_loss = self.add_up(mv_loss)
 
         return mv_loss
-
 
 
 #  _p1_list, _p2_list, _m_list = [], [], []

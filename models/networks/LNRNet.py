@@ -257,9 +257,11 @@ class LNRNet(nn.Module):
             # empty = torch.isnan(nocs).any() or torch.isnan(seg).any() or torch.isnan(mask).any()        
             if 0:
                 all_pnnocs.append(torch.zeros(pred_nocs[0].size()).to(device=pred_nocs.device))
-            else:                
-                pnnocs, pnnocs_map = self.repose_pm_core(nocs, loc, rot, seg, mask, self.joint_num)                    
-                if pnnocs is None:
+            else:
+                # m = mask.copy()                
+                pnnocs, pnnocs_map = self.repose_pm_core(nocs, loc, rot, seg, mask, self.joint_num)                                
+                # _, pnnocs_map = self.repose_pm_fast(nocs, loc, rot, seg, mask, self.joint_num)                                
+                if pnnocs_map is None:
                     all_pnnocs.append(torch.zeros(pred_nocs[0].size()).to(device=pred_nocs.device))
                 else:
                     all_pnnocs.append(pnnocs_map)
@@ -307,6 +309,106 @@ class LNRNet(nn.Module):
         seg_pc = torch.cat(to_cat, dim=1)
         loc = loc.unsqueeze(0)
         rot = rot.unsqueeze(0)
+        print(loc)
+        # TODO: following 2 rows would be deleted
+        # as here link 2 is the lens with no pose, but we didn't record that
+        loc = F.pad(loc, (0, 0, 1, 0), value=0)
+        rot = F.pad(rot, (0, 0, 1, 0), value=0)
+
+        # we will add the base joint, it's identical
+        joint_num = joint_num + 1
+        
+        # rotation
+        rodrigues = batch_rodrigues(
+                -rot.view(-1, 3),
+                dtype=rot.dtype
+                ).view([-1, 3, 3])
+        I_t = torch.Tensor([0, 0, 0]).to(device=rot.device)\
+                    .repeat((joint_num), 1).view(-1, 3, 1)
+        rot_mats = transform_mat(
+                        rodrigues,
+                        I_t,
+                        ).reshape(-1, joint_num, 4, 4)
+
+        # translation
+        I_r = torch.eye(3).to(device=rot.device)\
+                    .repeat(joint_num, 1).view(-1, 3, 3)
+        trslt_mat = transform_mat(
+                        I_r,
+                        loc.reshape(-1, 3, 1),
+                        ).reshape(-1, joint_num, 4, 4)
+        back_trslt_mat = transform_mat(
+                        I_r,
+                        -loc.reshape(-1, 3, 1),
+                        ).reshape(-1, joint_num, 4, 4)
+
+        # whole transformation point cloud
+        # repose_mat = torch.matmul(
+        #                 trslt_mat,
+        #                 torch.matmul(rot_mats, back_trslt_mat)
+        #                 )
+        repose_mat = back_trslt_mat
+            
+        
+        T = torch.matmul(seg_pc, repose_mat.view(1, joint_num, 16))\
+            .view(1, -1, 4, 4)
+        pnnocs_pc = lbs_(NOX_pc.unsqueeze(0), T, dtype=NOX.dtype).to(device=NOX.device)
+
+        # # re-normalize
+        # low_bound = pnnocs_pc.min(axis=1)[0]
+        # up_bound = pnnocs_pc.max(axis=1)[0]
+        # scale = (up_bound - low_bound).max()
+
+        # if scale != 0:
+        #     pnnocs_pc -= low_bound
+        #     pnnocs_pc /= scale
+
+        pnnocs_map = torch.zeros(NOX.size(), device=NOX.device)
+        pnnocs_map[:, masked] = pnnocs_pc.transpose(2, 1)
+
+        return pnnocs_pc, pnnocs_map
+
+    @staticmethod
+    def repose_pm_fast(NOX, loc, rot, seg, mask, joint_num, save_pc=False):
+        """
+        input shape:
+            NOX: 3, H, W
+            loc: N, 3
+            rot: N, 3
+            seg: N+2, H, W
+            mask: H, W
+        """
+        
+        thresh = 0.75        
+        masked = mask.reshape(-1) > thresh
+
+        # t1 = time()
+        img_size = NOX.shape
+        NOX_pc = NOX.reshape(3, -1)
+        NOX_pc *= masked
+        NOX_pc = NOX_pc.transpose(0, 1)
+        seg_pc = seg.reshape(joint_num+2, -1)
+        seg_pc *= masked
+        seg_pc = seg_pc.transpose(0, 1)        
+        # t3 = time()
+        # print(t2-t1, t3-t2)
+        num_valid = masked.sum()
+        if num_valid == 0:
+            # No valid point at all. This will cut off the gradient flow
+            return None, None
+        to_cat = ()
+        # using max_idx to confirm the segmentation
+        _, max_idx = seg_pc.max(dim=1, keepdim=True)
+                
+        seg_flags = range(1, joint_num+2) # 0 is background
+        for flag in seg_flags:
+            part = (max_idx == flag)
+            link = torch.where(part, torch.ones(1, device=NOX.device), torch.zeros(1, device=NOX.device))            
+            to_cat = to_cat + (link, )        
+        
+        seg_pc = torch.cat(to_cat, dim=1)
+        loc = loc.unsqueeze(0)
+        rot = rot.unsqueeze(0)
 
         # TODO: following 2 rows would be deleted
         # as here link 2 is the lens with no pose, but we didn't record that
@@ -316,7 +418,6 @@ class LNRNet(nn.Module):
         # we will add the base joint, it's identical
         joint_num = joint_num + 1
 
-        
         # rotation
         rodrigues = batch_rodrigues(
                 -rot.view(-1, 3),
@@ -361,9 +462,14 @@ class LNRNet(nn.Module):
         #     pnnocs_pc -= low_bound
         #     pnnocs_pc /= scale
 
-        pnnocs_map = torch.zeros(NOX.size(), device=NOX.device)
-        pnnocs_map[:, masked] = pnnocs_pc.transpose(2, 1)
+        # pnnocs_map = torch.zeros(NOX.size(), device=NOX.device)
+        # pnnocs_map[:, masked] = pnnocs_pc.transpose(2, 1)
+        # print(pnnocs_pc.shape)
+        pnnocs_map = pnnocs_pc.squeeze().reshape(img_size)
 
+        if save_pc:
+            pnnocs_pc = pnnocs_map[:, mask > thresh].transpose(0, 1)
+        print("here ", pnnocs_pc.shape)
         return pnnocs_pc, pnnocs_map
 
     def repose_lbs(self, pred_nocs, pred_loc_map, pred_pose_map, pred_weight, conf, pred_mask):

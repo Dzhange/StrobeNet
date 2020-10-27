@@ -96,7 +96,8 @@ def get_default_cfg():
     cfg.LOC_MAP_LOSS = 0
     cfg.POSE_LOSS = 0
     cfg.POSE_MAP_LOSS = 0
-    
+    cfg.RECON_LOSS = 1.0
+
     cfg.CONSISTENCY = 0
     
     cfg.IF_SHALLOW = False
