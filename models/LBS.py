@@ -218,7 +218,7 @@ class ModelLBSNOCS(object):
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_BW{}_00gt.png').format(str(i).zfill(3), b_id), tar_bw)
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_BW{}_01pred.png').format(str(i).zfill(3), b_id), pred_bw)
 
-    def save_joint(self, output, target, i, use_score=False, loc=True):
+    def save_joint(self, output, gt_joint, mask, i, use_score=False, loc=True, view_id=0):
         """
         input:
             predicted joint map
@@ -229,10 +229,11 @@ class ModelLBSNOCS(object):
         """
         bone_num = self.bone_num
         n_batch = output.shape[0]
+        gt_joint = gt_joint.cpu()
         if loc:
-            pred_joint_map = output[:, 4:4+bone_num*3, :, :]
+            pred_joint_map = output[:, 4:4+bone_num*3, :, :].cpu().detach()
             # gt
-            gt_joint = target['pose'][0, :, 0:3]
+            # gt_joint = target['pose'][0, :, 0:3]
             gt_path = os.path.join(self.output_dir, 'frame_{}_loc_gt.xyz').format(str(i).zfill(3))
             self.write(gt_path, gt_joint)
 
@@ -240,28 +241,28 @@ class ModelLBSNOCS(object):
             mean_pred_path = os.path.join(self.output_dir, 'frame_{}_mean_loc_pred.xyz').format(str(i).zfill(3))
         else:
             # pred_joint_map = output[:, 4+bone_num*3:4+bone_num*6, :, :] * 180 / np.pi
-            pred_joint_map = output[:, 4+bone_num*3:4+bone_num*6, :, :]
-            gt_joint = target['pose'][0, :, 3:6]
-            gt_path = os.path.join(self.output_dir, 'frame_{}_pose_gt.xyz').format(str(i).zfill(3))
+            pred_joint_map = output[:, 4+bone_num*3:4+bone_num*6, :, :].cpu().detach()
+            # gt_joint = target['pose'][0, :, 3:6]
+            gt_path = os.path.join(self.output_dir, 'frame_{}_view_{}_pose_gt.xyz').format(str(i).zfill(3), view_id)
 
-            pred_path = os.path.join(self.output_dir, 'frame_{}_pose_pred.xyz').format(str(i).zfill(3))
-            mean_pred_path = os.path.join(self.output_dir, 'frame_{}_mean_pose_pred.xyz').format(str(i).zfill(3))
+            pred_path = os.path.join(self.output_dir, 'frame_{}_view_{}_pose_pred.xyz').format(str(i).zfill(3), view_id)
+            mean_pred_path = os.path.join(self.output_dir, 'frame_{}_view_{}_mean_pose_pred.xyz').format(str(i).zfill(3), view_id)
             self.write(gt_path, gt_joint)
 
         # get final prediction: score map summarize
         pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
                                                 pred_joint_map.shape[3])  # B,bone_num,3,R,R
-        out_mask = target['maps'][:, 3, :, :]
-        pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
+        # mask = target['maps'][:, 3, :, :]
+        pred_joint_map = pred_joint_map * mask.unsqueeze(1).unsqueeze(1)
 
         # # Mean results
         # gt_joint_map = target['maps'][:, 4:4+bone_num*3, :, :]
         # gt_joint_map = gt_joint_map.reshape(n_batch, bone_num, 3, gt_joint_map.shape[2],
         #                                         gt_joint_map.shape[3])  # B,bone_num,3,R,R
-        # gt_joint_map = gt_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
+        # gt_joint_map = gt_joint_map * mask.unsqueeze(1).unsqueeze(1)
 
         # mean_gt_joint = gt_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
-        # mean_gt_joint /= out_mask.nonzero().shape[0]
+        # mean_gt_joint /= mask.nonzero().shape[0]
         # mean_gt_joint = mean_gt_joint[0]
         # mean_gt_path = os.path.join(self.output_dir, 'frame_{}_gt_mean_loc.xyz').format(str(i).zfill(3))
         # self.write(mean_gt_path, mean_gt_joint)
@@ -269,19 +270,19 @@ class ModelLBSNOCS(object):
         if use_score:
             # # Vote results
             sigmoid = nn.Sigmoid()
-            pred_joint_score = output[:, 4+bone_num*7:4+bone_num*8, :, :]
-            pred_joint_score = sigmoid(pred_joint_score) * out_mask.unsqueeze(1)
+            pred_joint_score = output[:, 4+bone_num*7:4+bone_num*8, :, :].cpu().detach()
+            pred_joint_score = sigmoid(pred_joint_score) * mask.unsqueeze(1)
             pred_score_map = pred_joint_score / (torch.sum(pred_joint_score.reshape(n_batch, bone_num, -1),
                                                     dim=2, keepdim=True).unsqueeze(3) + 1e-5)
             pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
             pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
-            pred_joint = pred_joint[0] # retrive the first one from batch            
+            pred_joint = pred_joint[0].detach() # retrive the first one from batch            
             # if loc:
             self.write(pred_path, pred_joint)
         else:
             # Mean results
             mean_pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
-            mean_pred_joint /= out_mask.nonzero().shape[0]
+            mean_pred_joint /= mask.nonzero().shape[0]
             mean_pred_joint = mean_pred_joint[0]
             
             # if loc:
@@ -298,23 +299,23 @@ class ModelLBSNOCS(object):
             mean_joint_loc_loss = mean_joint_diff.sum() / (n_batch * bone_num)            
             return np.sqrt(mean_joint_loc_loss.detach().cpu().numpy())
     
-    def visualize_joint_prediction(self, output, target, frame_id, loc=True):
+    def visualize_joint_prediction(self, output, gt_joint_map, mask, frame_id, loc=True, view_id=0):
         """
         save the inter results of joint predication as RGB image
         """
         bone_num = self.bone_num
-        mask = target['maps'][:, 3, :, :].cpu().detach()
-
+        # mask = target['maps'][:, 3, :, :].cpu().detach()
+        gt_joint_map = gt_joint_map.cpu()
         if loc:
-            pred_joint_map = output[:, 4:4+bone_num*3, :, :].cpu().detach()
-            gt_joint_map = target['maps'][:, 4:4+bone_num*3, :, :].cpu().detach()
+            pred_joint_map = output[:, 4:4+bone_num*3, :, :].detach()
+            # gt_joint_map = target['maps'][:, 4:4+bone_num*3, :, :].cpu().detach()
         else:
             pred_joint_map = output[:, 4+bone_num*3:4+bone_num*6, :, :].cpu().detach()
-            gt_joint_map = target['maps'][:, 4+bone_num*3:4+bone_num*6, :, :].cpu().detach()
+            # gt_joint_map = target['maps'][:, 4+bone_num*3:4+bone_num*6, :, :].cpu().detach()
         zero_map = torch.zeros(3, pred_joint_map.shape[2], pred_joint_map.shape[3])
         to_cat = ()
         for i in range(bone_num):
-            cur_pred = pred_joint_map[0, i*3:i*3+3, :, :]
+            cur_pred = pred_joint_map[0, i*3:i*3+3, :, :].cpu()
             gt = gt_joint_map[0, i*3:i*3+3, :, :]
 
             # rough linear normalize
@@ -337,10 +338,10 @@ class ModelLBSNOCS(object):
         
         big_img = np.concatenate(to_cat, axis=0)
         if loc:
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_loc_comp.png').format(str(frame_id).zfill(3)),
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_loc_comp.png').format(str(frame_id).zfill(3), view_id),
                             cv2.cvtColor(big_img, cv2.COLOR_BGR2RGB))
         else:
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_pose_comp.png').format(str(frame_id).zfill(3)),
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_pose_comp.png').format(str(frame_id).zfill(3), view_id),
                             cv2.cvtColor(big_img, cv2.COLOR_BGR2RGB))
 
     def write(self, path, joint):

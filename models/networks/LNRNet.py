@@ -309,7 +309,7 @@ class LNRNet(nn.Module):
         seg_pc = torch.cat(to_cat, dim=1)
         loc = loc.unsqueeze(0)
         rot = rot.unsqueeze(0)
-        print(loc)
+        # print(loc)
         # TODO: following 2 rows would be deleted
         # as here link 2 is the lens with no pose, but we didn't record that
         loc = F.pad(loc, (0, 0, 1, 0), value=0)
@@ -343,11 +343,11 @@ class LNRNet(nn.Module):
                         ).reshape(-1, joint_num, 4, 4)
 
         # whole transformation point cloud
-        # repose_mat = torch.matmul(
-        #                 trslt_mat,
-        #                 torch.matmul(rot_mats, back_trslt_mat)
-        #                 )
-        repose_mat = back_trslt_mat
+        repose_mat = torch.matmul(
+                        trslt_mat,
+                        torch.matmul(rot_mats, back_trslt_mat)
+                        )
+        # repose_mat = back_trslt_mat
             
         
         T = torch.matmul(seg_pc, repose_mat.view(1, joint_num, 16))\
