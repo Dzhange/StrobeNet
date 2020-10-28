@@ -302,8 +302,8 @@ class ModelLNRNET(ModelSegLBS):
             tar_nocs +=  transform['translation'][0].detach().cpu().numpy()
             tar_nocs *= transform['scale'][0].detach().cpu().numpy()
 
-            tar_nocs_path = os.path.join(self.output_dir, 'frame_{}_{}_trs_00gt.xyz').format(str(i).zfill(3), target_str)
-            pred_nocs_path = os.path.join(self.output_dir, 'frame_{}_{}_trs_01pred.xyz').format(str(i).zfill(3), target_str)
+            tar_nocs_path = os.path.join(self.output_dir, 'frame_{}_view_{}_{}_trs_00gt.xyz').format(str(i).zfill(3), view_id, target_str)
+            pred_nocs_path = os.path.join(self.output_dir, 'frame_{}_view_{}_{}_trs_01pred.xyz').format(str(i).zfill(3), view_id, target_str)
             self.write(tar_nocs_path, tar_nocs)
             self.write(pred_nocs_path, pred_nocs)
         
@@ -340,7 +340,7 @@ class ModelLNRNET(ModelSegLBS):
         # tar_loc[:, 1] = 0
         # tar_skin_seg = target['maps'][:, 4+self.bone_num*6:4+self.bone_num*6+1, :, :]
         tar_skin_seg = self.label2map(tar_skin_seg.squeeze(0))
-
+        # print("HEREHERE")
         pnnocs_pc, _ = self.net.repose_pm_core(tar_nocs, tar_loc, tar_rot, tar_skin_seg, tar_mask, self.bone_num)
         # pnnocs_pc, _ = self.net.repose_pm_fast(tar_nocs, tar_loc, tar_rot, tar_skin_seg, tar_mask, self.bone_num, True)
     

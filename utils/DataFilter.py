@@ -38,8 +38,10 @@ import trimesh
 import shutil
 import argparse
 import re
+import json
 import tools.implicit_waterproofing as iw
 import ast
+from time import time
 
 ERROR = -1
 
@@ -51,13 +53,17 @@ class DataFilter:
         self.inputDir = args.input_dir
         self.outputDir = args.output_dir
         self.sapien = args.sapien
+        
+        self.category = args.category
         self.pose_num = args.pose_per_actor
+
         self.transform = args.transform
         self.SampleNum = 100000
         if self.sapien:
             self.frame_per_dir = self.pose_num
         else:
             self.frame_per_dir = 100
+        self.mesh_per_frame = args.mesh_per_frame
 
     def filter(self):
         if not os.path.exists(self.outputDir):
@@ -67,9 +73,13 @@ class DataFilter:
             config_path = os.path.join(self.outputDir, "config.json")
             if os.path.exists(config_path):
                 os.remove(config_path)
-
+            
+            configs = {}
+            configs['pose_num'] = self.pose_num
+            configs['category'] = self.category
+            configs = json.dumps(configs)
+            
             f = open(config_path, "a")
-            configs = '{' + "\"pose_num\": {}".format(self.pose_num) + '}'
             f.write(configs)
             f.close()
 
@@ -88,13 +98,19 @@ class DataFilter:
                 all_frames = list(dict.fromkeys(all_frames))
                 all_frames.sort()
                 p = Pool(mp.cpu_count() >> 1)
+                # p = Pool(4)
+
+                # all_frames = all_frames[:20]
+                # print(all_frames)
+                # exit()
                 p.map(self.processFrame, all_frames)
             else:
                 # self.mode = "train"
-                self.mode = "val"
-                self.processFrame("00014500")
+                self.mode = "train"
+                self.processFrame("00000001")
 
     def processFrame(self, Frame):
+        print(mp.current_process(), "operaint on ", Frame)
         out_dir = os.path.join(self.outputDir, self.mode, str(
             int(Frame) // self.frame_per_dir).zfill(4))
         if not os.path.exists(out_dir):
@@ -103,6 +119,12 @@ class DataFilter:
             except:
                 print("subdir already exists")
         success = 0
+        if self.mesh_per_frame:
+            for view_id in range(self.view_num):
+                self.normalize_view_NOCS(Frame, view_id)
+                for sigma in [0.01, 0.1]:
+                    self.boudarySampling(Frame, sigma, view_id=view_id)
+        # we still need this part as we also stored the canonical mesh
         if not self.sapien or int(Frame) % self.pose_num == 0:
             success = self.normalizeNOCS(Frame)
             if success == ERROR:
@@ -113,7 +135,6 @@ class DataFilter:
         return
 
     def normalizeNOCS(self, Frame):
-
         in_dir = os.path.join(self.inputDir, self.mode, str(
             int(Frame) // self.frame_per_dir).zfill(4))
         out_dir = os.path.join(self.outputDir, self.mode, str(
@@ -135,7 +156,6 @@ class DataFilter:
             else:
                 # print('File {} exists. Done.'.format(target_mesh_path))
                 return 0
-
         translation = 0
         scale = 1
         try:
@@ -149,27 +169,75 @@ class DataFilter:
                 mesh.apply_translation(-centers)
                 mesh.apply_scale(1/total_size)
                 np.savez(transform_path, translation=translation, scale=scale)
-
             mesh.export(target_mesh_path)
         except Exception as e:
             print('Error normalize_NOCS {} with {}'.format(e, orig_mesh_path))
             return -1
         return 0
 
-    def boudarySampling(self, Frame, sigma):
+    def normalize_view_NOCS(self, Frame, view_id):
+        # print(mp.current_process(), "normalizing ", Frame)
+        in_dir = os.path.join(self.inputDir, self.mode, str(
+            int(Frame) // self.frame_per_dir).zfill(4))
         out_dir = os.path.join(self.outputDir, self.mode, str(
             int(Frame) // self.frame_per_dir).zfill(4))
-        if self.sapien:
+        orig_mesh_path = os.path.join(
+                in_dir, "frame_{}_view_{}_wt_mesh.obj".format(Frame, str(view_id).zfill(2)))
+        target_mesh_path = os.path.join(
+            out_dir, "frame_{}_view_{}_isosurf_scaled.off".format(Frame, str(view_id).zfill(2)))
+        transform_path = os.path.join(
+            out_dir, "frame_{}_view_{}_transform.npz".format(Frame, str(view_id).zfill(2)))
+        if os.path.exists(target_mesh_path):
+            if args.write_over:
+                print('overwrite ', target_mesh_path)
+            else:
+                # print('File {} exists. Done.'.format(target_mesh_path))
+                return 0
+        translation = 0
+        scale = 1
+        try:
+            mesh = trimesh.load(orig_mesh_path, process=False)
+            if self.transform:
+                # print("WRONG!!")
+                total_size = (mesh.bounds[1] - mesh.bounds[0]).max()
+                centers = (mesh.bounds[1] + mesh.bounds[0]) / 2
+                translation = -centers
+                scale = 1/total_size
+                mesh.apply_translation(-centers)
+                mesh.apply_scale(1/total_size)
+                np.savez(transform_path, translation=translation, scale=scale)
+            mesh.export(target_mesh_path)
+        except Exception as e:
+            print(mp.current_process(), ' Error normalize_NOCS {} with {}'.format(e, orig_mesh_path))
+            return -1
+        return 0
+ 
+    def boudarySampling(self, Frame, sigma, view_id=None):
+        out_dir = os.path.join(self.outputDir, self.mode, str(
+            int(Frame) // self.frame_per_dir).zfill(4))
+        # if sapien comes with no view_id, this is for canonical
+        if self.sapien and view_id is None:
             Frame = str(int(Frame) // self.pose_num * self.pose_num).zfill(8)
 
-        mesh_path = os.path.join(
-            out_dir, "frame_" + Frame + "_isosurf_scaled.off")
+        if view_id is None:
+            mesh_path = os.path.join(
+                out_dir, "frame_" + Frame + "_isosurf_scaled.off")
+        else:
+            mesh_path = os.path.join(
+                out_dir, "frame_{}_view_{}_isosurf_scaled.off".format(Frame, str(view_id).zfill(2)))
+        wait_time = time()
         while not os.path.exists(mesh_path):
-            print("waiting for ", mesh_path)
+            if time() - wait_time > 5:
+                print(mp.current_process()," waiting for ", mesh_path)
+                exit()
             continue
-        try:
-            out_file = os.path.join(
-                out_dir, "frame_" + Frame + '_boundary_{}_samples.npz'.format(sigma))
+        try:    
+            if view_id is None:
+                out_file = os.path.join(
+                    out_dir, "frame_" + Frame + '_boundary_{}_samples.npz'.format(sigma))
+            else:
+                out_file = os.path.join(
+                    out_dir,"frame_{}_view_{}_boundary_{}_samples.npz".format(Frame, str(view_id).zfill(2), sigma))
 
             if os.path.exists(out_file):
                 if args.write_over:
@@ -191,7 +259,7 @@ class DataFilter:
             np.savez(out_file, points=boundary_points,
                      occupancies=occupancies, grid_coords=grid_coords)
         except:
-            print('Error with {}: {}'.format(
+            print(mp.current_process(),' Error with {}: {}'.format(
                 mesh_path, traceback.format_exc()))
 
     def copyImgs(self, frame):
@@ -238,9 +306,12 @@ if __name__ == "__main__":
                         help="if use sapien, must specify number of poses")
     parser.add_argument('-v', '--view_num', type=int, default=1,
                         help="number of views per frame in the dataset")
-
     parser.add_argument('-s', '--sapien', default=False,
                         type=ast.literal_eval, help="SAPIEN dataset is a little different")
+    parser.add_argument('-mpf','--mesh_per_frame', default=False,
+                        type=ast.literal_eval, help="decide if there is a corresponding mesh for [ EACH VIEW ]")
+    parser.add_argument('-c', '--category', default='laptop', required=True, choices=['laptop', 'oven', 'eyeglass'],
+                        help='the category of the dataset')
     parser.add_argument('--write-over', default=False, type=ast.literal_eval,
                         help="Overwrite previous results if set to True")
     parser.add_argument('-t', '--transform', default=True, type=ast.literal_eval,
