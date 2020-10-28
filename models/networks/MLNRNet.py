@@ -63,28 +63,13 @@ class MLNRNet(LNRNet):
         else:
             transform_list = None
 
-        output_list = []
-
-        
+        output_list = []        
         for i in range(len(img_list)):
             if isinstance(self.SegNet, MVTHSegNet):
                 sv_output = pred_list[i]
             # else:
                 # sv_output = pred_item
-            pred_nocs = sv_output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
-            pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
-            pred_loc = sv_output[:, self.mask_end:self.loc_end, :, :].clone().requires_grad_(True)
-            pred_pose = sv_output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
-            pred_weight = sv_output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
-            conf = sv_output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
-            nocs_feature = sv_output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
-            
-            if self.config.REPOSE:
-                # b_f = time()
-                pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
-                # print("function time ", time() - b_f)
-                # pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
-                sv_output = torch.cat((sv_output, pnnocs_maps), dim=1)
+            sv_output, nocs_feature = self.process_sv(sv_output)
             output_list.append(sv_output)
 
             if not self.config.STAGE_ONE:
@@ -114,22 +99,8 @@ class MLNRNet(LNRNet):
                 occupancy_list = []
                 for i in range(batch_size):
                     # we aggregate for each item in the batch
-                    batch_pc_list = []
-                    batch_feature_list = []
-                    valid_view_num = len(mv_pc_list)
-                    for view in range(valid_view_num):
-                        cur_pc = mv_pc_list[view][i]
-                        cur_feature = mv_feature_list[view][i]
-                        if cur_pc is not None and cur_feature is not None:
-                            batch_pc_list.append(cur_pc)
-                            batch_feature_list.append(cur_feature)
-                    if len(batch_pc_list) == 0 or len(batch_feature_list) == 0:
-                        batch_pc = None
-                        batch_feature = None
-                    else:
-                        batch_pc = torch.cat(tuple(batch_pc_list), dim=1)
-                        batch_feature = torch.cat(tuple(batch_feature_list), dim=1)
-                    occupancy = self.discretize(batch_pc, batch_feature, self.resolution)
+                    instance_pc, instance_feature = self.collect_pc(mv_pc_list, mv_feature_list, batch_id=i)
+                    occupancy = self.discretize(instance_pc, instance_feature, self.resolution)
                     occupancy_list.append(occupancy)
                 occupancies = torch.stack(tuple(occupancy_list))
             else:
@@ -145,6 +116,45 @@ class MLNRNet(LNRNet):
             return output_list, recon
         else:
             return sv_output, recon
+
+
+    def process_sv(self, sv_output):
+        pred_nocs = sv_output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
+        pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
+        pred_loc = sv_output[:, self.mask_end:self.loc_end, :, :].clone().requires_grad_(True)
+        pred_pose = sv_output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
+        pred_weight = sv_output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
+        conf = sv_output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
+        nocs_feature = sv_output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
+        
+        if self.config.REPOSE:
+            # b_f = time()
+            pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
+            # print("function time ", time() - b_f)
+            # pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
+            sv_output = torch.cat((sv_output, pnnocs_maps), dim=1)
+
+        return sv_output, nocs_feature
+
+    def collect_pc(self, mv_pc_list, mv_feature_list, batch_id):                
+        # we aggregate for each item in the batch
+        instance_pc_list = []
+        instance_feature_list = []
+        valid_view_num = len(mv_pc_list)
+        for view in range(valid_view_num):
+            cur_pc = mv_pc_list[view][batch_id]
+            cur_feature = mv_feature_list[view][batch_id]
+            if cur_pc is not None and cur_feature is not None:
+                instance_pc_list.append(cur_pc)
+                instance_feature_list.append(cur_feature)
+        if len(instance_pc_list) == 0 or len(instance_feature_list) == 0:
+            instance_pc = None
+            instance_feature = None
+        else:
+            instance_pc = torch.cat(tuple(instance_pc_list), dim=1)
+            instance_feature = torch.cat(tuple(instance_feature_list), dim=1)
+        return instance_pc, instance_feature
+
 
     def avgpool_grids(self, feature_grids):
         """
