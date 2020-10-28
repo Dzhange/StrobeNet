@@ -122,39 +122,54 @@ class ModelMLNRNet(ModelLNRNET):
                 self.gen_NOCS_pc(segnet_output[view_id][:, 0:3, :, :], target['nox00'][view_id][:, 0:3, :, :], \
                     target['nox00'][view_id][:, 3, :, :], "nocs", i)
 
-                # if self.config.SKIN_LOSS or self.config.TASK == "lbs_seg":
-                #     self.save_mask(segnet_output, target['maps'], i)
-                # if self.config.LOC_LOSS or self.config.LOC_MAP_LOSS:
-                #     cur_loc_diff = self.save_joint(segnet_output, target, i, self.config.LOC_LOSS)
-                #     loc_diff.append(cur_loc_diff)
-                #     self.visualize_joint_prediction(segnet_output, target, i)
-                # if self.config.POSE_LOSS or self.config.POSE_MAP_LOSS:
-                #     cur_pose_diff = self.save_joint(segnet_output, target, i, use_score=self.config.POSE_LOSS, loc=False)
-                #     pose_diff.append(cur_pose_diff)
-                #     self.visualize_joint_prediction(segnet_output, target, i, loc=False)
+                mask = target['nox00'][view_id][:, 3, :, :].cpu()
+                bone_num = self.bone_num
 
-                # self.visualize_confidence(segnet_output, i)
-
-                # if self.config.REPOSE:
-                #     pred_pnnocs = segnet_output[:, -3:, :, :]
-                #     mask = target['maps'][:, 3, :, :]
-                #     tar_pnnocs = target['maps'][:, -3:, :, :]
+                if self.config.SKIN_LOSS or self.config.TASK == "lbs_seg":
+                    tar_seg = target['linkseg'][view_id].squeeze(0)
+                    self.save_mask(segnet_output[view_id], tar_seg, mask, i, view_id=view_id)
+                if self.config.LOC_LOSS or self.config.LOC_MAP_LOSS:
+                    tar_loc = target['pose'][view_id][0, :, 0:3]
+                    cur_loc_diff = self.save_joint(segnet_output[view_id], tar_loc, mask, i, self.config.LOC_LOSS, view_id=view_id)
+                    loc_diff.append(cur_loc_diff)                    
+                
+                    gt_joint_map = target["joint_map"][view_id][:,:bone_num*3]
+                    self.visualize_joint_prediction(segnet_output[view_id], gt_joint_map, mask, i, view_id=view_id)
+                
+                if self.config.POSE_LOSS or self.config.POSE_MAP_LOSS:
+                    tar_pose = target['pose'][view_id][0, :, 3:6]
+                    cur_pose_diff = self.save_joint(segnet_output[view_id], tar_pose, mask, i, \
+                        use_score=self.config.POSE_LOSS, loc=False, view_id=view_id)
+                    pose_diff.append(cur_pose_diff)
                     
-                #     self.save_single_img(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i)
+                    gt_joint_map = target["joint_map"][view_id][:,bone_num*3:]
+                    self.visualize_joint_prediction(segnet_output[view_id], gt_joint_map, mask, i, loc=False, view_id=view_id)
 
-                #     self.gt_debug(target, "reposed_debug", i)
-                #     if self.config.TRANSFORM:
-                #         transform = {'translation': net_input['translation'],
-                #         'scale':net_input['scale']}
-                #     else:
-                #         transform = None
+                self.visualize_confidence(segnet_output[view_id], i, view_id=view_id)
 
-                #     self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i, transform =transform)
+                if self.config.REPOSE:
+                    pred_pnnocs = segnet_output[view_id][:, -3:, :, :]
+                    tar_pnnocs = target['pnnocs00'][view_id]
+                    self.save_single_img(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i, view_id=view_id)
 
-                # str_loc_diff = "avg loc diff is {:.6f} ".format(np.mean(np.asarray(loc_diff)))
-                # str_angle_diff = "avg diff is {:.6f} degree ".format(np.degrees(np.mean(np.asarray(pose_diff))))
+                    tar_pose = target['pose'][view_id]
+                    tar_nocs = target['nox00'][view_id][:, 0:3, :, :].squeeze()
+                    tar_mask = target['nox00'][view_id][:, 3, :, :].squeeze()
+                    tar_skin_seg = target['linkseg'][view_id]
+                    # self.gt_debug(target, "reposed_debug", i)
+                    self.gt_debug(tar_pose, tar_nocs, tar_mask, tar_skin_seg, "reposed_debug", i)
+                    if self.config.TRANSFORM:
+                        transform = {'translation': net_input['translation'],
+                        'scale':net_input['scale']}
+                    else:
+                        transform = None
+
+                    self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i, transform =transform, view_id=view_id)
+
+                str_loc_diff = "avg loc diff is {:.6f} ".format(np.mean(np.asarray(loc_diff)))
+                str_angle_diff = "avg diff is {:.6f} degree ".format(np.degrees(np.mean(np.asarray(pose_diff))))
                 str_loss = "avg validation loss is {:6f}".format(np.mean(np.asarray(epoch_losses)))
-                # sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loc_diff + str_angle_diff + str_loss)
-                sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loss)
+                sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loc_diff + str_angle_diff + str_loss)
+                # sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loss)
                 sys.stdout.flush()
             print("\n")

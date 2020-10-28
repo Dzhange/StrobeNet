@@ -179,28 +179,42 @@ class ModelLNRNET(ModelSegLBS):
             segnet_output = output_recon[0]
             self.save_img(net_input['color00'], segnet_output[:, 0:4, :, :], target['maps'][:, 0:4, :, :], i)
             self.gen_NOCS_pc(segnet_output[:, 0:3, :, :], target['maps'][:, 0:3, :, :], target['maps'][:, 3, :, :], "nocs", i)
-
+            
+            mask = target['maps'][:, 3, :, :].cpu().detach()
+            bone_num = self.bone_num
             if self.config.SKIN_LOSS or self.config.TASK == "lbs_seg":
-                self.save_mask(segnet_output, target['maps'], i)
+                tar_seg = target['maps'][:, 4+bone_num*6, :, :].cpu()                
+                self.save_mask(segnet_output, tar_seg, mask, i)
             if self.config.LOC_LOSS or self.config.LOC_MAP_LOSS:
-                cur_loc_diff = self.save_joint(segnet_output, target, i, self.config.LOC_LOSS)
+                tar_loc = target['pose'][0, :, 0:3]
+                cur_loc_diff = self.save_joint(segnet_output, tar_loc, mask, i, self.config.LOC_LOSS)
                 loc_diff.append(cur_loc_diff)
-                self.visualize_joint_prediction(segnet_output, target, i)
+                
+                gt_joint_map = target['maps'][:, 4:4+bone_num*3, :, :].cpu().detach()
+                self.visualize_joint_prediction(segnet_output, gt_joint_map, mask, i)
+            
             if self.config.POSE_LOSS or self.config.POSE_MAP_LOSS:
-                cur_pose_diff = self.save_joint(segnet_output, target, i, use_score=self.config.POSE_LOSS, loc=False)
+                tar_pose = target['pose'][0, :, 3:6]
+                cur_pose_diff = self.save_joint(segnet_output, tar_pose, mask, i, use_score=self.config.POSE_LOSS, loc=False)
                 pose_diff.append(cur_pose_diff)
-                self.visualize_joint_prediction(segnet_output, target, i, loc=False)
+                
+                gt_joint_map = target['maps'][:, 4+bone_num*3:4+bone_num*6, :, :].cpu().detach()                
+                self.visualize_joint_prediction(segnet_output, gt_joint_map, mask, i, loc=False)
 
             self.visualize_confidence(segnet_output, i)
 
             if self.config.REPOSE:
-                pred_pnnocs = segnet_output[:, -3:, :, :]
-                mask = target['maps'][:, 3, :, :]
-                tar_pnnocs = target['maps'][:, -3:, :, :]
-                
+                pred_pnnocs = segnet_output[:, -3:, :, :]                
+                tar_pnnocs = target['maps'][:, -3:, :, :]                
                 self.save_single_img(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i)
 
-                self.gt_debug(target, "reposed_debug", i)
+
+                tar_pose = target['pose']        
+                tar_nocs = target['maps'][:, 0:3, :, :].squeeze() # nocs        
+                tar_mask = target['maps'][:, 3, :, :].squeeze() # mask
+                tar_skin_seg = target['maps'][:, 4+self.bone_num*6:4+self.bone_num*6+1, :, :]
+
+                self.gt_debug(tar_pose, tar_nocs, tar_mask, tar_skin_seg, "reposed_debug", i)
                 if self.config.TRANSFORM:
                     transform = {'translation': net_input['translation'],
                      'scale':net_input['scale']}
@@ -216,7 +230,7 @@ class ModelLNRNET(ModelSegLBS):
             sys.stdout.flush()
         print("\n")
 
-    def save_single_img(self, output, target, mask, target_str, i):
+    def save_single_img(self, output, target, mask, target_str, i, view_id=0):
         mask = sendToDevice(mask.detach(), 'cpu')
         output = sendToDevice(output.detach(), 'cpu')
         target = sendToDevice(target, 'cpu')
@@ -227,9 +241,9 @@ class ModelLNRNET(ModelSegLBS):
         target = torch2np(torch.squeeze(target)) * 255
         target[mask_prob <= 0.75] = 255
         
-        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_00gt.png').format(str(i).zfill(3), target_str),
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_{}_00gt.png').format(str(i).zfill(3), view_id, target_str),
                     cv2.cvtColor(target, cv2.COLOR_BGR2RGB))
-        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_01pred.png').format(str(i).zfill(3), target_str),
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_{}_01pred.png').format(str(i).zfill(3), view_id, target_str),
                     cv2.cvtColor(output, cv2.COLOR_BGR2RGB))
 
     def gen_mesh(self, grid_points_split, data, i):
@@ -261,7 +275,7 @@ class ModelLNRNET(ModelSegLBS):
             trans_path = target['iso_mesh'][0].replace("isosurf_scaled.off", "transform.npz")
             shutil.copyfile(trans_path, export_trans_path)
 
-    def gen_NOCS_pc(self, pred_nocs_map, tar_nocs_map, mask, target_str, i, transform=None):
+    def gen_NOCS_pc(self, pred_nocs_map, tar_nocs_map, mask, target_str, i, view_id=0, transform=None):
                 
         mask = sendToDevice(mask.detach(), 'cpu')
         pred_nocs_map = sendToDevice(pred_nocs_map.detach(), 'cpu')
@@ -275,8 +289,8 @@ class ModelLNRNET(ModelSegLBS):
         pred_nocs = pred_nocs_map[mask_prob > 0.75]
         tar_nocs = tar_nocs_map[mask_prob > 0.75]
 
-        tar_nocs_path = os.path.join(self.output_dir, 'frame_{}_{}_00gt.xyz').format(str(i).zfill(3), target_str)
-        pred_nocs_path = os.path.join(self.output_dir, 'frame_{}_{}_01pred.xyz').format(str(i).zfill(3), target_str)
+        tar_nocs_path = os.path.join(self.output_dir, 'frame_{}_view_{}_{}_00gt.xyz').format(str(i).zfill(3), view_id, target_str)
+        pred_nocs_path = os.path.join(self.output_dir, 'frame_{}_view_{}_{}_01pred.xyz').format(str(i).zfill(3), view_id, target_str)
         self.write(tar_nocs_path, tar_nocs)
         self.write(pred_nocs_path, pred_nocs)
 
@@ -288,8 +302,8 @@ class ModelLNRNET(ModelSegLBS):
             tar_nocs +=  transform['translation'][0].detach().cpu().numpy()
             tar_nocs *= transform['scale'][0].detach().cpu().numpy()
 
-            tar_nocs_path = os.path.join(self.output_dir, 'frame_{}_{}_trs_00gt.xyz').format(str(i).zfill(3), target_str)
-            pred_nocs_path = os.path.join(self.output_dir, 'frame_{}_{}_trs_01pred.xyz').format(str(i).zfill(3), target_str)
+            tar_nocs_path = os.path.join(self.output_dir, 'frame_{}_view_{}_{}_trs_00gt.xyz').format(str(i).zfill(3), view_id, target_str)
+            pred_nocs_path = os.path.join(self.output_dir, 'frame_{}_view_{}_{}_trs_01pred.xyz').format(str(i).zfill(3), view_id, target_str)
             self.write(tar_nocs_path, tar_nocs)
             self.write(pred_nocs_path, pred_nocs)
         
@@ -316,17 +330,17 @@ class ModelLNRNET(ModelSegLBS):
         vertices += [pmin, pmin, pmin]
         return trimesh.Trimesh(vertices, triangles)
 
-    def gt_debug(self, target, target_str, i):
-        tar_pose = target['pose']
+    def gt_debug(self, tar_pose, tar_nocs, tar_mask, tar_skin_seg, target_str, i):
+        # tar_pose = target['pose']
         
-        tar_nocs = target['maps'][:, 0:3, :, :].squeeze() # nocs        
-        tar_mask = target['maps'][:, 3, :, :].squeeze() # mask
+        # tar_nocs = target['maps'][:, 0:3, :, :].squeeze() # nocs        
+        # tar_mask = target['maps'][:, 3, :, :].squeeze() # mask
         tar_loc = tar_pose[:, :, 0:3].squeeze(0)
         tar_rot = tar_pose[:, :, 3:6].squeeze(0)
         # tar_loc[:, 1] = 0
-        tar_skin_seg = target['maps'][:, 4+self.bone_num*6:4+self.bone_num*6+1, :, :]
+        # tar_skin_seg = target['maps'][:, 4+self.bone_num*6:4+self.bone_num*6+1, :, :]
         tar_skin_seg = self.label2map(tar_skin_seg.squeeze(0))
-
+        # print("HEREHERE")
         pnnocs_pc, _ = self.net.repose_pm_core(tar_nocs, tar_loc, tar_rot, tar_skin_seg, tar_mask, self.bone_num)
         # pnnocs_pc, _ = self.net.repose_pm_fast(tar_nocs, tar_loc, tar_rot, tar_skin_seg, tar_mask, self.bone_num, True)
     
@@ -339,7 +353,7 @@ class ModelLNRNET(ModelSegLBS):
         # write_off(pn_path, pnnocs_pc)
         write_off(nox_path, nocs_pc)
 
-    def visualize_confidence(self, output, frame_id):
+    def visualize_confidence(self, output, frame_id, view_id=0):
         
         # bone_num = self.bone_num
         # H, W
@@ -352,4 +366,4 @@ class ModelLNRNET(ModelSegLBS):
             if scale != 0:
                 conf_map /= scale
             conf_map *= 255
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_conf.png').format(str(frame_id).zfill(3)), conf_map)
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_conf.png').format(str(frame_id).zfill(3), view_id), conf_map)

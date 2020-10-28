@@ -88,9 +88,9 @@ class MVSPDataset(SAPIENDataset):
 
         for view in range(self.view_num):
             data = self.get_sv_data(frame_base_path, view)                        
-            data_list.append(data)            
+            data_list.append(data)
         for k in data_list[0].keys():
-            batch[k] = [item[k] for item in data_list]
+            batch[k] = [item[k] for item in data_list]        
 
         # TODO: also include pair-wise consistency data
         if self.config.CONSISTENCY != 0:
@@ -152,7 +152,7 @@ class MVSPDataset(SAPIENDataset):
         
         return frame
         
-    def load_occupancies(self, frame_path):
+    def load_occupancies(self, frame_path, view_id=None):
         """
         load the occupancy data for the 2nd part(IF-Net)
             coords: position to be queried
@@ -161,15 +161,19 @@ class MVSPDataset(SAPIENDataset):
         data_dir = os.path.dirname(frame_path)
         file_name = os.path.basename(frame_path)
         index_of_frame = find_frame_num(file_name)
-        index_of_frame = str(int(index_of_frame) // self.pose_num * self.pose_num).zfill(8)
+        # we only use canonical as supervisioin
+        if view_id is None:
+            index_of_frame = str(int(index_of_frame) // self.pose_num * self.pose_num).zfill(8)
 
         points = []
         coords = []
         occupancies = []
         for i, num in enumerate(self.num_samples):
-            
-            boundary_samples_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
-                                                    self.occ_load_str[i] + '.npz')            
+            if view_id is None:
+                boundary_samples_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
+                                                    self.occ_load_str[i] + '.npz')
+            else:
+                boundary_samples_path = os.path.join(data_dir, "frame_{}_view_{}_{}.npz".format(index_of_frame, view_id, self.occ_load_str[i]))
             boundary_samples_npz = np.load(boundary_samples_path)
             boundary_sample_points = boundary_samples_npz['points']
             boundary_sample_coords = boundary_samples_npz['grid_coords']
@@ -182,9 +186,12 @@ class MVSPDataset(SAPIENDataset):
         assert len(points) == self.num_sample_points
         assert len(occupancies) == self.num_sample_points
         assert len(coords) == self.num_sample_points
-
-        gt_mesh_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
+        
+        if view_id is None:
+            gt_mesh_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
                                                     "isosurf_scaled.off")
+        else:
+            gt_mesh_path = os.path.join(data_dir, "frame_{}_view_{}_isosurf_scaled.off".format(index_of_frame, view_id))
         # None of the if-data would be needed if in validation mode
         if_data = {
             'grid_coords':np.array(coords, dtype=np.float32),
@@ -194,7 +201,10 @@ class MVSPDataset(SAPIENDataset):
         if_data['iso_mesh'] = gt_mesh_path
 
         if self.config.TRANSFORM:
-            transform_path = os.path.join(data_dir, "frame_" + index_of_frame + '_transform.npz')        
+            if view_id is None:
+                transform_path = os.path.join(data_dir, "frame_" + index_of_frame + '_transform.npz')        
+            else:
+                transform_path = os.path.join(data_dir, "frame_{}_view_{}_transform.npz".format(index_of_frame, view_id))                
             nocs_transform = {}
             nocs_transform['translation'] = np.load(transform_path)['translation']
             nocs_transform['scale'] = np.load(transform_path)['scale']

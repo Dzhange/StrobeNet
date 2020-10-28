@@ -46,34 +46,35 @@ class ModelSegLBS(ModelLBSNOCS):
         # 1, bone_num, W, H
         bw = bw.cpu()
         _, max_idx = bw.max(dim=0, keepdim=True)        
-        cur_seg = torch.zeros(3, bw.shape[1], bw.shape[2])        
+        cur_seg = torch.zeros(3, bw.shape[1], bw.shape[2], device=bw.device)
         for i in range(0, self.bone_num+2):
             cur_color = torch.Tensor(self.label_color[i]).unsqueeze(1).unsqueeze(2)
             cur_seg = torch.where(max_idx == i, cur_color, cur_seg)
         return cur_seg
 
 
-    def save_mask(self, output, target, i):
+    def save_mask(self, output, tar_seg, mask, i, view_id=0):
         bone_num = self.bone_num
-        mask = target[:, 3, :, :].cpu().detach()
-        tar_seg = target[:, 4+bone_num*6, :, :].cpu().detach()
+        mask = mask.cpu()
+        # mask = target[:, 3, :, :].cpu().detach()
+        # tar_seg = target[:, 4+bone_num*6, :, :].cpu().detach()
         gt_bw = self.label2map(tar_seg)
         # print(np.unique(gt_bw))
         gt_seg = self.map2seg(gt_bw)
 
-        zero_map = torch.zeros(gt_seg.size())
+        zero_map = torch.zeros(gt_seg.size())        
         gt_seg = torch.where(mask > 0.7, gt_seg, zero_map)
         gt_seg = torch2np(gt_seg)
 
         pred_bw = output[0, 4+bone_num*6:4+bone_num*7+2, :, :]*255
-        pred_seg = self.map2seg(pred_bw)
+        pred_seg = self.map2seg(pred_bw.cpu())
         
         # print(np.unique(pred_seg.cpu().detach().numpy()))
         pred_seg = torch.where(mask > 0.7, pred_seg, zero_map)
         pred_seg = torch2np(pred_seg)
         
-        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_seg_gt.png').format(str(i).zfill(3)), gt_seg)
-        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_seg_pred.png').format(str(i).zfill(3)), pred_seg)
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_seg_gt.png').format(str(i).zfill(3), view_id), gt_seg)
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_seg_pred.png').format(str(i).zfill(3), view_id), pred_seg)
         
 
     def save_mask_(self, output, target, i):

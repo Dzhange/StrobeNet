@@ -102,7 +102,7 @@ def get_default_cfg():
     
     cfg.IF_SHALLOW = False
     cfg.IF_IN_DIM = 16
-
+    cfg.CANO_IF = True # if set to True, we use only the canonical occupancy as supervision
 
     # for final pipeline
     cfg.STAGE_ONE = True # if set to true, we do not supervise the occupancy

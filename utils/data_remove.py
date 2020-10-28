@@ -10,9 +10,9 @@ cache_path = '/workspace/Data/SAPIEN/laptop/mv_laptop_500_4_IF/val/all_glob_fram
 cnt = 0
 
 
-def remove(frame_path):
-    print(frame_path)    
-    os.remove(frame_path)
+def remove(path):
+    # print(path)    
+    os.remove(path)
 
 # def move_unwanted_frames(path):
 #     frame_num = re.findall(r'%s(\d+)' % "frame_", path)[0]
@@ -22,8 +22,8 @@ if __name__ == "__main__":
     # with open(cache_path, 'rb') as fp:
         # frames = pickle.load(fp)
     import glob
-    frames = glob.glob("/workspace/Data/SAPIEN/oven/oven_mv1/train/0008/*")      
+    paths = glob.glob("/workspace/Data/SAPIEN/eyeglasses/aug_scale_mpf_IF/*/*/*")      
     p = Pool(mp.cpu_count() >> 2)
     # p.map(recolor, frames)
-    print(frames)
-    p.map(remove, frames)
+    print(len(paths))
+    p.map(remove, paths)

@@ -212,7 +212,7 @@ def transform_mat(R, t):
         Returns:
             - T: Bx4x4 Transformation matrix
     '''
-    # No padding left or right, only add an extra row    
+    # No padding left or right, only add an extra row        
     return torch.cat([F.pad(R, [0, 0, 0, 1]),
                       F.pad(t, [0, 0, 0, 1], value=1)], dim=2)
 
