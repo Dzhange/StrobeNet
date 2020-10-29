@@ -73,13 +73,17 @@ class LNRNet(nn.Module):
             bb_min = 0
             bb_max = 1
 
-        self.GridPoints = iw.create_grid_points_from_bounds(bb_min, bb_max, resolution)
+        # self.GridPoints = iw.create_grid_points_from_bounds(bb_min, bb_max, resolution)
         grid_points = iw.create_grid_points_from_bounds(bb_min, bb_max, resolution)
         grid_points[:, 0], grid_points[:, 2] = grid_points[:, 2], grid_points[:, 0].copy()        
-        a = bb_max + bb_min
-        b = bb_max - bb_min
-        grid_coords = 2 * grid_points - a
-        grid_coords = grid_coords / b
+        if self.transform:
+            a = bb_max + bb_min # 0, 1
+            b = bb_max - bb_min # 1, 1
+            grid_coords = 2 * grid_points - a # 
+            grid_coords = grid_coords / b
+        else:
+            grid_coords = grid_points
+
         grid_coords = torch.from_numpy(grid_coords).to(self.device, dtype=torch.float)
         grid_coords = torch.reshape(grid_coords, (1, len(grid_points), 3)).to(self.device)
         self.grid_coords = grid_coords
@@ -123,6 +127,8 @@ class LNRNet(nn.Module):
             if 0:
                 self.visualize(occupancies)
             # and then feed into IF-Net. The ground truth shouled be used in the back projection
+
+            
             recon = self.IFNet(grid_coords, occupancies)
         return output, recon
 
@@ -292,7 +298,8 @@ class LNRNet(nn.Module):
         # print(t2-t1, t3-t2)    
         
         pnnocs_pc = LNRNet.repose_pc(NOX_pc, seg_pc, loc, rot, joint_num)
-
+        if pnnocs_pc is None:
+            return None, None
         # # re-normalize
         # low_bound = pnnocs_pc.min(axis=1)[0]
         # up_bound = pnnocs_pc.max(axis=1)[0]
@@ -301,7 +308,7 @@ class LNRNet(nn.Module):
         # if scale != 0:
         #     pnnocs_pc -= low_bound
         #     pnnocs_pc /= scale
-
+        # print(pnnocs_pc)
         pnnocs_map = torch.zeros(NOX.size(), device=NOX.device)
         pnnocs_map[:, masked] = pnnocs_pc.transpose(2, 1)
 
@@ -312,7 +319,7 @@ class LNRNet(nn.Module):
         num_valid = NOX_pc.shape[0]
         if num_valid == 0:
             # No valid point at all. This will cut off the gradient flow
-            return None, None
+            return None
         to_cat = ()
         # using max_idx to confirm the segmentation
         _, max_idx = seg_pc.max(dim=1, keepdim=True)        
@@ -371,6 +378,7 @@ class LNRNet(nn.Module):
         T = torch.matmul(seg_pc, repose_mat.view(1, joint_num, 16))\
             .view(1, -1, 4, 4)
         pnnocs_pc = lbs_(NOX_pc.unsqueeze(0), T, dtype=NOX_pc.dtype).to(device=NOX_pc.device)
+
         return pnnocs_pc
 
     @staticmethod

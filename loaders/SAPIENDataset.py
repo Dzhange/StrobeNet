@@ -38,7 +38,8 @@ class SAPIENDataset(torch.utils.data.Dataset):
         self.load_data()
         ##############################################
         # if "laptop" in self.dataset_dir:        
-        self.projection = True
+        # self.projection = True
+        self.projection = False
         ##############################################
 
     def init(self, root, train=True, 
@@ -310,11 +311,18 @@ class SAPIENDataset(torch.utils.data.Dataset):
 
         gt_mesh_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
                                                     "isosurf_scaled.off")
-                        
+        f = open('/workspace/test1.xyz','w')
+        l = ""
+        coords = np.array(coords, dtype=np.float32)
+        for i in range(coords.shape[0]):
+            l += "{} {} {}\n".format(coords[i, 0], coords[i, 1], coords[i, 2])
+        f.write(l)
+        f.close()
+        exit()
         # None of the if-data would be needed if in validation mode
         if_data = {
             'grid_coords':np.array(coords, dtype=np.float32),
-            'occupancies': np.array(occupancies, dtype=np.float32),            
+            'occupancies': np.array(occupancies, dtype=np.float32),
             'iso_mesh': gt_mesh_path
             }
 

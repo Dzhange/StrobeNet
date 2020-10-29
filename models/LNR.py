@@ -147,6 +147,10 @@ class ModelLNRNET(ModelSegLBS):
         num_test_sample = 30000
 
         grid_coords = self.net.grid_coords
+        # print(grid_coords.shape)
+        # grid_path = os.path.join(self.output_dir, 'grid_coords.xyz')
+        # write_off(grid_path, grid_coords[0].cpu().numpy())
+        
         grid_points_split = torch.split(grid_coords, self.batch_points, dim=1)
 
         # Make sure we are not tracking running stats

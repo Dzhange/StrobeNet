@@ -217,7 +217,7 @@ class Validater:
         fgt.close()
         
     @staticmethod
-    def mesh_from_logits(logits, resolution):
+    def __mesh_from_logits(logits, resolution):
         logits = np.reshape(logits, (resolution,) * 3)
         initThreshold = 0.5
         pmax = 0.5

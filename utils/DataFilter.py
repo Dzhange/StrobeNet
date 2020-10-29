@@ -251,10 +251,13 @@ class DataFilter:
 
             boundary_points = points + sigma * \
                 np.random.randn(self.SampleNum, 3)
-            grid_coords = boundary_points.copy()
-            grid_coords[:, 0], grid_coords[:, 2] = boundary_points[:, 2], boundary_points[:, 0]
+            if self.transform:
+                grid_coords = boundary_points.copy()
+                grid_coords[:, 0], grid_coords[:, 2] = boundary_points[:, 2], boundary_points[:, 0]
 
-            grid_coords = 2 * grid_coords
+                grid_coords = 2 * grid_coords
+            else:
+                grid_coords = boundary_points.copy()                
             occupancies = iw.implicit_waterproofing(mesh, boundary_points)[0]
             np.savez(out_file, points=boundary_points,
                      occupancies=occupancies, grid_coords=grid_coords)
