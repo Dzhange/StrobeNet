@@ -114,7 +114,7 @@ class Validater:
 
             logits = torch.cat(logits_list, dim=0).numpy()
             print(logits.shape)
-            mesh = self.mesh_from_logits(logits, resolution)
+            mesh = self.__mesh_from_logits(logits, resolution)
             export_pred_path = os.path.join(output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
             export_gt_path = os.path.join(output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
             export_trans_path = os.path.join(output_dir, "frame_{}_trans.npz".format(str(i).zfill(3)))

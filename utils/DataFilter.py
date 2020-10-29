@@ -58,6 +58,10 @@ class DataFilter:
         self.pose_num = args.pose_per_actor
 
         self.transform = args.transform
+        if not self.transform:
+            print("[ ERROR ] not implemented yet")
+            exit()
+            
         self.SampleNum = 100000
         if self.sapien:
             self.frame_per_dir = self.pose_num
@@ -160,15 +164,14 @@ class DataFilter:
         scale = 1
         try:
             mesh = trimesh.load(orig_mesh_path, process=False)
-            if self.transform:
-                # print("WRONG!!")
+            if self.transform:                
                 total_size = (mesh.bounds[1] - mesh.bounds[0]).max()
                 centers = (mesh.bounds[1] + mesh.bounds[0]) / 2
                 translation = -centers
                 scale = 1/total_size
                 mesh.apply_translation(-centers)
                 mesh.apply_scale(1/total_size)
-                np.savez(transform_path, translation=translation, scale=scale)
+                np.savez(transform_path, translation=translation, scale=scale)            
             mesh.export(target_mesh_path)
         except Exception as e:
             print('Error normalize_NOCS {} with {}'.format(e, orig_mesh_path))
@@ -231,7 +234,7 @@ class DataFilter:
                 print(mp.current_process()," waiting for ", mesh_path)
                 exit()
             continue
-        try:    
+        try:
             if view_id is None:
                 out_file = os.path.join(
                     out_dir, "frame_" + Frame + '_boundary_{}_samples.npz'.format(sigma))
@@ -254,10 +257,9 @@ class DataFilter:
             if self.transform:
                 grid_coords = boundary_points.copy()
                 grid_coords[:, 0], grid_coords[:, 2] = boundary_points[:, 2], boundary_points[:, 0]
-
                 grid_coords = 2 * grid_coords
             else:
-                grid_coords = boundary_points.copy()                
+                grid_coords = boundary_points.copy()
             occupancies = iw.implicit_waterproofing(mesh, boundary_points)[0]
             np.savez(out_file, points=boundary_points,
                      occupancies=occupancies, grid_coords=grid_coords)

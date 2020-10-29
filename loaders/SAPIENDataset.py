@@ -311,14 +311,14 @@ class SAPIENDataset(torch.utils.data.Dataset):
 
         gt_mesh_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
                                                     "isosurf_scaled.off")
-        f = open('/workspace/test1.xyz','w')
-        l = ""
-        coords = np.array(coords, dtype=np.float32)
-        for i in range(coords.shape[0]):
-            l += "{} {} {}\n".format(coords[i, 0], coords[i, 1], coords[i, 2])
-        f.write(l)
-        f.close()
-        exit()
+        # f = open('/workspace/test1.xyz','w')
+        # l = ""
+        # coords = np.array(coords, dtype=np.float32)
+        # for i in range(coords.shape[0]):
+        #     l += "{} {} {}\n".format(coords[i, 0], coords[i, 1], coords[i, 2])
+        # f.write(l)
+        # f.close()
+        # exit()
         # None of the if-data would be needed if in validation mode
         if_data = {
             'grid_coords':np.array(coords, dtype=np.float32),
@@ -357,14 +357,14 @@ if __name__ == '__main__':
     Args, _ = Parser.parse_known_args()
     # f_str = ["color00", "nox00", "pnnocs00", "linkseg"]
     f_str = None
-    Data = SAPIENDataset(root=Args.data_dir, train=True, frame_load_str=None)
-    # Data.saveItem(random.randint(0, len(Data)))
-    # Data.visualizeRandom(10, nColsPerSam=len(Data.FrameLoadStr)-1) # Ignore Pose
-    # exit()
-    # LossUnitTest = GenericImageDataset.L2MaskLoss(0.7)
-    DataLoader = torch.utils.data.DataLoader(Data, batch_size=8, shuffle=True, num_workers=8)
-    # loss = LBSLoss()
-    for i, Data in enumerate(DataLoader, 0):  # Get each batch
-        # print(type(Data))
-        target_img = Data[1]
+    # Data = SAPIENDataset(root=Args.data_dir, train=True, frame_load_str=None)
+    # # Data.saveItem(random.randint(0, len(Data)))
+    # # Data.visualizeRandom(10, nColsPerSam=len(Data.FrameLoadStr)-1) # Ignore Pose
+    # # exit()
+    # # LossUnitTest = GenericImageDataset.L2MaskLoss(0.7)
+    # DataLoader = torch.utils.data.DataLoader(Data, batch_size=8, shuffle=True, num_workers=8)
+    # # loss = LBSLoss()
+    # for i, Data in enumerate(DataLoader, 0):  # Get each batch
+    #     # print(type(Data))
+    #     target_img = Data[1]
         

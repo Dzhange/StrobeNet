@@ -4,7 +4,8 @@
 # this mode runs good! let's just see how it perform
 
 
-DATASET_ROOT: '/workspace/Data/SAPIEN/debug/no_trs_IF/'
+DATASET_ROOT: '/workspace/Data/SAPIEN/debug/wt_trs_IF/'
+# DATASET_ROOT: '/workspace/Data/SAPIEN/debug/no_trs_IF/'
 OUTPUT_DIR: '/workspace/dev_nrnocs/output/debug'
 VIEW_NUM: 2
 MODES: ['train','val']
@@ -23,7 +24,10 @@ IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
 TASK: "lnrnet"
-EXPT_NAME: "no_trs"
+# EXPT_NAME: "no_trs"
+# TRANSFORM: False
+
+EXPT_NAME: "wt_trs"
 
 OUT_CHANNELS: 12 #4 + 1*8
 
@@ -33,7 +37,7 @@ TEST_ON_TRAIN: True
 MH: True
 BN: False
 
-TRANSFORM: False
+
 # NOCS_LOSS: 10
 NOCS_LOSS: 1
 POSE_LOSS: 1

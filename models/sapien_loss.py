@@ -2,7 +2,7 @@ import os
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
-from utils.DataUtils import DL2LD, LD2DL
+from utils.DataUtils import *
 from models.loss import *
 
 class PMloss(LBSLoss):

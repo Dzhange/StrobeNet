@@ -119,19 +119,19 @@ class MSMPLNRNet(LNRNet):
                 We do this for EACH pose
             3. we output the list of merged and posed point clouds. 
         """
-        
+        pass
 
 
 
 
-        thresh = 0.75
-        masked = mask > thresh
-        # t1 = time()        
-        NOX_pc = NOX[:, masked]
-        seg_pc = seg[:, masked]
-        # t2 = time()
-        NOX_pc = NOX_pc.transpose(0, 1)
-        seg_pc = seg_pc.transpose(0, 1)
+        # thresh = 0.75
+        # masked = mask > thresh
+        # # t1 = time()        
+        # NOX_pc = NOX[:, masked]
+        # seg_pc = seg[:, masked]
+        # # t2 = time()
+        # NOX_pc = NOX_pc.transpose(0, 1)
+        # seg_pc = seg_pc.transpose(0, 1)
         
 
 
