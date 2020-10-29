@@ -299,7 +299,7 @@ class PMLoss(nn.Module):
     def add_up(self, loss):
         
         all_loss = torch.zeros(1, device=loss['nox_loss'].device)
-        print(loss)
+        # print(loss)
         cfg = self.config
         all_loss = all_loss\
             + cfg.NOCS_LOSS * (loss['nox_loss'] + loss['mask_loss'])\
@@ -370,6 +370,68 @@ class MVPMLoss(PMLoss):
 
         return mv_loss
 
+
+class MVMPLoss(PMLoss):
+    
+    def __init__(self, config):
+        super().__init__(config)
+    
+    
+    def forward(self, output, target):
+        
+        target.pop('mesh', None)
+        target.pop('iso_mesh', None)
+        
+        crr = {}
+        crr['crr-idx-mtx'] = target.pop('crr-idx-mtx', None)
+        crr['crr-mask-mtx'] = target.pop('crr-mask-mtx', None)
+
+        target_list = DL2LD(target)
+        segnet_output = output[0]
+
+        mv_loss = {}
+        view_num = self.config.VIEW_NUM
+        for v in range(view_num):
+            if isinstance(segnet_output, list):
+                sv_output = segnet_output[v]
+            else:
+                sv_output = segnet_output
+
+            sv_target = target_list[v]
+
+            tar = {}
+            tar_maps = []
+            for k in ['nox00', 'joint_map', 'linkseg', 'pnnocs00']:
+                tar_maps.append(sv_target[k])
+            tar['maps'] = torch.cat(tuple(tar_maps), dim=1)
+            tar['pose'] = sv_target['pose']
+
+            sv_loss = self.segnet_loss(sv_output, tar)
+
+            if len(mv_loss) == 0:
+                mv_loss = sv_loss
+            else:
+                for k in sv_loss:
+                    mv_loss[k] += sv_loss[k]
+
+        for k in mv_loss:
+            mv_loss[k] /= view_num
+
+        if not self.config.STAGE_ONE:
+            ifnet_output = output[1]
+            recon_loss = self.recon_loss(ifnet_output, target_list[0])
+
+            posed_recons = output[2]
+            for i in range(len(view_num)):
+                posed_recon_loss = self.recon_loss(posed_recons[i], target_list[0])
+                recon_loss += posed_recon_loss
+            
+            recon_loss /= (view_num + 1)
+            mv_loss['recon_loss'] = recon_loss
+        
+        mv_loss = self.add_up(mv_loss)
+
+        return mv_loss
 
 #  _p1_list, _p2_list, _m_list = [], [], []
 

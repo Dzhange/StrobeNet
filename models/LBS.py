@@ -177,11 +177,11 @@ class ModelLBSNOCS(object):
             # shutil.copyfile(target['mesh'][0], gt_path)
         # print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
     
-    def save_img(self, net_input, output, target, i):
+    def save_img(self, net_input, output, target, i, view_id=0):
         # print(type(net_input), type(ou
         input_img, gt_out_tuple_rgb, gt_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(target, 'cpu'))
         _, pred_out_tuple_rgb, pred_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(output.detach(), 'cpu'), isMaskNOX=True)
-        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_color00.png').format(str(i).zfill(3)), cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB))
+        cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_color00.png').format(str(i).zfill(3), view_id), cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB))
 
         if "default" in self.config.TARGETS:
             out_target_str = ["nocs"]
@@ -189,13 +189,13 @@ class ModelLBSNOCS(object):
             out_target_str = self.config.TARGETS
 
         for target_str, gt, pred, gt_mask, pred_mask in zip(out_target_str, gt_out_tuple_rgb, pred_out_tuple_rgb, gt_out_tuple_mask, pred_out_tuple_mask):
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_00gt.png').format(str(i).zfill(3), target_str),
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_{}_00gt.png').format(str(i).zfill(3), view_id, target_str),
                         cv2.cvtColor(gt, cv2.COLOR_BGR2RGB))
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_01pred.png').format(str(i).zfill(3), target_str),
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_{}_01pred.png').format(str(i).zfill(3), view_id, target_str),
                         cv2.cvtColor(pred, cv2.COLOR_BGR2RGB))
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_02gtmask.png').format(str(i).zfill(3), target_str),
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_{}_02gtmask.png').format(str(i).zfill(3), view_id, target_str),
                         gt_mask)
-            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_{}_03predmask.png').format(str(i).zfill(3), target_str),
+            cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_{}_03predmask.png').format(str(i).zfill(3), view_id, target_str),
                         pred_mask)
 
     def save_mask(self, output, target, i):

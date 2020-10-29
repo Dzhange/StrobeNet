@@ -117,19 +117,18 @@ class MLNRNet(LNRNet):
         else:
             return sv_output, recon
 
-
     def process_sv(self, sv_output):
         pred_nocs = sv_output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
         pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
         pred_loc = sv_output[:, self.mask_end:self.loc_end, :, :].clone().requires_grad_(True)
         pred_pose = sv_output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
-        pred_weight = sv_output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
+        pred_seg = sv_output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
         conf = sv_output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
         nocs_feature = sv_output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
         
         if self.config.REPOSE:
             # b_f = time()
-            pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
+            pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_seg, conf, pred_mask)
             # print("function time ", time() - b_f)
             # pnnocs_maps = self.repose_pm(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)
             sv_output = torch.cat((sv_output, pnnocs_maps), dim=1)
@@ -155,7 +154,6 @@ class MLNRNet(LNRNet):
             instance_feature = torch.cat(tuple(instance_feature_list), dim=1)
         return instance_pc, instance_feature
 
-
     def avgpool_grids(self, feature_grids):
         """
         Copied from Srinath
@@ -180,3 +178,47 @@ class MLNRNet(LNRNet):
         MP.squeeze(dim=1)
 
         return MP
+
+    def get_seg_pc(self, sv_output):
+        """
+        output: list of seg array of shape (N_i, joint_num+2)        
+        """
+        batch_size = sv_output.shape[0]
+        thresh = 0.75
+
+        pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
+        pred_seg = sv_output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
+        
+        seg_list = []
+        for i in range(batch_size):
+            cur_mask = pred_mask[i]
+            cur_seg = pred_seg[i]
+            masked = cur_mask > thresh
+            seg_pc = cur_seg[:, masked]
+            seg_pc = seg_pc.transpose(0, 1)
+            seg_list.append(seg_pc)
+        
+        return seg_list
+
+    def get_pose(self, sv_output):
+        """
+        output: list of joint location, list of joint rotation
+        """
+        batch_size = sv_output.shape[0]
+        pred_loc = sv_output[:, self.mask_end:self.loc_end, :, :].clone().requires_grad_(True)
+        pred_rot = sv_output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
+        pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
+        conf = sv_output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
+
+        pred_loc = self.vote(pred_loc, conf, pred_mask)
+        pred_rot = self.vote(pred_rot, conf, pred_mask) # axis-angle representation for the joint
+        
+        loc_list = []
+        rot_list = []
+
+        for i in range(batch_size):
+            loc = pred_loc[i].clone().requires_grad_(True)
+            rot = pred_rot[i].clone().requires_grad_(True)
+            loc_list.append(loc)
+            rot_list.append(rot)
+        return loc_list, rot_list

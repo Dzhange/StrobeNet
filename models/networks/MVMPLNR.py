@@ -15,7 +15,7 @@ from utils.DataUtils import *
 from utils.lbs import *
 import trimesh, mcubes
 
-class ModelMLNRNet(ModelLNRNET):
+class ModelMVMPLNRNet(ModelLNRNET):
 
     def __init__(self, config):
         super().__init__(config)
@@ -117,7 +117,7 @@ class ModelMLNRNet(ModelLNRNET):
             for view_id in range(self.view_num):
 
                 segnet_output = output_recon[0]
-                self.save_img(net_input['color00'][view_id], segnet_output[view_id][:, 0:4, :, :], target['nox00'][view_id][:, 0:4, :, :], i, view_id=view_id)
+                self.save_img(net_input['color00'][view_id], segnet_output[view_id][:, 0:4, :, :], target['nox00'][view_id][:, 0:4, :, :], i)
 
                 self.gen_NOCS_pc(segnet_output[view_id][:, 0:3, :, :], target['nox00'][view_id][:, 0:3, :, :], \
                     target['nox00'][view_id][:, 3, :, :], "nocs", i)

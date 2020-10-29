@@ -360,14 +360,13 @@ class ModelLNRNET(ModelSegLBS):
     def visualize_confidence(self, output, frame_id, view_id=0):
         
         # bone_num = self.bone_num
-        # H, W
-        conf_maps = output[:, self.net.skin_end:self.net.conf_end, :, :].sigmoid().cpu().detach().squeeze().numpy()        
-
+        # H, W        
+        conf_maps = output[:, self.net.skin_end:self.net.conf_end, :, :].sigmoid().cpu().detach().squeeze().numpy()                
         for i in range(self.bone_num):
-            conf_map = conf_maps[:, i]
+            conf_map = conf_maps[i] # squeezed
             scale = conf_map.max() - conf_map.min()
             # print(conf_map.max(), conf_map.min())
             if scale != 0:
                 conf_map /= scale
-            conf_map *= 255
+            conf_map *= 255            
             cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_conf.png').format(str(frame_id).zfill(3), view_id), conf_map)
