@@ -23,6 +23,24 @@ def get_path_by_frame(frame_path, view_id, target_str, suffix):
 def short_pad(n):
     return str(int(n)).zfill(2)
 
+def write_off(path, pc):    
+    if os.path.exists(path):
+        os.remove(path)
+
+    with open(path, 'a') as f1:
+        for i in range(pc.shape[0]):
+            p = pc[i]            
+            f1.write("{} {} {}\n".format(p[0], p[1], p[2]))
+    f1.close()
+
+def write(path, joint):
+    if os.path.exists(path):
+        os.remove(path)
+    f = open(path, "a")
+    for i in range(joint.shape[0]):
+        p = joint[i]
+        f.write("{:6f} {:6f} {:6f}\n".format(p[0], p[1], p[2]))
+    f.close()
 
 def DL2LD(DL):
     """

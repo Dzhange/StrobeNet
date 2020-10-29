@@ -385,6 +385,8 @@ class MVMPLoss(PMLoss):
         crr = {}
         crr['crr-idx-mtx'] = target.pop('crr-idx-mtx', None)
         crr['crr-mask-mtx'] = target.pop('crr-mask-mtx', None)
+        
+        cano_occ = target.pop('cano_occupancies') # TODO
 
         target_list = DL2LD(target)
         segnet_output = output[0]
@@ -418,12 +420,12 @@ class MVMPLoss(PMLoss):
             mv_loss[k] /= view_num
 
         if not self.config.STAGE_ONE:
-            ifnet_output = output[1]
-            recon_loss = self.recon_loss(ifnet_output, target_list[0])
+            pn_recon = output[1]
+            recon_loss = self.recon_loss(pn_recon, cano_occ)
 
             posed_recons = output[2]
-            for i in range(len(view_num)):
-                posed_recon_loss = self.recon_loss(posed_recons[i], target_list[0])
+            for i in range(view_num):
+                posed_recon_loss = self.recon_loss(posed_recons[i], target_list[i]['occupancies'])
                 recon_loss += posed_recon_loss
             
             recon_loss /= (view_num + 1)
@@ -432,7 +434,15 @@ class MVMPLoss(PMLoss):
         mv_loss = self.add_up(mv_loss)
 
         return mv_loss
-
+        
+    def recon_loss(self, recon, occ):
+        
+        # out = (B,num_points) by componentwise comparing vecots of size num_samples :)
+        occ_loss = nn.functional.binary_cross_entropy_with_logits(
+                recon, occ, reduction='none')
+        num_sample = occ_loss.shape[1]
+        occ_loss = occ_loss.sum(-1).mean() / num_sample
+        return occ_loss
 #  _p1_list, _p2_list, _m_list = [], [], []
 
 # for base_view_id in range(len(pack['crr-idx-mtx'])):

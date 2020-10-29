@@ -189,6 +189,7 @@ class MLNRNet(LNRNet):
         pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
         pred_seg = sv_output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
         
+        pred_mask = pred_mask.sigmoid().squeeze(1)
         seg_list = []
         for i in range(batch_size):
             cur_mask = pred_mask[i]
@@ -209,6 +210,7 @@ class MLNRNet(LNRNet):
         pred_rot = sv_output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
         pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
         conf = sv_output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
+        pred_mask = pred_mask.sigmoid().squeeze(1)
 
         pred_loc = self.vote(pred_loc, conf, pred_mask)
         pred_rot = self.vote(pred_rot, conf, pred_mask) # axis-angle representation for the joint

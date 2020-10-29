@@ -11,13 +11,13 @@ from sklearn.neighbors import NearestNeighbors
 
 FileDirPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(FileDirPath, '..'))
-from loaders.MVSAPIENDataset import MVSAPIENDataset
+from loaders.MVSAPIENDataset import MVSPDataset
 from utils.DataUtils import *
 
-class MVMPDataset(MVSAPIENDataset):
+class MVMPDataset(MVSPDataset):
 
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, train):
+        super().__init__(config, train)
 
     def __getitem__(self, idx):        
         data_list = []

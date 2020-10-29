@@ -8,7 +8,7 @@ import shutil
 import glob
 import torch
 import torch.nn as nn
-from models.networks.MLNRNet import MLNRNet
+from models.networks.MVMPLNRNet import MVMPLNRNet
 from models.LNR import ModelLNRNET
 from models.SegLBS import ModelSegLBS
 from utils.DataUtils import *
@@ -23,7 +23,7 @@ class ModelMVMPLNRNet(ModelLNRNET):
     
     def init_net(self, device):        
         config = self.config
-        self.net = MLNRNet(config, device=device)
+        self.net = MVMPLNRNet(config, device=device)
         self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr,
                                           betas=(self.config.ADAM_BETA1, self.config.ADAM_BETA2))        
         if config.NRNET_PRETRAIN:
@@ -54,9 +54,13 @@ class ModelMVMPLNRNet(ModelLNRNET):
             10. scale
         """
         no_compute_item = ['mesh', 'iso_mesh', 'crr-idx-mtx', 'crr-mask-mtx']
-        input_items = ['color00', 'grid_coords', 'translation', 'scale']
-        target_items = ['nox00', 'pnnocs00', 'joint_map', 'linkseg', 'occupancies', 'pose']
-        
+
+        input_items = ['color00', 'grid_coords', 'translation', 'scale', \
+                        'cano_grid_coords', 'cano_translation', 'cano_scale']
+
+        target_items = ['nox00', 'pnnocs00', 'joint_map', 'linkseg', 'pose',\
+                        'occupancies', 'cano_occupancies']
+
         inputs = {}
         targets = {}
 
@@ -65,7 +69,10 @@ class ModelMVMPLNRNet(ModelLNRNET):
             if k in no_compute_item:
                 targets[k] = data[k][0] # data['mesh] = [('p1','p2')]
             else:
-                ondevice_data = [item.to(device=device) for item in data[k]]
+                if isinstance(data[k],list):
+                    ondevice_data = [item.to(device=device) for item in data[k]]
+                else:
+                    ondevice_data = data[k].to(device=device)
                 if k in input_items:
                     inputs[k] = ondevice_data
                 if k in target_items:
@@ -74,7 +81,7 @@ class ModelMVMPLNRNet(ModelLNRNET):
 
 
     def validate(self, val_dataloader, objective, device):
-
+        pass
         self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
         if os.path.exists(self.output_dir) == False:
             os.makedirs(self.output_dir)

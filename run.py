@@ -12,6 +12,7 @@ from loaders.HandDatasetLBS import HandDatasetLBS
 from loaders.HandOccDataset import HandOccDataset
 from loaders.SAPIENDataset import SAPIENDataset
 from loaders.MVSAPIENDataset import MVSPDataset
+from loaders.MVMPDataset import MVMPDataset
 
 # from inout.logger import get_logger
 from models.NOCS import ModelNOCS
@@ -21,6 +22,8 @@ from models.SegLBS import ModelSegLBS
 from models.PMLBS import PMLBS
 from models.LNR import ModelLNRNET
 from models.MLNR import ModelMLNRNet
+from models.MVMPLNR import ModelMVMPLNRNet
+
 from models.loss import *
 from models.sapien_loss import *
 # from core.coach import Coach
@@ -40,7 +43,7 @@ task = cfg.TASK
 def get_loaders(Dataset):
     for mode in cfg.MODES:
   
-        if task in ["lnrnet", 'mlnrnet']:
+        if task in ["lnrnet", 'mlnrnet', 'mvmp']:
             phase_dataset = Dataset(config=cfg, train=mode in ['train'] or cfg.TEST_ON_TRAIN)
         else:
             phase_dataset = Dataset(root=cfg.DATASET_ROOT,
@@ -93,7 +96,11 @@ if __name__ == "__main__":
         Dataset = MVSPDataset
         objective = MVPMLoss(cfg)
         Model = ModelMLNRNet(cfg)
-    
+    if task == "mvmp":
+        Dataset = MVMPDataset
+        objective = MVMPLoss(cfg)
+        Model = ModelMVMPLNRNet(cfg)
+        
     get_loaders(Dataset)
     device = torch.device(cfg.GPU)
     print("[ INFO ] Running on device ", device)

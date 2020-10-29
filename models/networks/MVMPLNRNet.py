@@ -20,12 +20,14 @@ import utils.tools.implicit_waterproofing as iw
 from utils.lbs import *
 from utils.tools.voxels import VoxelGrid
 from utils.tools.pc2voxel import voxelize as pc2vox
-from utils.DataUtils import DL2LD, LD2DL
+from utils.DataUtils import *
 
-class MVMPLNRNet(LNRNet):
+class MVMPLNRNet(MLNRNet):
 
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, device):
+        super().__init__(config, device=device)
+        # self.aggr_scatter = config.AGGR_SCATTER
+        # self.view_num = config.VIEW_NUM
         assert self.aggr_scatter
 
     def forward(self, inputs):
@@ -52,8 +54,7 @@ class MVMPLNRNet(LNRNet):
                      'scale':inputs['scale']}
             transform_list = DL2LD(transform)
         else:
-            transform_list = None
-
+            transform_list = None        
         ##### lifting, iterate through all views #####
         output_list = []        
         for i in range(len(img_list)):
@@ -66,6 +67,7 @@ class MVMPLNRNet(LNRNet):
 
             if not self.config.STAGE_ONE:
                 # sv_pc_list, sv_feature_list contrains pc from the same view_id in all batches
+                # pc in sv_pn_pc_list are transformed and added offset for discrestization
                 sv_pn_pc_list, sv_feature_list = self.lift(sv_output, nocs_feature, transform_list[i])
                 sv_seg_list = self.get_seg_pc(sv_output)
                 sv_loc_list, sv_rot_list = self.get_pose(sv_output)
@@ -94,18 +96,21 @@ class MVMPLNRNet(LNRNet):
 
                 posed_occupancy_list = []
                 for posed_pc in inst_posed_pc_list:
-                    posed_occupancy = self.discretize(inst_pn_pc, inst_feature, self.resolution)
+                    # print(posed_pc.shape)
+                    write_off('/workspace/debug_0.xyz', posed_pc[0].cpu().detach().numpy())
+                    exit()
+                    posed_occupancy = self.discretize(posed_pc, inst_feature, self.resolution)
                     posed_occupancy_list.append(posed_occupancy)
                         
             # self.visualize(occupancies)
             # and then feed into IF-Net. The ground truth shouled be used in the back projection
             pn_occupancies = torch.stack(tuple(pn_occupancy_list))
-            pn_grid_coords = inputs['cano_grid_coords'][0]
+            pn_grid_coords = inputs['cano_grid_coords']
             pn_recon = self.IFNet(pn_grid_coords, pn_occupancies)
             
             posed_recon_list = []            
             for view_id, posed_occupancy in enumerate(posed_occupancy_list):
-                grid_coords = inputs['cano_grid_coords'][view_id]
+                grid_coords = inputs['grid_coords'][view_id]
                 posed_recon = self.IFNet(grid_coords, pn_occupancies)
                 posed_recon_list.append(posed_recon)
                 
@@ -140,7 +145,8 @@ class MVMPLNRNet(LNRNet):
             cur_seg = mv_seg_list[view][batch_id]
             # cur_feature = mv_feature_list[view][batch_id]
             if cur_pc is not None:
-                inst_pn_pc_list.append(cur_pc)
+                # input with shape (3, N)
+                inst_pn_pc_list.append(cur_pc.transpose(0, 1))
                 inst_seg_list.append(cur_seg)
                 inst_loc_list.append(cur_loc)
                 inst_rot_list.append(cur_rot)
@@ -150,14 +156,17 @@ class MVMPLNRNet(LNRNet):
             # inst_pn_pc = None
             # inst_feature = None
         else:
-            inst_pn_pc = torch.cat(tuple(inst_pn_pc_list), dim=1)
-            inst_seg = torch.cat(tuple(inst_seg_list), dim=1)
+            inst_pn_pc = torch.cat(tuple(inst_pn_pc_list), dim=0)
+            inst_seg = torch.cat(tuple(inst_seg_list), dim=0)
             # inst_feature = torch.cat(tuple(inst_feature_list), dim=1)        
         
         posed_pc_list = []
         for i in range(len(inst_loc_list)):
             loc = inst_loc_list[i]
             rot = inst_loc_list[i]
+            write("debug_0_loc.xyz",loc)            
+            rot = -rot
+
             posed_pc = LNRNet.repose_pc(inst_pn_pc, inst_seg, loc, rot, joint_num=joint_num)
             posed_pc_list.append(posed_pc)
         
