@@ -22,8 +22,8 @@ if __name__ == "__main__":
     # with open(cache_path, 'rb') as fp:
         # frames = pickle.load(fp)
     import glob
-    paths = glob.glob("/workspace/Data/SAPIEN/eyeglasses/aug_scale_mpf_IF/*/*/*")      
-    p = Pool(mp.cpu_count() >> 2)
+    paths = glob.glob("/workspace/Data/SAPIEN/eyeglasses/aug_scale_mpf_uni/*/*/*")      
+    p = Pool(mp.cpu_count() >> 1)
     # p.map(recolor, frames)
     print(len(paths))
     p.map(remove, paths)

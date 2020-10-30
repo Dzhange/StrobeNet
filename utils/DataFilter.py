@@ -58,9 +58,9 @@ class DataFilter:
         self.pose_num = args.pose_per_actor
 
         self.transform = args.transform
-        if not self.transform:
-            print("[ ERROR ] not implemented yet")
-            exit()
+        # if not self.transform:
+        #     print("[ ERROR ] not implemented yet")
+        #     exit()
 
         self.SampleNum = 100000
         if self.sapien:
@@ -207,6 +207,7 @@ class DataFilter:
         translation = 0
         scale = 1
         try:
+            os.system("{} {} {} 10000".format("/workspace/Manifold/build/manifold", orig_mesh_path, orig_mesh_path))
             mesh = trimesh.load(orig_mesh_path, process=False)
             if self.transform:
                 # print("WRONG!!")
@@ -256,7 +257,7 @@ class DataFilter:
                     out_dir, "frame_" + Frame + '_boundary_{}_samples.npz'.format(sigma))
             else:
                 out_file = os.path.join(
-                    out_dir,"frame_{}_view_{}_boundary_{}_samples.npz".format(Frame, str(view_id).zfill(2), sigma))
+                    out_dir, "frame_{}_view_{}_boundary_{}_samples.npz".format(Frame, str(view_id).zfill(2), sigma))
 
             if os.path.exists(out_file):
                 if args.write_over:
@@ -271,7 +272,7 @@ class DataFilter:
             boundary_points = points + sigma * \
                 np.random.randn(self.SampleNum, 3)
             
-            # MUST DO THIS FOR grid_sample
+            # MUST DO THIS FOR grid
             grid_coords = boundary_points.copy()
             grid_coords[:, 0], grid_coords[:, 2] = boundary_points[:, 2], boundary_points[:, 0]
             grid_coords = 2 * grid_coords

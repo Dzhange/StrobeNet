@@ -43,6 +43,13 @@ class MVMPDataset(MVSPDataset):
             data.update(crr)
 
         return batch
+    
+    def get_sv_data(self, frame_path, view):
+        data = self.load_images(frame_path, view)
+        # occ = self.load_occupancies(frame_path) # for the wrongly trained model
+        occ = self.load_occupancies(frame_path, view)
+        data.update(occ)
+        return data
 
 if __name__ == '__main__':
     import argparse

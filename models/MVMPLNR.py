@@ -81,7 +81,7 @@ class ModelMVMPLNRNet(ModelLNRNET):
 
 
     def validate(self, val_dataloader, objective, device):
-        pass
+        # pass
         self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
         if os.path.exists(self.output_dir) == False:
             os.makedirs(self.output_dir)
@@ -180,3 +180,66 @@ class ModelMVMPLNRNet(ModelLNRNET):
                 # sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loss)
                 sys.stdout.flush()
             print("\n")
+
+    def gen_mesh(self, grid_points_split, data, frame_id):
+        
+        device = self.net.device
+        cano_logits_list = []
+        posed_logits_list = []
+        for i, points in enumerate(grid_points_split):
+            with torch.no_grad():
+                net_input, target = self.preprocess(data, device)
+                net_input['grid_coords'] = [points.to(device), ] * self.config.VIEW_NUM
+                net_input['cano_grid_coords'] = points.to(device)
+                output = self.net(net_input)
+                # self.save_img(net_input['RGB'], output[0], target['NOCS'], i)
+
+                # cano
+                cano_logits_list.append(output[1].squeeze(0).detach().cpu())
+
+                # posed
+                split_posed_logits = [occ.squeeze(0).detach().cpu() for occ in output[2]]
+                posed_logits_list.append(split_posed_logits)
+        
+        for j in range(self.config.VIEW_NUM):
+            mesh_logits = []
+            for i in range(len(grid_points_split)):
+                mesh_logits.append(posed_logits_list[i][j])
+            
+            logits = torch.cat(mesh_logits, dim=0).numpy()
+            mx = logits.max()
+            mn = logits.min()
+            # print(logits)
+            posed_mesh = self.mesh_from_logits(logits, self.net.resolution)
+            export_pred_path = os.path.join(self.output_dir, "frame_{}_view_{}_recon.off".format(str(frame_id).zfill(3), j))
+            # print("exported to ", export_pred_path)
+            posed_mesh.export(export_pred_path)
+
+            tar_grids = data['grid_coords'][j]
+            # print(tar_grids.shape)
+            export_gt_path = os.path.join(self.output_dir, "frame_{}_view_{}_gt.off".format(str(frame_id).zfill(3), j))
+            write_off(export_gt_path, tar_grids[0])
+            # gt_mesh = self.mesh_from_logits(tar_occ, self.net.resolution)
+            # export_gt_path = os.path.join(self.output_dir, "frame_{}_view_{}_gt.off".format(str(frame_id).zfill(3), j))
+            # gt_mesh.export(export_gt_path)
+
+
+
+        # generate predicted mesh from occupancy and save
+        logits = torch.cat(cano_logits_list, dim=0).numpy()
+        mx = logits.max()
+        mn = logits.min()
+        mesh = self.mesh_from_logits(logits, self.net.resolution)
+        export_pred_path = os.path.join(self.output_dir, "frame_{}_recon.off".format(str(frame_id).zfill(3)))
+        mesh.export(export_pred_path)
+
+        # Copy ground truth in the val results
+        export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.off".format(str(frame_id).zfill(3)))
+        # print(target['mesh'][0])
+        shutil.copyfile(target['iso_mesh'][0], export_gt_path)
+
+        if self.config.TRANSFORM:
+            # Get the transformation into val results
+            export_trans_path = os.path.join(self.output_dir, "frame_{}_trans.npz".format(str(frame_id).zfill(3)))
+            trans_path = target['iso_mesh'][0].replace("isosurf_scaled.off", "transform.npz")
+            shutil.copyfile(trans_path, export_trans_path)

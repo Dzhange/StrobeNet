@@ -426,6 +426,7 @@ class MVMPLoss(PMLoss):
             posed_recons = output[2]
             for i in range(view_num):
                 posed_recon_loss = self.recon_loss(posed_recons[i], target_list[i]['occupancies'])
+                # print(posed_recon_loss)
                 recon_loss += posed_recon_loss
             
             recon_loss /= (view_num + 1)
@@ -437,6 +438,7 @@ class MVMPLoss(PMLoss):
         
     def recon_loss(self, recon, occ):
         
+        sm = occ.sum()
         # out = (B,num_points) by componentwise comparing vecots of size num_samples :)
         occ_loss = nn.functional.binary_cross_entropy_with_logits(
                 recon, occ, reduction='none')

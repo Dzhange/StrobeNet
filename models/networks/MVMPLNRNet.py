@@ -82,7 +82,8 @@ class MVMPLNRNet(MLNRNet):
         ##### aggregation, iterate through all instance #####
         # recon = None        
         if not self.config.STAGE_ONE:
-            pn_occupancy_list = []
+            pn_occupancy_list = [] # list for multi instance
+            batch_posed_occupancy_list = [] # value is list of multi view occupancy in each instance
             for i in range(batch_size):
                 # aggregatre pose normalized view in each batch
                 inst_pn_pc, inst_feature = self.collect_pc(mv_pn_pc_list, mv_feature_list, batch_id=i)
@@ -94,24 +95,32 @@ class MVMPLNRNet(MLNRNet):
                 inst_posed_pc_list = self.pose_union(mv_pn_pc_list, mv_seg_list, mv_loc_list, mv_rot_list,\
                                                          joint_num=self.joint_num, batch_id=i)
 
-                posed_occupancy_list = []
+                posed_occupancy_list = [] # value is occupancy of multi view of 1 instance
+                # print((inst_posed_pc_list[0] - inst_posed_pc_list[1]).sum())
                 for posed_pc in inst_posed_pc_list:
                     # print(posed_pc.shape)
-                    write_off('/workspace/debug_0.xyz', posed_pc[0].cpu().detach().numpy())
-                    exit()
+                    # write_off('/workspace/debug_0.xyz', posed_pc.transpose(0, 1).cpu().detach().numpy())
+                    # exit()
                     posed_occupancy = self.discretize(posed_pc, inst_feature, self.resolution)
                     posed_occupancy_list.append(posed_occupancy)
-                        
+                batch_posed_occupancy_list.append(posed_occupancy_list)
+
             # self.visualize(occupancies)
             # and then feed into IF-Net. The ground truth shouled be used in the back projection
             pn_occupancies = torch.stack(tuple(pn_occupancy_list))
             pn_grid_coords = inputs['cano_grid_coords']
             pn_recon = self.IFNet(pn_grid_coords, pn_occupancies)
-            
-            posed_recon_list = []            
-            for view_id, posed_occupancy in enumerate(posed_occupancy_list):
+
+                        
+            posed_recon_list = []
+            for view_id in range(self.view_num):
+                view_occ = []
+                # accumulate across batch
+                for b_id in range(batch_size):
+                    view_occ.append(batch_posed_occupancy_list[b_id][view_id])
+                one_pose_occ = torch.stack(tuple(pn_occupancy_list))
                 grid_coords = inputs['grid_coords'][view_id]
-                posed_recon = self.IFNet(grid_coords, pn_occupancies)
+                posed_recon = self.IFNet(grid_coords, one_pose_occ)
                 posed_recon_list.append(posed_recon)
                 
         return output_list, pn_recon, posed_recon_list
@@ -163,11 +172,13 @@ class MVMPLNRNet(MLNRNet):
         posed_pc_list = []
         for i in range(len(inst_loc_list)):
             loc = inst_loc_list[i]
-            rot = inst_loc_list[i]
-            write("debug_0_loc.xyz",loc)            
+            rot = inst_rot_list[i]
+            # write("/workspace/debug_0_loc.xyz",loc)
+            # write("/workspace/debug_0_rot.xyz",rot)
             rot = -rot
 
             posed_pc = LNRNet.repose_pc(inst_pn_pc, inst_seg, loc, rot, joint_num=joint_num)
+            posed_pc = posed_pc[0].transpose(1, 0)
             posed_pc_list.append(posed_pc)
         
         return posed_pc_list

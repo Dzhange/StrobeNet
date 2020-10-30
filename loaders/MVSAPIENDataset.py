@@ -173,7 +173,7 @@ class MVSPDataset(SAPIENDataset):
                 boundary_samples_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
                                                     self.occ_load_str[i] + '.npz')
             else:
-                boundary_samples_path = os.path.join(data_dir, "frame_{}_view_{}_{}.npz".format(index_of_frame, view_id, self.occ_load_str[i]))
+                boundary_samples_path = os.path.join(data_dir, "frame_{}_view_{}_{}.npz".format(index_of_frame, str(view_id).zfill(2), self.occ_load_str[i]))
             boundary_samples_npz = np.load(boundary_samples_path)
             boundary_sample_points = boundary_samples_npz['points']
             boundary_sample_coords = boundary_samples_npz['grid_coords']
@@ -191,7 +191,7 @@ class MVSPDataset(SAPIENDataset):
             gt_mesh_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
                                                     "isosurf_scaled.off")
         else:
-            gt_mesh_path = os.path.join(data_dir, "frame_{}_view_{}_isosurf_scaled.off".format(index_of_frame, view_id))
+            gt_mesh_path = os.path.join(data_dir, "frame_{}_view_{}_isosurf_scaled.off".format(index_of_frame, str(view_id).zfill(2)))
         # None of the if-data would be needed if in validation mode
         if_data = {
             'grid_coords':np.array(coords, dtype=np.float32),
@@ -204,7 +204,7 @@ class MVSPDataset(SAPIENDataset):
             if view_id is None:
                 transform_path = os.path.join(data_dir, "frame_" + index_of_frame + '_transform.npz')        
             else:
-                transform_path = os.path.join(data_dir, "frame_{}_view_{}_transform.npz".format(index_of_frame, view_id))                
+                transform_path = os.path.join(data_dir, "frame_{}_view_{}_transform.npz".format(index_of_frame, str(view_id).zfill(2)))                
             nocs_transform = {}
             nocs_transform['translation'] = np.load(transform_path)['translation']
             nocs_transform['scale'] = np.load(transform_path)['scale']
@@ -261,7 +261,8 @@ class MVSPDataset(SAPIENDataset):
         # cur_mask = out_mask[i].squeeze()
         # masked = cur_mask > threshold
         # point_cloud = pred_nocs[i, :, masked]
-                
+        crr_len = self.supervision_cap
+
         q_pc_list = [query_view[:, query_mask.squeeze() > 0].permute(1, 0).numpy()
                      for query_view, query_mask in zip(query_pc_list, query_mask_list)]
         b_pc = base_pc[:, base_mask.squeeze() > 0].permute(1, 0).numpy()
@@ -276,28 +277,30 @@ class MVSPDataset(SAPIENDataset):
             _idx = indices.ravel()
             _mask = (_min_d < th).astype(np.float)
             # make sure the output is in the same size
-            index = np.zeros((self.supervision_cap, 1))
-            mask = np.zeros((self.supervision_cap, 1)).astype(np.float)
-            min_d = np.zeros((self.supervision_cap, 1)).astype(np.float)
+            index = np.zeros((crr_len, 1))
+            mask = np.zeros((crr_len, 1)).astype(np.float)
+            min_d = np.zeros((crr_len, 1)).astype(np.float)
 
-            crr_idx = np.where(_min_d < th)[0]
+            # crr_idx = np.where(_min_d < th)[0] # here crr_idx stores the index
 
-            if crr_idx.shape[0] > self.supervision_cap:
+            if len(q_pc) > self.supervision_cap:
                 samples = np.random.choice(crr_idx.shape[0], self.supervision_cap, replace=False)
-                crr_idx = crr_idx[samples]
+                
+                
+            # crr_idx = crr_idx[samples]
+            
+            # num_crr = len(crr_idx)
 
-            num_crr = len(crr_idx)            
-
-            # here we store no more than self.cap pairs
-            _idx = _idx[crr_idx]
-            _mask = _mask[crr_idx]
-            _min_d = _min_d[crr_idx]
+            # # here we store no more than self.cap pairs
+            # _idx = _idx[crr_idx]
+            # _mask = _mask[crr_idx]
+            # _min_d = _min_d[crr_idx]
             
             # # for current use we choose uniform sample
-            # sampled_idx = crr_idx[random_index]            
-            index[:num_crr, 0] = _idx
-            mask[:num_crr, 0] = _mask
-            min_d[:num_crr, 0] = _min_d
+            # sampled_idx = crr_idx[random_index]
+            index[:crr_len, 0] = _idx
+            mask[:crr_len, 0] = _mask
+            min_d[:crr_len, 0] = _min_d
             index_list.append(index.astype(np.int))
             mask_list.append(mask.astype(np.float))
             min_dis_list.append(min_d.astype(np.float))
