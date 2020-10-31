@@ -36,6 +36,9 @@ class L2Loss(nn.Module):
             loss = torch.sum(loss) / non_zero_count
         return loss
 
+
+
+
 class LPMaskLoss(nn.Module):
     Thresh = 0.7 # PARAM
     def __init__(self, Thresh=0.7, MaskWeight=0.7, ImWeight=0.3, P=2): # PARAM

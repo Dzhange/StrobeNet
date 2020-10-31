@@ -80,7 +80,9 @@ class MVMPLNRNet(MLNRNet):
                     mv_rot_list.append(sv_rot_list)
 
         ##### aggregation, iterate through all instance #####
-        # recon = None        
+        pn_recon = None    
+        posed_recon_list = []
+            
         if not self.config.STAGE_ONE:
             pn_occupancy_list = [] # list for multi instance
             batch_posed_occupancy_list = [] # value is list of multi view occupancy in each instance
@@ -112,13 +114,14 @@ class MVMPLNRNet(MLNRNet):
             pn_recon = self.IFNet(pn_grid_coords, pn_occupancies)
 
                         
-            posed_recon_list = []
+            
             for view_id in range(self.view_num):
                 view_occ = []
                 # accumulate across batch
                 for b_id in range(batch_size):
                     view_occ.append(batch_posed_occupancy_list[b_id][view_id])
-                one_pose_occ = torch.stack(tuple(pn_occupancy_list))
+                one_pose_occ = torch.stack(tuple(view_occ))
+                # self.visualize(one_pose_occ)
                 grid_coords = inputs['grid_coords'][view_id]
                 posed_recon = self.IFNet(grid_coords, one_pose_occ)
                 posed_recon_list.append(posed_recon)

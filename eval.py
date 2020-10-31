@@ -20,11 +20,15 @@ class evaluator():
             os.path.join(self.input_dir, "*" + self.gt_occ_postfix)
         )
         self.gt_occ_paths.sort()
+
         self.pred_occ_paths = glob.glob(
             os.path.join(self.input_dir, "*" + self.pred_occ_postfix)
         )       
         self.pred_occ_paths.sort()
 
+
+        self.gt_occ_paths = [path for path in self.gt_occ_paths if "view" not in path]
+        self.pred_occ_paths = [path for path in self.pred_occ_paths if "view" not in path]
         assert len(self.gt_occ_paths) == len(self.pred_occ_paths)
         self.data_num = len(self.gt_occ_paths)
 

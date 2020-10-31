@@ -1,0 +1,25 @@
+##################################################################################################
+# Oct 20
+# DATASET_ROOT: '/workspace/Data/SAPIEN/laptop/laptop_nocs_500_30_full_IF'
+# this mode runs good! let's just see how it perform
+
+DATASET_ROOT: '/workspace/Data/SAPIEN/eyeglasses/aug_scale_mpf_uni'
+OUTPUT_DIR: '/workspace/dev_nrnocs/output/expt/'
+VIEW_NUM: 2
+
+BATCHSIZE: 1
+DATALOADER_WORKERS: 4
+EPOCH_TOTAL: 20
+
+DATA_LIMIT: 100
+VAL_DATA_LIMIT: 5
+EXPT_NAME: "occ"
+
+GPU: 7
+TEST_ON_TRAIN: False
+
+###################################################
+MODES: ['train','val']
+# MODES: ['val']
+LR: 1e-4
+

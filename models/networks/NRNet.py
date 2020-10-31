@@ -110,7 +110,7 @@ class NRNet(nn.Module):
         out_mask = output[:, -1, :, :].clone().requires_grad_(True)
         sigmoid = nn.Sigmoid()
         out_mask = sigmoid(out_mask)
-        threshold = 0.75
+        threshold = 0.7
         pred_nocs = output[:, :-1, :, :].clone().requires_grad_(True)
 
         valid = out_mask > threshold

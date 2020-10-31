@@ -153,7 +153,7 @@ class LNRNet(nn.Module):
         """
         sigmoid = nn.Sigmoid()
         pred_mask = sigmoid(pred_mask).squeeze(1)
-        threshold = 0.75
+        threshold = 0.7
         valid = pred_mask > threshold
         batch_size = pred_mask.shape[0]
         # masked_nocs = torch.where(torch.unsqueeze(valid, 1),\
@@ -286,7 +286,7 @@ class LNRNet(nn.Module):
             mask: H, W
         """
         
-        thresh = 0.75
+        thresh = 0.7
         masked = mask > thresh
         # t1 = time()        
         NOX_pc = NOX[:, masked]
@@ -392,7 +392,7 @@ class LNRNet(nn.Module):
             mask: H, W
         """
         
-        thresh = 0.75        
+        thresh = 0.7        
         masked = mask.reshape(-1) > thresh
 
         # t1 = time()
@@ -511,7 +511,7 @@ class LNRNet(nn.Module):
         out_mask = output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
         sigmoid = nn.Sigmoid()
         out_mask = sigmoid(out_mask)
-        threshold = 0.75
+        threshold = 0.7
 
         if self.config.REPOSE:
             pred_nocs = output[:, -3:, :, :].clone().requires_grad_(True)

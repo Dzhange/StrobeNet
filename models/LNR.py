@@ -243,7 +243,7 @@ class ModelLNRNET(ModelSegLBS):
         mask_prob = torch2np(mask.squeeze())
         output = torch2np(torch.squeeze(output)) * 255
         target = torch2np(torch.squeeze(target)) * 255
-        target[mask_prob <= 0.75] = 255
+        target[mask_prob <= 0.7] = 255
         
         cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_{}_00gt.png').format(str(i).zfill(3), view_id, target_str),
                     cv2.cvtColor(target, cv2.COLOR_BGR2RGB))
@@ -290,8 +290,8 @@ class ModelLNRNET(ModelSegLBS):
         pred_nocs_map = torch2np(torch.squeeze(pred_nocs_map))
         tar_nocs_map = torch2np(torch.squeeze(tar_nocs_map))
 
-        pred_nocs = pred_nocs_map[mask_prob > 0.75]
-        tar_nocs = tar_nocs_map[mask_prob > 0.75]
+        pred_nocs = pred_nocs_map[mask_prob > 0.7]
+        tar_nocs = tar_nocs_map[mask_prob > 0.7]
 
         tar_nocs_path = os.path.join(self.output_dir, 'frame_{}_view_{}_{}_00gt.xyz').format(str(i).zfill(3), view_id, target_str)
         pred_nocs_path = os.path.join(self.output_dir, 'frame_{}_view_{}_{}_01pred.xyz').format(str(i).zfill(3), view_id, target_str)
@@ -351,7 +351,7 @@ class ModelLNRNET(ModelSegLBS):
         pn_path = os.path.join(self.output_dir, 'frame_{}_{}_00gt.xyz').format(str(i).zfill(3), target_str)
         nox_path = os.path.join(self.output_dir, 'frame_{}_{}_01orig.xyz').format(str(i).zfill(3), target_str)
 
-        nocs_pc = tar_nocs[:,  tar_mask > 0.75].transpose(0, 1)
+        nocs_pc = tar_nocs[:,  tar_mask > 0.7].transpose(0, 1)
 
         write_off(pn_path, pnnocs_pc[0])
         # write_off(pn_path, pnnocs_pc)

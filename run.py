@@ -24,6 +24,8 @@ from models.LNR import ModelLNRNET
 from models.MLNR import ModelMLNRNet
 from models.MVMPLNR import ModelMVMPLNRNet
 
+from models.im2mesh.onet.models import OccupancyNetwork
+
 from models.loss import *
 from models.sapien_loss import *
 # from core.coach import Coach
@@ -100,7 +102,12 @@ if __name__ == "__main__":
         Dataset = MVMPDataset
         objective = MVMPLoss(cfg)
         Model = ModelMVMPLNRNet(cfg)
-        
+    ####################################
+    if task == "onet":
+        Dataset = MVMPDataset
+        objective = MVMPLoss(cfg)
+        Model = ModelMVMPLNRNet(cfg)
+
     get_loaders(Dataset)
     device = torch.device(cfg.GPU)
     print("[ INFO ] Running on device ", device)

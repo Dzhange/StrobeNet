@@ -11,7 +11,7 @@ import torch.optim as optim
 import torch_scatter
 from models.networks.MVTHSegNet import MVTHSegNet
 from models.networks.TripleHeadSegNet import THSegNet
-from models.networks.IFNet import SVR
+from models.networks.IFNet import SVR, SuperRes
 from models.networks.ShallowIFNet import ShallowSVR
 from models.networks.LNRNet import LNRNet
 from time import time
@@ -36,8 +36,11 @@ class MLNRNet(LNRNet):
         self.SegNet.to(self.device)
         if self.config.IF_SHALLOW:
             self.IFNet = ShallowSVR(self.config, self.device)
+        if self.config.SUPER_RES:
+            self.IFNet = SuperRes(self.config, self.device)
         else:
             self.IFNet = SVR(self.config, self.device)
+        
         # if not self.config.PRED_FEATURE:
             # torch.backends.cudnn.enabled = False
 
@@ -184,7 +187,7 @@ class MLNRNet(LNRNet):
         output: list of seg array of shape (N_i, joint_num+2)        
         """
         batch_size = sv_output.shape[0]
-        thresh = 0.75
+        thresh = 0.7
 
         pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
         pred_seg = sv_output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)

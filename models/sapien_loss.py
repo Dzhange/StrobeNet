@@ -299,7 +299,7 @@ class PMLoss(nn.Module):
     def add_up(self, loss):
         
         all_loss = torch.zeros(1, device=loss['nox_loss'].device)
-        # print(loss)
+        print(loss)
         cfg = self.config
         all_loss = all_loss\
             + cfg.NOCS_LOSS * (loss['nox_loss'] + loss['mask_loss'])\
@@ -311,7 +311,8 @@ class PMLoss(nn.Module):
             all_loss += cfg.NOCS_LOSS * loss['pnnocs_loss']
         if cfg.STAGE_ONE == False:
             all_loss += cfg.RECON_LOSS * loss['recon_loss']
-
+        if cfg.CONSISTENCY != 0:
+            all_loss += cfg.CONSISTENCY * loss['crr_loss']
         # print("all loss is ", all_loss)
         # if all_loss > 3:
         #     print("error, outlier")
@@ -321,15 +322,17 @@ class MVPMLoss(PMLoss):
 
     def __init__(self, config):
         super().__init__(config)
-    
+        self.crr_l2 = JiahuiL2Loss()
+
     def forward(self, output, target):
         
         target.pop('mesh', None)
         target.pop('iso_mesh', None)
-        
+
         crr = {}
         crr['crr-idx-mtx'] = target.pop('crr-idx-mtx', None)
         crr['crr-mask-mtx'] = target.pop('crr-mask-mtx', None)
+        tar_mask = [nox[:, 3] for nox in target['nox00']]
 
         target_list = DL2LD(target)
         segnet_output = output[0]
@@ -366,22 +369,64 @@ class MVPMLoss(PMLoss):
             ifnet_output = output[1]
             mv_loss['recon_loss'] = self.recon_loss(ifnet_output, target_list[0])
         
+        if self.config.CONSISTENCY != 0:
+            mv_loss['crr_loss'] = self.crr_loss(segnet_output, tar_mask, crr)
+
         mv_loss = self.add_up(mv_loss)
 
         return mv_loss
 
+    def crr_loss(self, output_list, tar_mask, crr):        
+        """
+        We do this for each instance in batch
+        """        
+        batch_size = output_list[0].shape[0]
 
-class MVMPLoss(PMLoss):
+        for b_id in range(batch_size):
+            _p1_list, _p2_list, _m_list = [], [], []
+            for base_view_id in range(len(crr['crr-idx-mtx'])):
+                for query_view_id in range(len(crr['crr-idx-mtx'][base_view_id])):
+                    
+                    base_pn_map = output_list[base_view_id][b_id, -3:, ]
+                    base_pn_map = output_list[base_view_id][b_id, -3:, ]
+                    query_pn_map = output_list[base_view_id + query_view_id + 1][b_id, -3:, ]
+                    base_mask = tar_mask[base_view_id][b_id]
+                    query_mask = tar_mask[base_view_id + query_view_id + 1][b_id]
+                    
+                    base_pn_pc = base_pn_map[:, base_mask.squeeze() > 0].transpose(1, 0)
+                    query_pn_pc = query_pn_map[:, query_mask.squeeze() > 0].transpose(1, 0)
+
+                    # base_pc = pred_xyz_list[base_view_id]                    
+                    # query_pc = pred_xyz_list[base_view_id + query_view_id + 1]
+
+                    pair_idx = crr['crr-idx-mtx'][base_view_id][query_view_id][b_id]
+                    paired_pc_from_base_to_query = base_pn_pc[pair_idx]
+                    paired_pc_from_base_to_query = paired_pc_from_base_to_query.squeeze(0)
+                    # paired_pc_from_base_to_query = torch.gather(base_pn_pc.squeeze(3), dim=2,
+                    #                                             index=pair_idx.repeat(1, 3, 1)).unsqueeze(3)
+                    # write_off("/workspace/crr/pred_crr_0.xyz", query_pn_pc)
+                    # write_off("/workspace/crr/pred_crr_1.xyz", paired_pc_from_base_to_query)
+                    # exit()
+                    _p1_list.append(paired_pc_from_base_to_query)
+                    _p2_list.append(query_pn_pc)
+                    _m_list.append(crr['crr-mask-mtx'][base_view_id][query_view_id][b_id].squeeze())
+
+        crr_xyz_loss = self.crr_l2(torch.stack(_p1_list, dim=0).contiguous(),
+                                        torch.stack(_p2_list, dim=0).contiguous(),
+                                        torch.stack(_m_list, dim=0).contiguous().squeeze(), detach=False)
+        return crr_xyz_loss
+
+class MVMPLoss(MVPMLoss):
     
     def __init__(self, config):
         super().__init__(config)
-    
     
     def forward(self, output, target):
         
         target.pop('mesh', None)
         target.pop('iso_mesh', None)
-        
+        tar_mask = [nox[:, 3] for nox in target['nox00']]
+
         crr = {}
         crr['crr-idx-mtx'] = target.pop('crr-idx-mtx', None)
         crr['crr-mask-mtx'] = target.pop('crr-mask-mtx', None)
@@ -431,7 +476,11 @@ class MVMPLoss(PMLoss):
             
             recon_loss /= (view_num + 1)
             mv_loss['recon_loss'] = recon_loss
-        
+
+
+        if self.config.CONSISTENCY != 0:
+            mv_loss['crr_loss'] = self.crr_loss(segnet_output, tar_mask, crr)
+            
         mv_loss = self.add_up(mv_loss)
 
         return mv_loss
@@ -445,20 +494,3 @@ class MVMPLoss(PMLoss):
         num_sample = occ_loss.shape[1]
         occ_loss = occ_loss.sum(-1).mean() / num_sample
         return occ_loss
-#  _p1_list, _p2_list, _m_list = [], [], []
-
-# for base_view_id in range(len(pack['crr-idx-mtx'])):
-#     for query_view_id in range(len(pack['crr-idx-mtx'][base_view_id])):
-#         base_pc = pred_xyz_list[base_view_id]
-#         query_pc = pred_xyz_list[base_view_id + query_view_id + 1]
-
-#         pair_idx = pack['crr-idx-mtx'][base_view_id][query_view_id].squeeze(3)
-#         paired_pc_from_base_to_query = torch.gather(base_pc.squeeze(3), dim=2,
-#                                                     index=pair_idx.repeat(1, 3, 1)).unsqueeze(3)
-#         _p1_list.append(paired_pc_from_base_to_query)
-#         _p2_list.append(query_pc)
-#         _m_list.append(pack['crr-mask-mtx'][base_view_id][query_view_id])
-
-# crr_xyz_loss = self.ml2_criterion(torch.cat(_p1_list, dim=2).contiguous(),
-#                                     torch.cat(_p2_list, dim=2).contiguous(),
-#                                     torch.cat(_m_list, dim=2).contiguous(), detach=False)

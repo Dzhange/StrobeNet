@@ -53,13 +53,14 @@ class ModelMVMPLNRNet(ModelLNRNET):
             9. translation
             10. scale
         """
-        no_compute_item = ['mesh', 'iso_mesh', 'crr-idx-mtx', 'crr-mask-mtx']
+        no_compute_item = ['mesh', 'iso_mesh']
 
         input_items = ['color00', 'grid_coords', 'translation', 'scale', \
                         'cano_grid_coords', 'cano_translation', 'cano_scale']
 
         target_items = ['nox00', 'pnnocs00', 'joint_map', 'linkseg', 'pose',\
                         'occupancies', 'cano_occupancies']
+        crr_items = ['crr-idx-mtx', 'crr-mask-mtx']
 
         inputs = {}
         targets = {}
@@ -69,14 +70,18 @@ class ModelMVMPLNRNet(ModelLNRNET):
             if k in no_compute_item:
                 targets[k] = data[k][0] # data['mesh] = [('p1','p2')]
             else:
-                if isinstance(data[k],list):
-                    ondevice_data = [item.to(device=device) for item in data[k]]
+                if k in crr_items:
+                    # targets[k] = [[ii.float().permute(0, 2, 1).unsqueeze(3).to(device) for ii in item] for item in data[k]]
+                    targets[k] = [[ii.permute(0, 2, 1).to(device) for ii in item] for item in data[k]]                    
                 else:
-                    ondevice_data = data[k].to(device=device)
-                if k in input_items:
-                    inputs[k] = ondevice_data
-                if k in target_items:
-                    targets[k] = ondevice_data
+                    if isinstance(data[k],list):
+                        ondevice_data = [item.to(device=device) for item in data[k]]
+                    else:
+                        ondevice_data = data[k].to(device=device)
+                    if k in input_items:
+                        inputs[k] = ondevice_data
+                    if k in target_items:
+                        targets[k] = ondevice_data
         return inputs, targets
 
 

@@ -101,6 +101,7 @@ def get_default_cfg():
     cfg.CONSISTENCY = 0
     
     cfg.IF_SHALLOW = False
+    cfg.SUPER_RES = False
     cfg.IF_IN_DIM = 16
     cfg.CANO_IF = True # if set to True, we use only the canonical occupancy as supervision
 

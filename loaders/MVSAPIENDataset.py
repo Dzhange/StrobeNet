@@ -76,7 +76,6 @@ class MVSPDataset(SAPIENDataset):
                 # offset only works for overfitting task
                 self.frame_ids = self.frame_ids[self.data_offset:self.data_offset+dataset_length]
 
-
     def __len__(self):
         return len(self.frame_ids)
 
@@ -95,7 +94,7 @@ class MVSPDataset(SAPIENDataset):
         # TODO: also include pair-wise consistency data
         if self.config.CONSISTENCY != 0:
             crr = self.get_crr(batch)
-            data.update(crr)
+            batch.update(crr)
 
         return batch
 
@@ -277,16 +276,17 @@ class MVSPDataset(SAPIENDataset):
             _idx = indices.ravel()
             _mask = (_min_d < th).astype(np.float)
             # make sure the output is in the same size
-            index = np.zeros((crr_len, 1))
-            mask = np.zeros((crr_len, 1)).astype(np.float)
-            min_d = np.zeros((crr_len, 1)).astype(np.float)
+            index = np.zeros((len(q_pc), 1))
+            mask = np.zeros((len(q_pc), 1)).astype(np.float)
+            min_d = np.zeros((len(q_pc), 1)).astype(np.float)
 
             # crr_idx = np.where(_min_d < th)[0] # here crr_idx stores the index
 
-            if len(q_pc) > self.supervision_cap:
-                samples = np.random.choice(crr_idx.shape[0], self.supervision_cap, replace=False)
+            # if len(q_pc) > self.supervision_cap:
+                # samples = np.random.choice(crr_idx.shape[0], self.supervision_cap, replace=False)
                 
-                
+            # write_off("/workspace/crr/gt_crr_1.xyz", q_pc)
+            # write_off("/workspace/crr/gt_crr_0.xyz", b_pc[_idx])
             # crr_idx = crr_idx[samples]
             
             # num_crr = len(crr_idx)
@@ -298,9 +298,13 @@ class MVSPDataset(SAPIENDataset):
             
             # # for current use we choose uniform sample
             # sampled_idx = crr_idx[random_index]
-            index[:crr_len, 0] = _idx
-            mask[:crr_len, 0] = _mask
-            min_d[:crr_len, 0] = _min_d
+            index[:len(q_pc), 0] = _idx
+            mask[:len(q_pc), 0] = _mask
+            min_d[:len(q_pc), 0] = _min_d
+            # index = _idx
+            # mask = _mask
+            # min_d = _min_d
+
             index_list.append(index.astype(np.int))
             mask_list.append(mask.astype(np.float))
             min_dis_list.append(min_d.astype(np.float))
