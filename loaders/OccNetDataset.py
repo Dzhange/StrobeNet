@@ -36,7 +36,8 @@ class OccNetDataset(torch.utils.data.Dataset):
 
         # self.occ_load_str = ['boundary_0.1_samples', 'boundary_0.01_samples']
         self.occ_load_str = 'boundary_0.01_samples.npz'
-        self.num_sample_points = 1024        
+        # self.num_sample_points = 1024        
+        self.num_sample_points = 100000      
 
         self.shuffle_in_limit = True
 
@@ -111,7 +112,7 @@ class OccNetDataset(torch.utils.data.Dataset):
         if self.shuffle_in_limit:
             total_size = len(self)
             dataset_length = math.ceil((self.data_limit / 100) * total_size)
-            # DatasetLength = 10
+            dataset_length = 1
             step = int(np.floor(100 / self.data_limit))        
             sample_index = []
             cur_idx = 0
@@ -140,6 +141,7 @@ class OccNetDataset(torch.utils.data.Dataset):
         """
         frame = {}
         for k in self.frame_files:
+            # print(self.frame_files[k][idx])
             frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)                        
             frame[k] /= 255.0
         
@@ -163,7 +165,7 @@ class OccNetDataset(torch.utils.data.Dataset):
         # boundary_samples_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
         #                                         self.occ_load_str[i] + '.npz')
         boundary_samples_path = required_path.replace('color00.png', self.occ_load_str)
-
+        # print(boundary_samples_path)
         boundary_samples_npz = np.load(boundary_samples_path)
         boundary_sample_points = boundary_samples_npz['points']
         boundary_sample_coords = boundary_samples_npz['grid_coords']
@@ -180,7 +182,8 @@ class OccNetDataset(torch.utils.data.Dataset):
         gt_mesh_path = required_path.replace('color00.png', 'isosurf_scaled.off')            
         # None of the if-data would be needed if in validation mode
         if_data = {
-            'grid_coords':np.array(coords, dtype=np.float32),
+            # 'grid_coords':np.array(coords, dtype=np.float32),
+            'grid_coords':np.array(points, dtype=np.float32),
             'occupancies': np.array(occupancies, dtype=np.float32),
             'iso_mesh': gt_mesh_path
             }

@@ -7,16 +7,18 @@ DATASET_ROOT: '/workspace/Data/SAPIEN/eyeglasses/aug_scale_mpf_uni'
 OUTPUT_DIR: '/workspace/dev_nrnocs/output/expt/'
 VIEW_NUM: 2
 
-BATCHSIZE: 64
-DATALOADER_WORKERS: 8
-EPOCH_TOTAL: 20
+BATCHSIZE: 1
+DATALOADER_WORKERS: 1
+EPOCH_TOTAL: 2000
 
-DATA_LIMIT: 100
-VAL_DATA_LIMIT: 20
-EXPT_NAME: "occ"
+LR: 1e-4
+DATA_LIMIT: 1
+VAL_DATA_LIMIT: 1
+EXPT_NAME: "occ1"
 
 GPU: 7
-TEST_ON_TRAIN: False
+# TEST_ON_TRAIN: False
+TEST_ON_TRAIN: True
 
 ###################################################
 MODES: ['train','val']

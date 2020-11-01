@@ -59,9 +59,8 @@ class ModelONet(object):
         self.threshold = 0.5
         self.eval_sample = False
 
-    def init_net(self, device=None):        
-        config = self.config        
-        
+    def init_net(self, device=None):
+        config = self.config
         self.net = OccupancyNetwork(device=device)
         self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr,
                                         betas=(self.config.ADAM_BETA1, self.config.ADAM_BETA2),
@@ -162,8 +161,10 @@ class ModelONet(object):
         logits = self.net.decode(p, z, c).logits
         loss_i = F.binary_cross_entropy_with_logits(
             logits, occ, reduction='none')
-        loss = loss + loss_i.sum(-1).mean()
-        # print(loss_i.sum(-1).mean())
+        # loss = loss + loss_i.sum(-1).mean()
+        loss = loss_i.sum(-1).mean()
+
+        # print(loss_i.sum(-1).mean() / loss_i.shape[1])
         return loss
 
 
@@ -179,7 +180,9 @@ class ModelONet(object):
         loss = self.compute_loss(data)
         return loss
 
-    def eval_step(self, data):
+
+
+    def _eval_step(self, data):
         ''' Performs an evaluation step.
 
         Args:
