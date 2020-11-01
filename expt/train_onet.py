@@ -16,8 +16,8 @@ from utils.DataUtils import *
 def run(config):
 
     model = ModelONet(config)
-    train_dataset = OccNetDataset(root=config.DATASET_ROOT, train=True)
-    val_dataset = OccNetDataset(root=config.DATASET_ROOT, train=False)
+    train_dataset = OccNetDataset(root=config.DATASET_ROOT, train=True, limit=config.DATA_LIMIT)
+    val_dataset = OccNetDataset(root=config.DATASET_ROOT, train=False, limit=config.VAL_DATA_LIMIT)
     train_loader = DataLoader(train_dataset, batch_size=config.BATCHSIZE,
                                 shuffle=True,
                                 num_workers=config.DATALOADER_WORKERS, drop_last=True)
@@ -26,37 +26,62 @@ def run(config):
                                 num_workers=config.DATALOADER_WORKERS, drop_last=True)
 
 
+    model.setup_checkpoint(model.device)
+    
+    
     cur_epoch = 0
-    all_tic = getCurrentEpochTime()
+    all_tic = getCurrentEpochTime()    
     while cur_epoch < config.EPOCH_TOTAL:
-        cur_epoch += 1
-    #     scheduler.step()
-        tic = getCurrentEpochTime()
-        epoch_losses = [] # For all batches in an epoch
-        for i, batch in enumerate(train_loader):
-            
-            loss = model.train_step(batch)
-            epoch_losses.append(loss.item())
+        try:
+            cur_epoch += 1
+        #     scheduler.step()
+            tic = getCurrentEpochTime()
+            epoch_losses = [] # For all batches in an epoch
+        
+            for i, batch in enumerate(train_loader):
+                
+                loss = model.train_step(batch)
+                epoch_losses.append(loss.item())
 
-            toc = getCurrentEpochTime()
-            elapsed = math.floor((toc - tic) * 1e-6)
-            total_elapsed = math.floor((toc - all_tic) * 1e-6)
-            done = int(30 * (i+1) / len(train_loader))
-            # Compute ETA
-            time_per_batch = (toc - all_tic) / ((cur_epoch * len(train_loader)) + (i+1)) # Time per batch
-            ETA = math.floor(time_per_batch * config.EPOCH_TOTAL * len(train_loader) * 1e-6)
-            
-            progress_str = ('\r[{}>{}] epoch - {}/{}, {}th step train loss - {:.8f} | epoch - {}, total - {} ETA - {} |')\
-                                    .format('=' * done, '-' * (30 - done),
-                                            model.start_epoch + cur_epoch + 1,
-                                            model.start_epoch + config.EPOCH_TOTAL,
-                                            i,
-                                            np.mean(np.asarray(epoch_losses)),
-                                            getTimeDur(elapsed),
-                                            getTimeDur(total_elapsed),
-                                            getTimeDur(ETA-total_elapsed))
+                toc = getCurrentEpochTime()
+                elapsed = math.floor((toc - tic) * 1e-6)
+                total_elapsed = math.floor((toc - all_tic) * 1e-6)
+                done = int(30 * (i+1) / len(train_loader))
+                # Compute ETA
+                time_per_batch = (toc - all_tic) / ((cur_epoch * len(train_loader)) + (i+1)) # Time per batch
+                ETA = math.floor(time_per_batch * config.EPOCH_TOTAL * len(train_loader) * 1e-6)
+                
+                progress_str = ('\r[{}>{}] epoch - {}/{}, {}th step train loss - {:.8f} | epoch - {}, total - {} ETA - {} |')\
+                                        .format('=' * done, '-' * (30 - done),
+                                                model.start_epoch + cur_epoch + 1,
+                                                model.start_epoch + config.EPOCH_TOTAL,
+                                                i,
+                                                np.mean(np.asarray(epoch_losses)),
+                                                getTimeDur(elapsed),
+                                                getTimeDur(total_elapsed),
+                                                getTimeDur(ETA-total_elapsed))
 
-            print(progress_str)
+                sys.stdout.write(progress_str.ljust(100))
+                sys.stdout.flush()
+            
+            val_losses = []
+            for i, batch in enumerate(val_loader):                
+                loss = model.val_step(batch)
+                val_losses.append(loss.item())
+                val_loss_str = '\rmean val loss: {}'.format(np.mean(np.asarray(val_losses)))
+                sys.stdout.write(val_loss_str.ljust(100))
+                sys.stdout.flush()
+            model.val_loss_history.append(np.mean(np.asarray(val_losses)))                        
+        except (KeyboardInterrupt, SystemExit):
+            print('\n[ INFO ]: KeyboardInterrupt detected. Saving checkpoint.')
+            model.save_checkpoint(cur_epoch, time_string='eot', print_str='$'*3)
+            break
+        except Exception as error:
+            print(traceback.format_exc())
+            print('\n[ WARN ]: Exception detected. *NOT* saving checkpoint. {}'.format(error))
+            break
+
+    model.save_checkpoint(cur_epoch, time_string='eot', print_str='$'*3)
 
 
 

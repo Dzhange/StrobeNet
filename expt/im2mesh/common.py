@@ -1,6 +1,6 @@
 # import multiprocessing
 import torch
-from im2mesh.utils.libkdtree import KDTree
+# from im2mesh.utils.libkdtree import KDTree
 import numpy as np
 
 

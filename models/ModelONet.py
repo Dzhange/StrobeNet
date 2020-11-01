@@ -14,7 +14,7 @@ from models.loss import LBSLoss
 FileDirPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(FileDirPath, '..'))
 
-# from im2mesh.onet.models import OccupancyNetwork
+from expt.im2mesh.common import *
 
 from utils.DataUtils import *
 import time
@@ -56,7 +56,9 @@ class ModelONet(object):
         self.init_net(device=device)
         
         self.device = device
-    
+        self.threshold = 0.5
+        self.eval_sample = False
+
     def init_net(self, device=None):        
         config = self.config        
         
@@ -161,6 +163,82 @@ class ModelONet(object):
         loss_i = F.binary_cross_entropy_with_logits(
             logits, occ, reduction='none')
         loss = loss + loss_i.sum(-1).mean()
-        
+        # print(loss_i.sum(-1).mean())
         return loss
-        
+
+
+    def val_step(self, data):
+        ''' Performs a training step.
+
+        Args:
+            data (dict): data dictionary
+        '''
+        self.net.eval()
+        self.optimizer.zero_grad()
+        data = self.preprocess(data, self.device)
+        loss = self.compute_loss(data)
+        return loss
+
+    def eval_step(self, data):
+        ''' Performs an evaluation step.
+
+        Args:
+            data (dict): data dictionary
+        '''
+        self.net.eval()
+        data = self.preprocess(data, self.device)
+        device = self.device
+        threshold = self.threshold
+        eval_dict = {}
+
+        # Compute elbo
+        points = data.get('points').to(device)
+        occ = data.get('occupancies').to(device)
+
+        inputs = data.get('inputs', torch.empty(points.size(0), 0)).to(device)
+        voxels_occ = data.get('voxels')
+
+        points_iou = data.get('points_iou').to(device)
+        occ_iou = data.get('points_iou.occ').to(device)
+
+        kwargs = {}
+
+        with torch.no_grad():
+            elbo, rec_error, kl = self.net.compute_elbo(
+                points, occ, inputs, **kwargs)
+
+        eval_dict['loss'] = -elbo.mean().item()
+        eval_dict['rec_error'] = rec_error.mean().item()
+        eval_dict['kl'] = kl.mean().item()
+
+        # Compute iou
+        batch_size = points.size(0)
+
+        with torch.no_grad():
+            p_out = self.net(points_iou, inputs,
+                               sample=self.eval_sample, **kwargs)
+
+        occ_iou_np = (occ_iou >= 0.5).cpu().numpy()
+        occ_iou_hat_np = (p_out.probs >= threshold).cpu().numpy()
+        iou = compute_iou(occ_iou_np, occ_iou_hat_np).mean()
+        eval_dict['iou'] = iou
+
+        # Estimate voxel iou
+        if voxels_occ is not None:
+            voxels_occ = voxels_occ.to(device)
+            points_voxels = make_3d_grid(
+                (-0.5 + 1/64,) * 3, (0.5 - 1/64,) * 3, (32,) * 3)
+            points_voxels = points_voxels.expand(
+                batch_size, *points_voxels.size())
+            points_voxels = points_voxels.to(device)
+            with torch.no_grad():
+                p_out = self.net(points_voxels, inputs,
+                                   sample=self.eval_sample, **kwargs)
+
+            voxels_occ_np = (voxels_occ >= 0.5).cpu().numpy()
+            occ_hat_np = (p_out.probs >= threshold).cpu().numpy()
+            iou_voxels = compute_iou(voxels_occ_np, occ_hat_np).mean()
+
+            eval_dict['iou_voxels'] = iou_voxels
+        print(eval_dict)
+        return eval_dict
