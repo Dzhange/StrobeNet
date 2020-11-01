@@ -7,7 +7,7 @@ DATASET_ROOT: '/workspace/Data/SAPIEN/eyeglasses/aug_scale_mpf_uni'
 OUTPUT_DIR: '/workspace/dev_nrnocs/output/expt/'
 VIEW_NUM: 2
 
-BATCHSIZE: 1
+BATCHSIZE: 64
 DATALOADER_WORKERS: 4
 EPOCH_TOTAL: 20
 

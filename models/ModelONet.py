@@ -20,6 +20,25 @@ from utils.DataUtils import *
 import time
 from torch import distributions as dist
 
+
+
+# def get_prior_z(cfg, device):
+#     ''' Returns prior distribution for latent code z.
+
+#     Args:
+#         cfg (dict): imported yaml config
+#         device (device): pytorch device
+#     '''
+#     z_dim = 64
+#     p0_z = dist.Normal(
+#         torch.zeros(z_dim, device=device),
+#         torch.ones(z_dim, device=device)
+#     )
+
+#     return p0_z
+
+
+    
 class ModelONet(object):
 
     def __init__(self, config):
@@ -40,7 +59,8 @@ class ModelONet(object):
     
     def init_net(self, device=None):        
         config = self.config        
-        self.net = OccupancyNetwork()
+        
+        self.net = OccupancyNetwork(device=device)
         self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr,
                                         betas=(self.config.ADAM_BETA1, self.config.ADAM_BETA2),
                                         weight_decay=config.WEIGHT_DECAY
@@ -98,7 +118,7 @@ class ModelONet(object):
         """
         
         inputs = data[0].to(device=device)
-        print(data[1])
+        # print(data[1])
         points = data[1]['grid_coords'].to(device=device)
         occ = data[1]['occupancies'].to(device=device)
 

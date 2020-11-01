@@ -706,11 +706,16 @@ class OccupancyNetwork(nn.Module):
     def __init__(self, p0_z=None, device=None):
         super().__init__()
         if p0_z is None:
-            p0_z = dist.Normal(torch.tensor([]), torch.tensor([]))
+            z_dim=64
+            p0_z = dist.Normal(
+                    torch.zeros(z_dim, device=device),
+                    torch.ones(z_dim, device=device)
+                )
+            # p0_z = dist.Normal(torch.tensor([]), torch.tensor([]))
         
-        self.encoder = Resnet18(3)        
+        self.encoder = Resnet18(c_dim=512).to(device)
         self.encoder_latent = Encoder(dim=3, z_dim=64, c_dim=512).to(device)
-        self.decoder = Decoder().to(device)
+        self.decoder = Decoder(z_dim=64, c_dim=512).to(device)
 
         self._device = device
         self.p0_z = p0_z
