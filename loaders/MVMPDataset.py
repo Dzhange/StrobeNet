@@ -24,8 +24,13 @@ class MVMPDataset(MVSPDataset):
         batch = {}
         frame_base_path = self.frame_ids[idx]
 
-        for view in range(self.view_num):
-            data = self.get_sv_data(frame_base_path, view)
+        if self.config.RANDOM_VIEW:
+            views = np.random.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
+        else:
+            views = list(range(self.view_num))
+
+        for view_id in views:
+            data = self.get_sv_data(frame_base_path, view_id)
             data_list.append(data)
         for k in data_list[0].keys():
             batch[k] = [item[k] for item in data_list]

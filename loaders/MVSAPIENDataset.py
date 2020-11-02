@@ -85,7 +85,12 @@ class MVSPDataset(SAPIENDataset):
         batch = {}
         frame_base_path = self.frame_ids[idx]
 
-        for view in range(self.view_num):
+        if self.config.RANDOM_VIEW:
+            views = np.random.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
+        else:
+            views = list(range(self.view_num))
+
+        for view in views:
             data = self.get_sv_data(frame_base_path, view)                        
             data_list.append(data)
         for k in data_list[0].keys():

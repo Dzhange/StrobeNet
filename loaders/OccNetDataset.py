@@ -12,6 +12,7 @@ sys.path.append(os.path.join(FileDirPath, '..'))
 from utils.DataUtils import *
 from models.loss import L2MaskLoss, L2Loss, LBSLoss
 import trimesh
+import utils.tools.implicit_waterproofing as iw
 
 class OccNetDataset(torch.utils.data.Dataset):
     """
@@ -36,8 +37,8 @@ class OccNetDataset(torch.utils.data.Dataset):
 
         # self.occ_load_str = ['boundary_0.1_samples', 'boundary_0.01_samples']
         self.occ_load_str = 'boundary_0.01_samples.npz'
-        # self.num_sample_points = 1024        
-        self.num_sample_points = 100000      
+        self.num_sample_points = 2048        
+        # self.num_sample_points = 100000      
 
         self.shuffle_in_limit = True
 
@@ -112,7 +113,7 @@ class OccNetDataset(torch.utils.data.Dataset):
         if self.shuffle_in_limit:
             total_size = len(self)
             dataset_length = math.ceil((self.data_limit / 100) * total_size)
-            dataset_length = 1
+            # dataset_length = 64
             step = int(np.floor(100 / self.data_limit))        
             sample_index = []
             cur_idx = 0
@@ -143,6 +144,7 @@ class OccNetDataset(torch.utils.data.Dataset):
         for k in self.frame_files:
             # print(self.frame_files[k][idx])
             frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)                        
+            # frame[k] = imread_rgb_torch('/workspace/Data/shapenet_sample/img_choy2016/000.jpg', Size=self.img_size).type(torch.FloatTensor)                        
             frame[k] /= 255.0
         
 
@@ -158,31 +160,47 @@ class OccNetDataset(torch.utils.data.Dataset):
         file_name = os.path.basename(required_path)
         index_of_frame = find_frame_num(file_name)
         
+        gt_mesh_path = required_path.replace('color00.png', 'isosurf_scaled.off')
 
         points = []
         coords = []
         occupancies = []        
-        # boundary_samples_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
-        #                                         self.occ_load_str[i] + '.npz')
+                
         boundary_samples_path = required_path.replace('color00.png', self.occ_load_str)
-        # print(boundary_samples_path)
+        
         boundary_samples_npz = np.load(boundary_samples_path)
-        boundary_sample_points = boundary_samples_npz['points']
-        boundary_sample_coords = boundary_samples_npz['grid_coords']
+        boundary_sample_points = boundary_samples_npz['points']        
         boundary_sample_occupancies = boundary_samples_npz['occupancies']
-        subsample_indices = np.random.randint(0, len(boundary_sample_points), self.num_sample_points)
-        points.extend(boundary_sample_points[subsample_indices])
-        coords.extend(boundary_sample_coords[subsample_indices])
-        occupancies.extend(boundary_sample_occupancies[subsample_indices])
+        
+        uniform_sample_path = required_path.replace('color00.png', "uni_sampled.npz")
+        if os.path.exists(uniform_sample_path):
+            uniform_points = np.load(uniform_sample_path)['points']
+            uniform_occ = np.load(uniform_sample_path)['occupancies']
+        else:
+            # generate online
+            mesh = trimesh.load(gt_mesh_path)            
+            uniform_points = np.random.rand(100000, 3)
+            uniform_points = 1.1 * (uniform_points - 0.5)
+            uniform_occ = iw.implicit_waterproofing(mesh, uniform_points)[0]
+            np.savez(uniform_sample_path, points=uniform_points,
+                     occupancies=uniform_occ)
+                
+        sample_indices = np.random.randint(0, len(boundary_sample_points), self.num_sample_points//2)
+        uni_sample_indices = np.random.randint(0, len(uniform_points), self.num_sample_points//2)
+        
+        points.extend(boundary_sample_points[sample_indices])
+        points.extend(uniform_points[uni_sample_indices])
+
+        occupancies.extend(boundary_sample_occupancies[sample_indices])
+        occupancies.extend(uniform_occ[uni_sample_indices])
 
         assert len(points) == self.num_sample_points
         assert len(occupancies) == self.num_sample_points
-        assert len(coords) == self.num_sample_points
+        # assert len(coords) == self.num_sample_points
         
-        gt_mesh_path = required_path.replace('color00.png', 'isosurf_scaled.off')            
+        
         # None of the if-data would be needed if in validation mode
-        if_data = {
-            # 'grid_coords':np.array(coords, dtype=np.float32),
+        if_data = {            
             'grid_coords':np.array(points, dtype=np.float32),
             'occupancies': np.array(occupancies, dtype=np.float32),
             'iso_mesh': gt_mesh_path

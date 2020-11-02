@@ -1,4 +1,5 @@
 import os
+import traceback
 import sys
 import torch
 import torch.nn as nn
@@ -34,7 +35,7 @@ def run(config):
     
     
     cur_epoch = 0
-    all_tic = getCurrentEpochTime()    
+    all_tic = getCurrentEpochTime()
     while cur_epoch < config.EPOCH_TOTAL:
         try:
             cur_epoch += 1

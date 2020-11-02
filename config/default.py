@@ -17,6 +17,9 @@ def get_default_cfg():
     cfg.PROPORTION = 1.0  # how many of the first K samples in the dataset list
     cfg.TRANSFORM = True # if set too true, we use the dataset where all mesh/occupancy are transformed into [-0.5, 0.5]
     cfg.VIEW_NUM = 1
+    cfg.RANDOM_VIEW = False
+    cfg.TOTAL_VIEW = 8
+
     # fundamental setting
     cfg.ROOT_DIR = os.getcwd()
     cfg.CONFIG_FILE = 'None'

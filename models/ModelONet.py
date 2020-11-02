@@ -15,11 +15,11 @@ FileDirPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(FileDirPath, '..'))
 
 from expt.im2mesh.common import *
-
+import utils.tools.implicit_waterproofing as iw
 from utils.DataUtils import *
 import time
 from torch import distributions as dist
-
+import trimesh, mcubes
 
 
 # def get_prior_z(cfg, device):
@@ -49,23 +49,25 @@ class ModelONet(object):
         self.val_loss_history = []
         self.start_epoch = 0
         self.expt_dir_path = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME)
+        self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
+
         if os.path.exists(self.expt_dir_path) == False:
             os.makedirs(self.expt_dir_path)
+        if os.path.exists(self.output_dir) == False:
+            os.makedirs(self.output_dir)
 
         device = torch.device(config.GPU)
         self.init_net(device=device)
-        
+
         self.device = device
         self.threshold = 0.5
         self.eval_sample = False
+        self.init_grids(128)
 
     def init_net(self, device=None):
         config = self.config
         self.net = OccupancyNetwork(device=device)
-        self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr,
-                                        betas=(self.config.ADAM_BETA1, self.config.ADAM_BETA2),
-                                        weight_decay=config.WEIGHT_DECAY
-                                        )
+        self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr)
 
     def setup_checkpoint(self, TrainDevice):
         latest_checkpoint_dict = None
@@ -94,7 +96,7 @@ class ModelONet(object):
                                 state[k] = v.to(TrainDevice)
             else:
                 print('[ INFO ]: Experiment names do not match. Training from scratch.')
-            
+
     def save_checkpoint(self, epoch, time_string='humanlocal', print_str='*'*3):
         checkpoint_dict = {
             'Name': self.config.EXPT_NAME,
@@ -117,9 +119,7 @@ class ModelONet(object):
         """
         put data onto the right device
         """
-        
-        inputs = data[0].to(device=device)
-        # print(data[1])
+        inputs = data[0].to(device=device)        
         points = data[1]['grid_coords'].to(device=device)
         occ = data[1]['occupancies'].to(device=device)
 
@@ -132,8 +132,9 @@ class ModelONet(object):
 
     def train_step(self, data):
         
-        self.net.train()
         data = self.preprocess(data, self.device)
+
+        self.net.train()
         self.optimizer.zero_grad()
         loss = self.compute_loss(data)
         loss.backward()
@@ -147,6 +148,7 @@ class ModelONet(object):
         device = self.device
         p = data.get('points').to(device)
         occ = data.get('occupancies').to(device)
+        
         inputs = data.get('inputs', torch.empty(p.size(0), 0)).to(device)
         
         c = self.net.encode_inputs(inputs)
@@ -170,17 +172,118 @@ class ModelONet(object):
 
     def val_step(self, data):
         ''' Performs a training step.
-
         Args:
             data (dict): data dictionary
         '''
-        self.net.eval()
-        self.optimizer.zero_grad()
+        self.net.eval()        
         data = self.preprocess(data, self.device)
         loss = self.compute_loss(data)
         return loss
 
 
+    def init_grids(self, resolution):
+        
+        bb_min = -0.5
+        bb_max = 0.5
+       
+        # self.GridPoints = iw.create_grid_points_from_bounds(bb_min, bb_max, resolution)
+        grid_points = iw.create_grid_points_from_bounds(bb_min, bb_max, resolution)
+        grid_points[:, 0], grid_points[:, 2] = grid_points[:, 2], grid_points[:, 0].copy()        
+        
+        a = bb_max + bb_min # 0, 1
+        b = bb_max - bb_min # 1, 1
+        grid_coords = 2 * grid_points - a # 
+        grid_coords = grid_coords / b
+
+
+        grid_coords = torch.from_numpy(grid_coords).to(self.device, dtype=torch.float)
+        grid_coords = torch.reshape(grid_coords, (1, len(grid_points), 3)).to(self.device)
+        self.grid_coords = grid_coords
+
+    @staticmethod
+    def make_3d_grid(bb_min, bb_max, shape):
+        ''' Makes a 3D grid.
+
+        Args:
+            bb_min (tuple): bounding box minimum
+            bb_max (tuple): bounding box maximum
+            shape (tuple): output shape
+        '''
+        size = shape[0] * shape[1] * shape[2]
+
+        pxs = torch.linspace(bb_min[0], bb_max[0], shape[0])
+        pys = torch.linspace(bb_min[1], bb_max[1], shape[1])
+        pzs = torch.linspace(bb_min[2], bb_max[2], shape[2])
+
+        pxs = pxs.view(-1, 1, 1).expand(*shape).contiguous().view(size)
+        pys = pys.view(1, -1, 1).expand(*shape).contiguous().view(size)
+        pzs = pzs.view(1, 1, -1).expand(*shape).contiguous().view(size)
+        p = torch.stack([pxs, pys, pzs], dim=1)
+
+        return p
+
+
+    def eval_step(self, batch_data, i):
+
+        box_size = 1.1
+        self.batch_points = 2097152
+        # grid_points_split = torch.split(self.grid_coords, self.batch_points, dim=1)
+        pointsf = box_size * make_3d_grid(
+                (-0.5,)*3, (0.5,)*3, (128,)*3
+            )
+                    
+        device = self.device
+        logits_list = []
+        
+        with torch.no_grad():
+            data = self.preprocess(batch_data, device)
+
+            p = pointsf.to(device).unsqueeze(0)
+            # print(p.shape)
+            occ = data.get('occupancies').to(device)
+            inputs = data.get('inputs', torch.empty(p.size(0), 0)).to(device)
+            
+            c = self.net.encode_inputs(inputs)
+            q_z = self.net.infer_z(p, occ, c)
+            z = q_z.rsample()
+            # General points
+            logits = self.net.decode(p, z, c).logits
+            # loss_i = F.binary_cross_entropy_with_logits(
+            # logits, occ, reduction='none')
+            
+            # self.save_img(net_input['RGB'], output[0], target['NOCS'], i)
+            logits_list.append(logits.squeeze(0).detach().cpu())
+
+        # generate predicted mesh from occupancy and save
+        logits = torch.cat(logits_list, dim=0).numpy()
+        mesh = self.mesh_from_logits(logits, 128)
+        export_pred_path = os.path.join(self.output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
+        mesh.export(export_pred_path)
+
+        # Copy ground truth in the val results
+        export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
+        # print(target['mesh'][0])
+        shutil.copyfile(batch_data[1]['iso_mesh'][0], export_gt_path)        
+
+    def mesh_from_logits(self, logits, resolution):
+        logits = np.reshape(logits, (resolution,) * 3)
+        initThreshold = 0.5
+        
+        pmax = 0.5
+        pmin = -0.5
+    
+        # padding to ba able to retrieve object close to bounding box bondary
+        logits = np.pad(logits, ((1, 1), (1, 1), (1, 1)), 'constant', constant_values=0)
+        threshold = np.log(initThreshold) - np.log(1. - initThreshold)
+        vertices, triangles = mcubes.marching_cubes(
+            logits, threshold)
+        # remove translation due to padding
+        vertices -= 1
+        # rescale to original scale
+        step = (pmax - pmin) / (resolution - 1)
+        vertices = np.multiply(vertices, step)
+        vertices += [pmin, pmin, pmin]
+        return trimesh.Trimesh(vertices, triangles)
 
     def _eval_step(self, data):
         ''' Performs an evaluation step.
@@ -243,5 +346,6 @@ class ModelONet(object):
             iou_voxels = compute_iou(voxels_occ_np, occ_hat_np).mean()
 
             eval_dict['iou_voxels'] = iou_voxels
+        
         print(eval_dict)
         return eval_dict
