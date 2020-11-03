@@ -18,7 +18,7 @@ def get_default_cfg():
     cfg.TRANSFORM = True # if set too true, we use the dataset where all mesh/occupancy are transformed into [-0.5, 0.5]
     cfg.VIEW_NUM = 1
     cfg.RANDOM_VIEW = False
-    cfg.TOTAL_VIEW = 8
+    cfg.TOTAL_VIEW = 4
 
     # fundamental setting
     cfg.ROOT_DIR = os.getcwd()
@@ -107,6 +107,7 @@ def get_default_cfg():
     cfg.SUPER_RES = False
     cfg.IF_IN_DIM = 16
     cfg.CANO_IF = True # if set to True, we use only the canonical occupancy as supervision
+    cfg.ONET_CANO = False
 
     # for final pipeline
     cfg.STAGE_ONE = True # if set to true, we do not supervise the occupancy

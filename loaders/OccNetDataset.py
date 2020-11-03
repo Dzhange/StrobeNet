@@ -13,24 +13,37 @@ from utils.DataUtils import *
 from models.loss import L2MaskLoss, L2Loss, LBSLoss
 import trimesh
 import utils.tools.implicit_waterproofing as iw
+import json
 
 class OccNetDataset(torch.utils.data.Dataset):
     """
     A basic dataloader for HandOccDataset
     """
-    def __init__(self, root, train=True, transform=None,
-                 img_size=(320, 240), limit=100, frame_load_str=None, required='color00'):
+    def __init__(self, config, train=True, required='color00'):
+        
+        self.config = config
+        root = config.DATASET_ROOT
+        limit = config.DATA_LIMIT if train else config.VAL_DATA_LIMIT
+        img_size = config.IMAGE_SIZE
         self.num_cameras = 10
         self.frame_load_str = ['color00']
 
-        self.init(root, train, transform, img_size, limit, self.frame_load_str, required)
+        self.init(root, train, img_size, limit, self.frame_load_str, required)
         self.load_data()
 
-    def init(self, root, train=True, transform=None,
+    def init(self, root, train=True,
              img_size=(320, 240), limit=100, frame_load_str=None, required='VertexColors'):
         self.dataset_dir = root
-        self.is_train_data = train
-        self.transform = transform
+        config_path = os.path.join(root,'config.json')
+        # pose num let us know how can we find the occupancies
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                configs = json.load(f)
+                self.dataset_config = configs
+                self.pose_num = configs['pose_num']
+        else:
+                self.pose_num = 1
+        self.is_train_data = train        
         self.img_size = img_size
         self.required = required
         self.frame_load_str = frame_load_str
@@ -38,10 +51,10 @@ class OccNetDataset(torch.utils.data.Dataset):
         # self.occ_load_str = ['boundary_0.1_samples', 'boundary_0.01_samples']
         self.occ_load_str = 'boundary_0.01_samples.npz'
         self.num_sample_points = 2048        
-        # self.num_sample_points = 100000      
+        # self.num_sample_points = 100000
 
         self.shuffle_in_limit = True
-
+        print(limit)
         if limit <= 0.0 or limit > 100.0:
             raise RuntimeError('Data limit percent has to be >0% and <=100%')
         self.data_limit = limit
@@ -143,13 +156,38 @@ class OccNetDataset(torch.utils.data.Dataset):
         frame = {}
         for k in self.frame_files:
             # print(self.frame_files[k][idx])
-            frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)                        
+            if 0:
+                frame[k] = imread_rgb_torch("/workspace/Data/SAPIEN/eyeglasses/aug_scale_mpf_uni/train/0000/frame_00000000_view_00_color00.png", Size=self.img_size).type(torch.FloatTensor)
+            else:
+                frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)                        
             # frame[k] = imread_rgb_torch('/workspace/Data/shapenet_sample/img_choy2016/000.jpg', Size=self.img_size).type(torch.FloatTensor)                        
             frame[k] /= 255.0
         
 
         return frame['color00']
 
+    @staticmethod
+    def make_3d_grid(bb_min, bb_max, shape):
+        ''' Makes a 3D grid.
+
+        Args:
+            bb_min (tuple): bounding box minimum
+            bb_max (tuple): bounding box maximum
+            shape (tuple): output shape
+        '''
+        size = shape[0] * shape[1] * shape[2]
+
+        pxs = torch.linspace(bb_min[0], bb_max[0], shape[0])
+        pys = torch.linspace(bb_min[1], bb_max[1], shape[1])
+        pzs = torch.linspace(bb_min[2], bb_max[2], shape[2])
+
+        pxs = pxs.view(-1, 1, 1).expand(*shape).contiguous().view(size)
+        pys = pys.view(1, -1, 1).expand(*shape).contiguous().view(size)
+        pzs = pzs.view(1, 1, -1).expand(*shape).contiguous().view(size)
+        p = torch.stack([pxs, pys, pzs], dim=1)
+
+        return p
+    
     def load_occupancies(self, required_path):
         """
         load the occupancy data for the 2nd part(IF-Net)
@@ -164,38 +202,92 @@ class OccNetDataset(torch.utils.data.Dataset):
 
         points = []
         coords = []
-        occupancies = []        
-                
-        boundary_samples_path = required_path.replace('color00.png', self.occ_load_str)
+        occupancies = []
+
+
+
+        if 0:
+            # path = "/workspace/Data/shapenet_sample/points.npz"
+            path = "/workspace/Data/SAPIEN/eyeglasses/aug_scale_mpf_uni/train/0000/frame_00000000_view_03_uni_sampled.npz"
+            pointsf = np.load(path)['points']
+
+            # write_off("/workspace/z.xyz", pointsf)
+            # exit()
+            grid_occ = np.load(path)['occupancies']
+            # grid_occ = np.unpackbits(np.load(path)['occupancies'])
+            # print(pointsf.shape)
+            sample_indices = np.random.randint(0, len(pointsf), self.num_sample_points)
+
+            return {
+                'grid_coords':pointsf.astype(np.float32)[sample_indices],
+                'occupancies':np.array(grid_occ).astype(np.float32)[sample_indices],
+                'iso_mesh': gt_mesh_path
+            }
+        elif 0:
+            # boundary_samples_path = "/workspace/Data/SAPIEN/eyeglasses/aug_scale_mpf_uni/train/0000/frame_00000000_boundary_0.01_samples.npz"
+            grid_sample = "/workspace/Data/debug/frame_00000000_grid_0.01_samples.npz"
+            if os.path.exists(grid_sample):
+                pointsf = np.load(grid_sample)['points']
+                grid_occ = np.load(grid_sample)['occupancies']
+            else:
+                nx = 128
+                pointsf = 1.1 * self.make_3d_grid(
+                    (-0.5,)*3, (0.5,)*3, (nx,)*3
+                ).numpy()
+                # generate online
+                mesh = trimesh.load(gt_mesh_path)            
+                grid_occ = iw.implicit_waterproofing(mesh, pointsf)[0]
+                np.savez(grid_sample, points=pointsf,
+                        occupancies=grid_occ)
+            
+            p_occ = pointsf[grid_occ]
+            write_off("/workspace/in_load.xyz", p_occ)
+            # exit()
+
+            sample_indices = np.random.randint(0, len(pointsf), self.num_sample_points)
+            return {
+                'grid_coords':pointsf[sample_indices],
+                'occupancies':grid_occ.astype(np.float32)[sample_indices],
+                'iso_mesh': gt_mesh_path
+            }
+
+        else:
+            if not self.config.ONET_CANO:
+                boundary_samples_path = required_path.replace('color00.png', self.occ_load_str)
+            else:
+                index_of_frame = str(int(index_of_frame) // self.pose_num * self.pose_num).zfill(8)
+                boundary_samples_path = os.path.join(data_dir, "frame_{}_{}".format(index_of_frame, self.occ_load_str))
         
-        boundary_samples_npz = np.load(boundary_samples_path)
-        boundary_sample_points = boundary_samples_npz['points']        
-        boundary_sample_occupancies = boundary_samples_npz['occupancies']
-        
-        uniform_sample_path = required_path.replace('color00.png', "uni_sampled.npz")
+        # boundary_samples_npz = np.load(boundary_samples_path)
+        # boundary_sample_points = boundary_samples_npz['points']        
+        # boundary_sample_occupancies = boundary_samples_npz['occupancies']
+        uniform_sample_path = boundary_samples_path.replace(self.occ_load_str, "uni_sampled.npz")
+
         if os.path.exists(uniform_sample_path):
             uniform_points = np.load(uniform_sample_path)['points']
             uniform_occ = np.load(uniform_sample_path)['occupancies']
         else:
             # generate online
-            mesh = trimesh.load(gt_mesh_path)            
+            mesh = trimesh.load(gt_mesh_path)
             uniform_points = np.random.rand(100000, 3)
             uniform_points = 1.1 * (uniform_points - 0.5)
             uniform_occ = iw.implicit_waterproofing(mesh, uniform_points)[0]
             np.savez(uniform_sample_path, points=uniform_points,
                      occupancies=uniform_occ)
                 
-        sample_indices = np.random.randint(0, len(boundary_sample_points), self.num_sample_points//2)
-        uni_sample_indices = np.random.randint(0, len(uniform_points), self.num_sample_points//2)
-        
-        points.extend(boundary_sample_points[sample_indices])
-        points.extend(uniform_points[uni_sample_indices])
+        sample_indices = np.random.randint(0, len(uniform_points), self.num_sample_points)
+                
+        # points.extend(boundary_sample_points)
+        points.extend(uniform_points[sample_indices])
 
-        occupancies.extend(boundary_sample_occupancies[sample_indices])
-        occupancies.extend(uniform_occ[uni_sample_indices])
+        # occupancies.extend(boundary_sample_occupancies)
+        occupancies.extend(uniform_occ[sample_indices])
 
-        assert len(points) == self.num_sample_points
-        assert len(occupancies) == self.num_sample_points
+        # points = points[sample_indices]
+        # occupancies = occupancies[sample_indices]
+
+        # assert len(points) == self.num_sample_points
+        # assert len(occupancies) == self.num_sample_points
         # assert len(coords) == self.num_sample_points
         
         
@@ -207,6 +299,7 @@ class OccNetDataset(torch.utils.data.Dataset):
             }
 
         return if_data
+
 
 
 if __name__ == '__main__':

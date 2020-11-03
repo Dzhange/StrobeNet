@@ -6,8 +6,8 @@
 DATASET_ROOT: '/workspace/Data/SAPIEN/eyeglasses/aug_scale_mpf_uni'
 OUTPUT_DIR: '/workspace/dev_nrnocs/output/expt/'
 
-BATCHSIZE: 32
-DATALOADER_WORKERS: 4
+BATCHSIZE: 1
+DATALOADER_WORKERS: 1
 EPOCH_TOTAL: 2000
 
 LR: 1e-4
@@ -15,11 +15,11 @@ DATA_LIMIT: 100
 # DATA_LIMIT: 1
 VAL_DATA_LIMIT: 100
 # VAL_DATA_LIMIT: 1
-EXPT_NAME: "occ_b64"
+EXPT_NAME: "occ_debug"
 
-GPU: 7
-TEST_ON_TRAIN: False
-# TEST_ON_TRAIN: True
+GPU: 5
+# TEST_ON_TRAIN: False
+TEST_ON_TRAIN: True
 
 ###################################################
 MODES: ['train','val']

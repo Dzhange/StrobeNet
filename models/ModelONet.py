@@ -15,6 +15,7 @@ FileDirPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(FileDirPath, '..'))
 
 from expt.im2mesh.common import *
+from expt.im2mesh.utils import libmcubes
 import utils.tools.implicit_waterproofing as iw
 from utils.DataUtils import *
 import time
@@ -161,6 +162,7 @@ class ModelONet(object):
 
         # General points
         logits = self.net.decode(p, z, c).logits
+        # print(logits.sum(), occ.sum())
         loss_i = F.binary_cross_entropy_with_logits(
             logits, occ, reduction='none')
         # loss = loss + loss_i.sum(-1).mean()
@@ -227,9 +229,10 @@ class ModelONet(object):
 
         box_size = 1.1
         self.batch_points = 2097152
+        nx = 128
         # grid_points_split = torch.split(self.grid_coords, self.batch_points, dim=1)
         pointsf = box_size * make_3d_grid(
-                (-0.5,)*3, (0.5,)*3, (128,)*3
+                (-0.5,)*3, (0.5,)*3, (nx,)*3
             )
                     
         device = self.device
@@ -239,7 +242,10 @@ class ModelONet(object):
             data = self.preprocess(batch_data, device)
 
             p = pointsf.to(device).unsqueeze(0)
+            # p = data.get('points').to(device) # DEBUG
+            # p = pointsf.to(device).unsqueeze(0)
             # print(p.shape)
+            
             occ = data.get('occupancies').to(device)
             inputs = data.get('inputs', torch.empty(p.size(0), 0)).to(device)
             
@@ -247,16 +253,30 @@ class ModelONet(object):
             q_z = self.net.infer_z(p, occ, c)
             z = q_z.rsample()
             # General points
+
+            # p_split = torch.split(p, 100000)
+            # occ_hats = []
+
+            # for pi in p_split:
             logits = self.net.decode(p, z, c).logits
+                # print(logits.shape)
+            p_occ = p[0][logits[0] > 0]
+            write_off("/workspace/text.xyz", p_occ)
+            # exit()
+            logits_list.append(logits.squeeze(0).detach().cpu())
+
             # loss_i = F.binary_cross_entropy_with_logits(
             # logits, occ, reduction='none')
             
             # self.save_img(net_input['RGB'], output[0], target['NOCS'], i)
-            logits_list.append(logits.squeeze(0).detach().cpu())
+            
 
         # generate predicted mesh from occupancy and save
         logits = torch.cat(logits_list, dim=0).numpy()
-        mesh = self.mesh_from_logits(logits, 128)
+        # print(logits)
+        # mesh = self.mesh_from_logits(logits, 128)
+        logits = logits.reshape((nx,)*3)
+        mesh = self.extract_mesh(logits)
         export_pred_path = os.path.join(self.output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
         mesh.export(export_pred_path)
 
@@ -349,3 +369,63 @@ class ModelONet(object):
         
         print(eval_dict)
         return eval_dict
+
+    def extract_mesh(self, occ_hat):
+        ''' Extracts the mesh from the predicted occupancy grid.
+
+        Args:
+            occ_hat (tensor): value grid of occupancies
+            z (tensor): latent code z
+            c (tensor): latent conditioned code c
+            stats_dict (dict): stats dictionary
+        '''
+        # Some short hands
+        import time
+        n_x, n_y, n_z = occ_hat.shape
+        box_size = 1.1
+        threshold = np.log(0.2) - np.log(1. - 0.2)
+        # Make sure that mesh is watertight
+        
+        occ_hat_padded = np.pad(
+            occ_hat, 1, 'constant', constant_values=-1e6)
+        vertices, triangles = libmcubes.marching_cubes(
+            occ_hat_padded, threshold)
+        
+        # Strange behaviour in libmcubes: vertices are shifted by 0.5
+        vertices -= 0.5
+        # Undo padding
+        vertices -= 1
+        # Normalize to bounding box
+        vertices /= np.array([n_x-1, n_y-1, n_z-1])
+        vertices = box_size * (vertices - 0.5)
+
+        # mesh_pymesh = pymesh.form_mesh(vertices, triangles)
+        # mesh_pymesh = fix_pymesh(mesh_pymesh)
+
+        # Estimate normals if needed
+        # if self.with_normals and not vertices.shape[0] == 0:        
+        #     normals = self.estimate_normals(vertices, z, c)    
+        # else:
+        #     normals = None
+
+        # Create mesh
+        mesh = trimesh.Trimesh(vertices, triangles,
+                               process=False)
+
+        # Directly return if mesh is empty
+        # if vertices.shape[0] == 0:
+        #     return mesh
+
+        # TODO: normals are lost here
+        # if self.simplify_nfaces is not None:
+        #     t0 = time.time()
+        #     mesh = simplify_mesh(mesh, self.simplify_nfaces, 5.)
+        #     stats_dict['time (simplify)'] = time.time() - t0
+
+        # # Refine mesh
+        # if self.refinement_step > 0:
+        #     t0 = time.time()
+        #     self.refine_mesh(mesh, occ_hat, z, c)
+        #     stats_dict['time (refine)'] = time.time() - t0
+
+        return mesh

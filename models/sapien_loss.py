@@ -299,7 +299,7 @@ class PMLoss(nn.Module):
     def add_up(self, loss):
         
         all_loss = torch.zeros(1, device=loss['nox_loss'].device)
-        print(loss)
+        # print(loss)
         cfg = self.config
         all_loss = all_loss\
             + cfg.NOCS_LOSS * (loss['nox_loss'] + loss['mask_loss'])\

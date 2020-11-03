@@ -17,11 +17,11 @@ from utils.DataUtils import *
 def run(config):
 
     model = ModelONet(config)
-    train_dataset = OccNetDataset(root=config.DATASET_ROOT, train=True, limit=config.DATA_LIMIT)
+    train_dataset = OccNetDataset(config, train=True)
     if config.TEST_ON_TRAIN:
         val_dataset = train_dataset
     else:
-        val_dataset = OccNetDataset(root=config.DATASET_ROOT, train=False, limit=config.VAL_DATA_LIMIT)
+        val_dataset = OccNetDataset(config, train=False)
     
     train_loader = DataLoader(train_dataset, batch_size=config.BATCHSIZE,
                                 shuffle=True,

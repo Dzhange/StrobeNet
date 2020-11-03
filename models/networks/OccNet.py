@@ -497,6 +497,7 @@ class DecoderCBatchNorm(nn.Module):
     def forward(self, p, z, c, **kwargs):
         p = p.transpose(1, 2)
         batch_size, D, T = p.size()
+        # print(type(p))
         net = self.fc_p(p)
 
         if self.z_dim != 0:

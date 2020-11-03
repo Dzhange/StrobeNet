@@ -5,6 +5,7 @@
 
 DATASET_ROOT: '/workspace/Data/SAPIEN/eyeglasses/aug_scale_mpf_uni'
 OUTPUT_DIR: '/workspace/dev_nrnocs/output/expt/'
+VIEW_NUM: 2
 
 BATCHSIZE: 32
 DATALOADER_WORKERS: 4
@@ -15,9 +16,10 @@ DATA_LIMIT: 100
 # DATA_LIMIT: 1
 VAL_DATA_LIMIT: 100
 # VAL_DATA_LIMIT: 1
-EXPT_NAME: "occ_b64"
+EXPT_NAME: "occ_cano"
+ONET_CANO: True
 
-GPU: 7
+GPU: 6
 TEST_ON_TRAIN: False
 # TEST_ON_TRAIN: True
 
