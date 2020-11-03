@@ -692,7 +692,7 @@ class DecoderBatchNorm(nn.Module):
 
         return out
 
-
+### the whole network
 class OccupancyNetwork(nn.Module):
     ''' Occupancy Network class.
 
@@ -704,7 +704,7 @@ class OccupancyNetwork(nn.Module):
         device (device): torch device
     '''
 
-    def __init__(self, p0_z=None, device=None):
+    def __init__(self, c_dim=256, p0_z=None, view_num=1, device=None):
         super().__init__()
         if p0_z is None:
             z_dim=0
@@ -714,10 +714,13 @@ class OccupancyNetwork(nn.Module):
                 )
             # p0_z = dist.Normal(torch.tensor([]), torch.tensor([]))
         
-        self.encoder = Resnet18(c_dim=256).to(device)
-        # self.encoder_latent = Encoder(dim=3, z_dim=64, c_dim=512).to(device)
+        self.encoder = Resnet18(c_dim=c_dim).to(device)        
         self.encoder_latent = None
-        self.decoder = DecoderCBatchNorm(dim=3, z_dim=0, c_dim=256).to(device)
+        
+        self.view_num = view_num
+        
+        decoder_feat_dim = int(c_dim * self.view_num)
+        self.decoder = DecoderCBatchNorm(dim=3, z_dim=0, c_dim=decoder_feat_dim).to(device)
 
         self._device = device
         self.p0_z = p0_z

@@ -22,23 +22,6 @@ import time
 from torch import distributions as dist
 import trimesh, mcubes
 
-
-# def get_prior_z(cfg, device):
-#     ''' Returns prior distribution for latent code z.
-
-#     Args:
-#         cfg (dict): imported yaml config
-#         device (device): pytorch device
-#     '''
-#     z_dim = 64
-#     p0_z = dist.Normal(
-#         torch.zeros(z_dim, device=device),
-#         torch.ones(z_dim, device=device)
-#     )
-
-#     return p0_z
-
-
     
 class ModelONet(object):
 
@@ -51,7 +34,7 @@ class ModelONet(object):
         self.start_epoch = 0
         self.expt_dir_path = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME)
         self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
-
+        
         if os.path.exists(self.expt_dir_path) == False:
             os.makedirs(self.expt_dir_path)
         if os.path.exists(self.output_dir) == False:
@@ -64,10 +47,11 @@ class ModelONet(object):
         self.threshold = 0.5
         self.eval_sample = False
         self.init_grids(128)
+        self.view_num = self.config.VIEW_NUM
 
     def init_net(self, device=None):
         config = self.config
-        self.net = OccupancyNetwork(device=device)
+        self.net = OccupancyNetwork(view_num=config.VIEW_NUM, device=device)
         self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr)
 
     def setup_checkpoint(self, TrainDevice):
@@ -114,15 +98,20 @@ class ModelONet(object):
                         legend=["train loss", "val loss"], title=self.config.EXPT_NAME)
         # print('[ INFO ]: Checkpoint saved.')
         print(print_str) # Checkpoint saved. 50 + 3 characters [>]
-
-    @staticmethod
-    def preprocess(data, device):
+    
+    def preprocess(self, data, device):
         """
         put data onto the right device
         """
-        inputs = data[0].to(device=device)        
-        points = data[1]['grid_coords'].to(device=device)
-        occ = data[1]['occupancies'].to(device=device)
+
+        if self.view_num > 1:
+            inputs = [img.to(device=device) for img in data['color00']]
+            points = data['grid_coords'][0].to(device=device)
+            occ = data['occupancies'][0].to(device=device)
+        else:
+            inputs = data[0].to(device=device)        
+            points = data[1]['grid_coords'].to(device=device)
+            occ = data[1]['occupancies'].to(device=device)
 
         data = {}
         data['inputs'] = inputs
@@ -150,17 +139,27 @@ class ModelONet(object):
         p = data.get('points').to(device)
         occ = data.get('occupancies').to(device)
         
-        inputs = data.get('inputs', torch.empty(p.size(0), 0)).to(device)
-        
-        c = self.net.encode_inputs(inputs)
-        q_z = self.net.infer_z(p, occ, c)
-        z = q_z.rsample()
+                
+        if self.view_num == 1:
+            inputs = data.get('inputs').to(device)
+            c = self.net.encode_inputs(inputs)
+        else:
+            inputs = data.get('inputs')
+            con_list = []
+            for img in inputs:
+                c = self.net.encode_inputs(img)
+                con_list.append(c)
+            c = torch.cat(tuple(con_list), dim=1)
 
+        # q_z = self.net.infer_z(p, occ, c)
+        # z = q_z.rsample()
+        z = None
         # KL-divergence
-        kl = dist.kl_divergence(q_z, self.net.p0_z).sum(dim=-1)
-        loss = kl.mean()
+        # kl = dist.kl_divergence(q_z, self.net.p0_z).sum(dim=-1)
+        # loss = kl.mean()
 
         # General points
+        
         logits = self.net.decode(p, z, c).logits
         # print(logits.sum(), occ.sum())
         loss_i = F.binary_cross_entropy_with_logits(
@@ -247,30 +246,38 @@ class ModelONet(object):
             # print(p.shape)
             
             occ = data.get('occupancies').to(device)
-            inputs = data.get('inputs', torch.empty(p.size(0), 0)).to(device)
-            
-            c = self.net.encode_inputs(inputs)
-            q_z = self.net.infer_z(p, occ, c)
-            z = q_z.rsample()
-            # General points
+                        
+            # inputs = data.get('inputs', torch.empty(p.size(0), 0)).to(device)
+                        
+            if self.view_num == 1:
+                c = self.net.encode_inputs(inputs)
+                inputs = data.get('inputs').to(device) 
+            else:
+                inputs = data.get('inputs')
+                con_list = []
+                for img in inputs:
+                    c = self.net.encode_inputs(img)
+                    con_list.append(c)
+                c = torch.cat(tuple(con_list), dim=1)
 
-            # p_split = torch.split(p, 100000)
+            # q_z = self.net.infer_z(p, occ, c)
+            # z = q_z.rsample()
+            z = None
+            # General points
+            p_split = torch.split(p, 100000)
             # occ_hats = []
 
-            # for pi in p_split:
-            logits = self.net.decode(p, z, c).logits
+            for pi in p_split:
+                logits = self.net.decode(pi, z, c).logits
+                logits_list.append(logits.squeeze(0).detach().cpu())
                 # print(logits.shape)
-            p_occ = p[0][logits[0] > 0]
-            write_off("/workspace/text.xyz", p_occ)
-            # exit()
-            logits_list.append(logits.squeeze(0).detach().cpu())
+                # p_occ = p[0][logits[0] > 0]
+                # write_off("/workspace/text.xyz", p_occ)
+                # exit()
+                
 
             # loss_i = F.binary_cross_entropy_with_logits(
-            # logits, occ, reduction='none')
-            
-            # self.save_img(net_input['RGB'], output[0], target['NOCS'], i)
-            
-
+            # logits, occ, reduction='none')                                
         # generate predicted mesh from occupancy and save
         logits = torch.cat(logits_list, dim=0).numpy()
         # print(logits)
@@ -280,10 +287,15 @@ class ModelONet(object):
         export_pred_path = os.path.join(self.output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
         mesh.export(export_pred_path)
 
+        # self.save_img(net_input['RGB'], output[0], target['NOCS'], i)/
         # Copy ground truth in the val results
         export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
         # print(target['mesh'][0])
-        shutil.copyfile(batch_data[1]['iso_mesh'][0], export_gt_path)        
+        if self.config.VIEW_NUM == 1:
+            shutil.copyfile(batch_data[1]['iso_mesh'][0], export_gt_path)        
+        else:
+            print(batch_data['iso_mesh'][0])
+            shutil.copyfile(batch_data['iso_mesh'][0][0], export_gt_path)
 
     def mesh_from_logits(self, logits, resolution):
         logits = np.reshape(logits, (resolution,) * 3)

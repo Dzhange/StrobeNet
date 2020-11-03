@@ -111,7 +111,8 @@ class SAPIENDataset(torch.utils.data.Dataset):
             file_path = os.path.join(self.dataset_dir, 'val/')
 
         # Load index for data
-        camera_idx = '00'
+        # camera_idx = '00'
+        camera_idx = '*'
         prepend_list = []
         for i in self.frame_load_str:
             prepend_list.append(i)

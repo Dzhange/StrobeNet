@@ -8,6 +8,7 @@ sys.path.append(os.path.join(FileDirPath, '..'))
 sys.path.append(os.path.join(FileDirPath, '../..'))
 from models.ModelONet import ModelONet
 from loaders.OccNetDataset import OccNetDataset
+from loaders.OccNetMVDataset import OccNetMVDataset
 import argparse
 from torch.utils.data import DataLoader
 from config import get_cfg
@@ -17,11 +18,21 @@ from utils.DataUtils import *
 def run(config):
 
     model = ModelONet(config)
-    train_dataset = OccNetDataset(config, train=True)
+    if config.VIEW_NUM == 1:
+        train_dataset = OccNetDataset(config, train=True)
+    else:
+        train_dataset = OccNetMVDataset(config, train=True)
+
+    
+
     if config.TEST_ON_TRAIN:
         val_dataset = train_dataset
     else:
-        val_dataset = OccNetDataset(config, train=False)
+        if config.VIEW_NUM == 1:
+            val_dataset = OccNetDataset(config, train=config.TEST_ON_TRAIN)
+        else:
+            val_dataset = OccNetMVDataset(config, train=config.TEST_ON_TRAIN)
+            
     
     train_loader = DataLoader(train_dataset, batch_size=config.BATCHSIZE,
                                 shuffle=True,
