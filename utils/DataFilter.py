@@ -101,7 +101,7 @@ class DataFilter:
                 all_frames = [self.findFrameNum(p) for p in all_color_imgs]
                 all_frames = list(dict.fromkeys(all_frames))
                 all_frames.sort()
-                p = Pool(mp.cpu_count() >> 3)
+                p = Pool(mp.cpu_count() >> 1)
                 p.map(self.processFrame, all_frames)
             else:
                 # self.mode = "train"

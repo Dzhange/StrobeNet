@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch
 from utils.DataUtils import *
 from models.loss import *
+from time import time
 
 class PMloss(LBSLoss):
     """
@@ -57,7 +58,7 @@ class PMLBSLoss(nn.Module):
         super().__init__()
         self.cfg = cfg
         self.mask_loss = nn.BCELoss(reduction='mean')
-        self.sigmoid = nn.Sigmoid()
+        # self.sigmoid = nn.Sigmoid()
         self.Thresh = 0.7
         self.bone_num = cfg.BONE_NUM
         self.l2_loss = JiahuiL2Loss()
@@ -75,17 +76,18 @@ class PMLBSLoss(nn.Module):
 
     def forward(self, output, target):
         loss = {}
-        
+        show_time = 0   
+
         bone_num = self.bone_num
         batch_size = output.shape[0]
         # loss = torch.Tensor([0]).to(device=output.device)
 
         pred_nocs = output[:, 0:3, :, :].clone().requires_grad_(True)
         out_mask = output[:, 3, :, :].clone().requires_grad_(True)
-        out_mask = self.sigmoid(out_mask)
+        out_mask = out_mask.sigmoid()
 
-        pred_loc_map = self.sigmoid(output[:, 4:4+bone_num*3, :, :].clone().requires_grad_(True))
-        pred_rot_map = self.sigmoid(output[:, 4+bone_num*3:4+bone_num*6, :, :].clone().requires_grad_(True))
+        pred_loc_map = output[:, 4:4+bone_num*3, :, :].clone().requires_grad_(True).sigmoid()
+        pred_rot_map = output[:, 4+bone_num*3:4+bone_num*6, :, :].clone().requires_grad_(True).sigmoid()
 
         pred_skin_seg = output[:, 4+bone_num*6:4+bone_num*7+2, :, :].clone().requires_grad_(True)
         pred_joint_score = output[:, 4+bone_num*7+2:4+bone_num*8+2, :, :].clone().requires_grad_(True)
@@ -93,27 +95,47 @@ class PMLBSLoss(nn.Module):
         tar_maps = target['maps']
         target_nocs = tar_maps[:, 0:3, :, :] # nocs
         target_mask = tar_maps[:, 3, :, :] # mask
-        tar_loc_map = self.sigmoid(tar_maps[:, 4:4+bone_num*3, :, :]) # location
-        tar_rot_map = self.sigmoid(tar_maps[:, 4+bone_num*3:4+bone_num*6, :, :]) # rotation, angle axis
+        tar_loc_map = tar_maps[:, 4:4+bone_num*3, :, :].sigmoid() # location
+        tar_rot_map = tar_maps[:, 4+bone_num*3:4+bone_num*6, :, :].sigmoid() # rotation, angle axis
         tar_skin_seg = tar_maps[:, 4+bone_num*6:4+bone_num*6+1, :, :]
-        
+
         # nocs_pc = pred_nocs[0, :, target_mask.squeeze() > 0].permute(1, 0)
-        
+
         tar_pose = target['pose']
-        tar_loc = self.sigmoid(tar_pose[:, :, 0:3])
-        tar_rot = self.sigmoid(tar_pose[:, :, 3:6])
+        tar_loc = tar_pose[:, :, 0:3].sigmoid()
+        tar_rot = tar_pose[:, :, 3:6].sigmoid()
+        
+        if show_time:
+            t1 = torch.cuda.Event(enable_timing=True)
+            t2 = torch.cuda.Event(enable_timing=True)        
+            t3 = torch.cuda.Event(enable_timing=True)        
+        if show_time:
+            torch.cuda.synchronize()
+            t1.record()
+        
+            # mask_loss_2 = nn.functional.binary_cross_entropy(out_mask, target_mask)
+                
+            # torch.cuda.synchronize()
+            # t2.record()
 
         mask_loss = self.mask_loss(out_mask, target_mask)
-        nocs_loss = self.masked_l2_loss(pred_nocs, target_nocs, target_mask)
+        
+        if show_time:
+            torch.cuda.synchronize()
+            t3.record()
 
+        if show_time:
+            torch.cuda.synchronize()
+            print(" PMLOSS ", t1.elapsed_time(t2), t2.elapsed_time(t3))
+                
+        nocs_loss = self.masked_l2_loss(pred_nocs, target_nocs, target_mask)
+        
         # skin_loss = self.masked_l2_loss(self.sigmoid(pred_skin_seg), tar_skin_weights, target_mask)
         pred_seg = pred_skin_seg.transpose(1, 2).transpose(2, 3).contiguous().view(-1, bone_num+2)
         tar_seg = tar_skin_seg.long().squeeze(1).view(-1)
-        
-        # print(torch.unique(tar_seg))
+                
         skin_loss = self.seg_loss(pred_seg, tar_seg)
-        # print(skin_loss)
-        # print(target_mask.max())
+
         loc_map_loss = self.l2_loss(pred_loc_map, tar_loc_map, target_mask)
         rot_map_loss = self.l2_loss(pred_rot_map, tar_rot_map, target_mask)
                 
@@ -126,6 +148,7 @@ class PMLBSLoss(nn.Module):
                                             target_mask,
                                             tar_rot)
 
+   
         vis = 0
         if vis:
             self.vis_joint_loc(tar_loc_map, target_mask, self.frame_id)
@@ -144,15 +167,21 @@ class PMLBSLoss(nn.Module):
                 
         if self.cfg.REPOSE:
             pred_pnnocs = output[:, -3:, :, :].clone().requires_grad_(True)            
-            # pred_pnnocs = output[:, 4+bone_num*8+2:4+bone_num*8+5, :, :].clone().requires_grad_(True)            
+            # pred_pnnocs = output[:, 4+bone_num*8+2:4+bone_num*8+5, :, :].clone().requires_grad_(True)
             tar_pnnocs = tar_maps[:, -3:, :, :]
             # tar_pnnocs = tar_maps[:, 4+bone_num*6+1:4+bone_num*6+4, :, :] #
             # assert (tar_pnnocs == tar_pnnocs_).all()
             pnnocs_loss = self.masked_l2_loss(pred_pnnocs, tar_pnnocs, target_mask)
             # loss += pnnocs_loss
             loss['pnnocs_loss'] = pnnocs_loss
-        # print("[ DIFF ] map_loss is {:5f}; loc_loss is {:5f}".format(loc_map_loss, joint_loc_loss))
+            # print("[ DIFF ] map_loss is {:5f}; loc_loss is {:5f}".format(loc_map_loss, joint_loc_loss))
+        
 
+
+        
+
+            # print("PMloss time",time_a - time_0, time_b - time_a, time_c - time_b, time_d - time_c, time_e - time_d)
+            # print("PMloss time",time_e - time_0)
         return loss
 
     def masked_l2_loss(self, out, tar, mask):
@@ -186,10 +215,9 @@ class PMLBSLoss(nn.Module):
         pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
                                                 pred_joint_map.shape[3])  # B,bone_num,3,R,R
         pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
-        pred_joint_score = self.sigmoid(pred_joint_score) * out_mask.unsqueeze(1)
+        pred_joint_score = pred_joint_score.sigmoid() * out_mask.unsqueeze(1)
         pred_score_map = pred_joint_score / (torch.sum(pred_joint_score.reshape(n_batch, bone_num, -1),
                                                     dim=2, keepdim=True).unsqueeze(3) + 1e-5)
-                
         pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
         pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
         
@@ -423,6 +451,8 @@ class MVMPLoss(MVPMLoss):
     
     def forward(self, output, target):
         
+        show_time = 0
+        # show_time = 0
         target.pop('mesh', None)
         target.pop('iso_mesh', None)
         tar_mask = [nox[:, 3] for nox in target['nox00']]
@@ -436,9 +466,17 @@ class MVMPLoss(MVPMLoss):
         target_list = DL2LD(target)
         segnet_output = output[0]
 
+        if show_time:
+            torch.cuda.synchronize()
+            time_0 = time()
+
         mv_loss = {}
         view_num = self.config.VIEW_NUM
         for v in range(view_num):
+            if show_time:
+                torch.cuda.synchronize()
+                time_a = time()
+
             if isinstance(segnet_output, list):
                 sv_output = segnet_output[v]
             else:
@@ -454,16 +492,26 @@ class MVMPLoss(MVPMLoss):
             tar['pose'] = sv_target['pose']
 
             sv_loss = self.segnet_loss(sv_output, tar)
-
+        
             if len(mv_loss) == 0:
                 mv_loss = sv_loss
             else:
                 for k in sv_loss:
                     mv_loss[k] += sv_loss[k]
+            
+            if show_time:
+                torch.cuda.synchronize()
+                time_b = time()
+                print(" time step {} {} {} {} ".format(v, time_a, time_b, time_b - time_a))
+
+        if show_time:
+            torch.cuda.synchronize()
+            time_1 = time()
 
         for k in mv_loss:
             mv_loss[k] /= view_num
-
+        
+        # print("time all ", time_0, time_a, time_1 - time_0)
         if not self.config.STAGE_ONE:
             pn_recon = output[1]
             recon_loss = self.recon_loss(pn_recon, cano_occ)
@@ -477,10 +525,13 @@ class MVMPLoss(MVPMLoss):
             recon_loss /= (view_num + 1)
             mv_loss['recon_loss'] = recon_loss
 
-
         if self.config.CONSISTENCY != 0:
             mv_loss['crr_loss'] = self.crr_loss(segnet_output, tar_mask, crr)
-            
+        
+        
+        # if show_time:
+            # print("loss time",time_b - time_a, time_c - time_b)
+            # print("loss time", time_1 - time_0)
         mv_loss = self.add_up(mv_loss)
 
         return mv_loss

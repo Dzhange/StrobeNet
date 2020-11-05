@@ -38,6 +38,7 @@ class MVMPDataset(MVSPDataset):
         cano_occ = self.load_occupancies(frame_base_path)
         batch['cano_grid_coords'] = cano_occ['grid_coords']
         batch['cano_occupancies'] = cano_occ['occupancies']
+        batch['cano_iso_mesh'] = cano_occ['iso_mesh']
         if self.config.TRANSFORM:
             batch['cano_translation'] = cano_occ['translation']
             batch['cano_scale'] = cano_occ['scale']

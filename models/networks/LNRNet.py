@@ -140,7 +140,7 @@ class LNRNet(nn.Module):
         pred_joint_map = pred_joint_map.reshape(n_batch, joint_num, 3, pred_joint_map.shape[2],
                                                 pred_joint_map.shape[3])  # B,joint_num,3,R,R
         pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
-        pred_joint_score = self.sigmoid(pred_joint_score) * out_mask.unsqueeze(1)
+        pred_joint_score = pred_joint_score.sigmoid() * out_mask.unsqueeze(1)
         pred_score_map = pred_joint_score / (torch.sum(pred_joint_score.reshape(n_batch, joint_num, -1),
                                                     dim=2, keepdim=True).unsqueeze(3) + 1e-5)                
         pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)

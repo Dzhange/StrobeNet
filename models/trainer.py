@@ -32,6 +32,7 @@ class Trainer:
         cur_epoch = 0
 
         all_tic = getCurrentEpochTime()
+        show_time = 1
         while cur_epoch < self.config.EPOCH_TOTAL:
             try:
                 epoch_losses = [] # For all batches in an epoch
@@ -42,14 +43,22 @@ class Trainer:
                     ################### START WEIGHT UPDATE ################################
                     self.model.optimizer.zero_grad()
                     net_input, target = self.model.preprocess(data, self.device)
-                    time_a = time()
+                    if show_time:
+                        torch.cuda.synchronize()
+                        time_a = time()
                     output = self.model.net(net_input)
-                    time_b = time()
+                    if show_time:
+                        torch.cuda.synchronize()
+                        time_b = time()
                     loss = self.objective(output, target)
-                    time_c = time()                    
+                    if show_time:
+                        torch.cuda.synchronize()
+                        time_c = time()                    
                     if loss > 50:
                         print("[ ERROR ] strange loss encountered")
-                    loss.backward()
+                    if show_time:
+                        torch.cuda.synchronize()
+                        loss.backward()
                     time_d = time()
                     self.model.optimizer.step()
                     ####################### START MONITOR ################################
@@ -71,7 +80,7 @@ class Trainer:
                                                     getTimeDur(elapsed),
                                                     getTimeDur(total_elapsed),
                                                     getTimeDur(ETA-total_elapsed))
-                    show_time = 0
+                    
                     if show_time:
                         progress_str += "forward: {:.5f}s, loss: {:.5f}s, BP: {:.5f}s, total:{:5f}".format(time_b - time_a, time_c - time_b, time_d - time_c, time_d - time_a)
                     sys.stdout.write(progress_str.ljust(100))

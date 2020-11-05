@@ -53,7 +53,7 @@ class ModelMVMPLNRNet(ModelLNRNET):
             9. translation
             10. scale
         """
-        no_compute_item = ['mesh', 'iso_mesh']
+        no_compute_item = ['mesh', 'iso_mesh', 'cano_iso_mesh']
 
         input_items = ['color00', 'grid_coords', 'translation', 'scale', \
                         'cano_grid_coords', 'cano_translation', 'cano_scale']
@@ -223,12 +223,12 @@ class ModelMVMPLNRNet(ModelLNRNET):
             tar_grids = data['grid_coords'][j]
             # print(tar_grids.shape)
             export_gt_path = os.path.join(self.output_dir, "frame_{}_view_{}_gt.off".format(str(frame_id).zfill(3), j))
-            write_off(export_gt_path, tar_grids[0])
+            # print(str(data['iso_mesh'][j][0]))
+            shutil.copyfile(str(data['iso_mesh'][j][0]), export_gt_path)
+            # write_off(export_gt_path, tar_grids[0])
             # gt_mesh = self.mesh_from_logits(tar_occ, self.net.resolution)
             # export_gt_path = os.path.join(self.output_dir, "frame_{}_view_{}_gt.off".format(str(frame_id).zfill(3), j))
             # gt_mesh.export(export_gt_path)
-
-
 
         # generate predicted mesh from occupancy and save
         logits = torch.cat(cano_logits_list, dim=0).numpy()
@@ -241,7 +241,7 @@ class ModelMVMPLNRNet(ModelLNRNET):
         # Copy ground truth in the val results
         export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.off".format(str(frame_id).zfill(3)))
         # print(target['mesh'][0])
-        shutil.copyfile(target['iso_mesh'][0], export_gt_path)
+        shutil.copyfile(target['cano_iso_mesh'], export_gt_path)
 
         if self.config.TRANSFORM:
             # Get the transformation into val results
