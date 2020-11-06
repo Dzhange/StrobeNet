@@ -249,7 +249,17 @@ class SAPIENDataset(torch.utils.data.Dataset):
                 cur_pose[:, 1] = 0
 
         # print(cur_pose)
+        
         joint_map = self.gen_joint_map(cur_pose, self.img_size)
+        # tmp
+        if joint_map is None:
+            os.system("rm {}".format(cur_pose_path))
+            os.system("cp {} {}".format(cur_pose_path.replace("_uni", ""), cur_pose_path))
+            cur_pose = torch.Tensor(np.loadtxt(cur_pose_path))
+            if len(cur_pose.shape) == 1:
+                cur_pose = cur_pose.unsqueeze(0)
+            joint_map = self.gen_joint_map(cur_pose, self.img_size)
+
         load_tuple = load_tuple + (joint_map, )
 
         # Original order: 0: Color&NOCS; 1: Seg; 2: PNNOCS; 3: joint map
@@ -266,7 +276,11 @@ class SAPIENDataset(torch.utils.data.Dataset):
         # get locations
         for i in range(cur_pose.shape[0]):
             for j in range(3):
-                joint_map[cnt] = joint_map[cnt].fill_(cur_pose[i, j])
+                # tmp
+                try:
+                    joint_map[cnt] = joint_map[cnt].fill_(cur_pose[i, j])
+                except IndexError:
+                    return None
                 cnt += 1
         # get rotations
         for i in range(cur_pose.shape[0]):
@@ -275,7 +289,6 @@ class SAPIENDataset(torch.utils.data.Dataset):
                 cnt += 1
         
         return joint_map
-
 
     def load_occupancies(self, required_path):
         """

@@ -36,8 +36,7 @@ class ModelLNRNET(ModelSegLBS):
         if os.path.exists(self.expt_dir_path) == False:
             os.makedirs(self.expt_dir_path)
                 
-        # generation conifgs
-        # self.resolution = 128
+        # generation conifgs        
         self.batch_points = 100000
 
     def init_net(self, device):
@@ -147,6 +146,8 @@ class ModelLNRNET(ModelSegLBS):
         num_test_sample = 30000
 
         grid_coords = self.net.grid_coords
+
+        grid_coords = self.net.init_grids(256)
         # print(grid_coords.shape)
         # grid_path = os.path.join(self.output_dir, 'grid_coords.xyz')
         # write_off(grid_path, grid_coords[0].cpu().numpy())

@@ -14,6 +14,7 @@ from models.loss import L2MaskLoss, L2Loss, LBSLoss
 import trimesh
 import utils.tools.implicit_waterproofing as iw
 import json
+import time 
 
 class OccNetMVDataset(torch.utils.data.Dataset):
     """
@@ -90,7 +91,7 @@ class OccNetMVDataset(torch.utils.data.Dataset):
             batch[k] = [item[k] for item in data_list]
         return batch
 
-    def load_data(self):    
+    def load_data(self):
         # we only load valid frameIDS, we do not record 
         # file names as the view num is not specified
         self.frame_ids = []
@@ -209,15 +210,25 @@ class OccNetMVDataset(torch.utils.data.Dataset):
         if os.path.exists(uniform_sample_path):
             uniform_points = np.load(uniform_sample_path)['points']
             uniform_occ = np.load(uniform_sample_path)['occupancies']
+
+            # pointsf = uniform_points[uniform_occ]
+            # write_off("/workspace/z.xyz", pointsf)
+            # write_off("/workspace/check/z_{}.xyz".format(time.time()), pointsf)
+            # exit()
         else:
             # generate online
+            # print("MESH IS ", gt_mesh_path)            
             mesh = trimesh.load(gt_mesh_path)
             uniform_points = np.random.rand(100000, 3)
             uniform_points = 1.1 * (uniform_points - 0.5)
             uniform_occ = iw.implicit_waterproofing(mesh, uniform_points)[0]
+            
+            # pointsf = uniform_points[uniform_occ]
+            # write_off("/workspace/check/z_{}.xyz".format(time.time()), pointsf)
+            # exit()
             np.savez(uniform_sample_path, points=uniform_points,
                      occupancies=uniform_occ)
-        
+
         sample_indices = np.random.randint(0, len(uniform_points), self.num_sample_points)
                         
         points.extend(uniform_points[sample_indices])

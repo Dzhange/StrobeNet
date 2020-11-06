@@ -87,7 +87,7 @@ class LNRNet(nn.Module):
         grid_coords = torch.from_numpy(grid_coords).to(self.device, dtype=torch.float)
         grid_coords = torch.reshape(grid_coords, (1, len(grid_points), 3)).to(self.device)
         self.grid_coords = grid_coords
-        # return grid_coords
+        return grid_coords
     
     def forward(self, inputs):
         color = inputs['color00']
@@ -558,7 +558,7 @@ class LNRNet(nn.Module):
 
     def discretize(self, point_cloud, FeatureCloud, Res):
         # input: N*3 pointcloud
-        # output: 128**3 * F
+        # output resolution**3 * F
         if point_cloud is None:
             feature_dim = self.SegNet.feature_channels
             return torch.ones(feature_dim, *(self.resolution,)*3).to(device=self.device)        
@@ -581,6 +581,169 @@ class LNRNet(nn.Module):
 
         return voxel_feature
 
+    def gen_new_pose(self, input, pose_list):
+        """
+        Generate new posed shape for given instance
+        pose_list: 
+        """
+        ##############################################################################
+        color = inputs['color00']
+        output = self.SegNet(color)
+        batch_size = output.shape[0]
+
+        pred_nocs = output[:, :self.nocs_end, :, :].clone().requires_grad_(True)
+        pred_mask = output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)        
+
+        pred_loc = output[:, self.mask_end:self.loc_end, :, :].clone().requires_grad_(True)
+        pred_pose = output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
+        pred_weight = output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
+        conf = output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
+        nocs_feature = output[:, self.conf_end:self.ft_end, :, :].clone().requires_grad_(True)
+
+
+        pnnocs_maps = self.repose_pm_pred(pred_nocs, pred_loc, pred_pose, pred_weight, conf, pred_mask)        
+        output = torch.cat((output, pnnocs_maps), dim=1)
+
+        recon = None
+        grid_coords = inputs['grid_coords']
+        
+        transform = {'translation': inputs['translation'],
+                    'scale':inputs['scale']}
+        
+        ######################################################################################
+        
+        # then: we transform the point cloud into occupancy(along with the features)            
+        point_cloud_list, feature_cloud_list = self.lift(output, nocs_feature, transform)
+        sv_seg_list = self.get_seg_pc(output)
+        # sv_seg = sv_seg_list[0]
+
+        sv_loc_list, sv_rot_list = self.get_pose(output)
+        sv_loc = sv_loc_list[0] # this is the location for all the following re-posing
+        sv_rot = sv_rot_list[0]
+        axis = sv_rot / torch.norm(sv_rot, dim=1).unsqueeze(1)
+
+        loc_list = [sv_rot, ] * len(pose_list)
+        axis_angle_list = [axis * p for p in pose_list]
+
+        batch_id = 0
+        joint_num = self.joint_num
+        posed_pc_list = pose_union(point_cloud_list, sv_seg_list, loc_list, axis_angle_list, joint_num, batch_id)
+
+        occupancy_list = []
+        for i in range(batch_size):
+            occupancy = self.discretize(posed_pc_list[i], feature_cloud_list[i], self.resolution)
+            occupancy_list.append(occupancy)
+
+        occupancies = torch.stack(tuple(occupancy_list))
+            # if self.vis == True:
+        if 0:
+            self.visualize(occupancies)        
+        pass
+    
+    def get_seg_pc(self, sv_output):
+        """
+        output: list of seg array of shape (N_i, joint_num+2)
+        """
+        batch_size = sv_output.shape[0]
+        thresh = 0.7
+
+        pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
+        pred_seg = sv_output[:, self.pose_end:self.skin_end, :, :].clone().requires_grad_(True)
+        
+        pred_mask = pred_mask.sigmoid().squeeze(1)
+        seg_list = []
+        for i in range(batch_size):
+            cur_mask = pred_mask[i]
+            cur_seg = pred_seg[i]
+            masked = cur_mask > thresh
+            seg_pc = cur_seg[:, masked]
+            seg_pc = seg_pc.transpose(0, 1)
+            seg_list.append(seg_pc)
+        
+        return seg_list
+
+    def get_pose(self, sv_output):
+        """
+        output: list of joint location, list of joint rotation
+        """
+        batch_size = sv_output.shape[0]
+        pred_loc = sv_output[:, self.mask_end:self.loc_end, :, :].clone().requires_grad_(True)
+        pred_rot = sv_output[:, self.loc_end:self.pose_end, :, :].clone().requires_grad_(True)
+        pred_mask = sv_output[:, self.nocs_end:self.mask_end, :, :].clone().requires_grad_(True)
+        conf = sv_output[:, self.skin_end:self.conf_end, :, :].clone().requires_grad_(True)
+        pred_mask = pred_mask.sigmoid().squeeze(1)
+
+        pred_loc = self.vote(pred_loc, conf, pred_mask)
+        pred_rot = self.vote(pred_rot, conf, pred_mask) # axis-angle representation for the joint
+        
+        loc_list = []
+        rot_list = []
+
+        for i in range(batch_size):
+            loc = pred_loc[i].clone().requires_grad_(True)
+            rot = pred_rot[i].clone().requires_grad_(True)
+            loc_list.append(loc)
+            rot_list.append(rot)
+        return loc_list, rot_list
+    
+    @staticmethod
+    def pose_union(mv_pn_pc_list, mv_seg_list, mv_loc_list, mv_rot_list, joint_num, batch_id):
+        """        
+        Output:
+            a list of feature enriched occupancy, each item stands for one pose
+
+        Steps:
+            1. In the input point cloud and segmentation, we get each point in the PC corresponds to
+                a seg flag in the segmentation, so if we just concate the point cloud and segmentation
+                individually, the new point cloud is still segmented
+            2. Then we call the `repose_core` function, bring the point cloud to a new pose. 
+                We do this for EACH pose
+            3. we output the list of merged and posed point clouds. 
+        """
+        inst_pn_pc_list = []
+        inst_seg_list = []
+        inst_loc_list = []
+        inst_rot_list = []
+        # inst_feature_list = []        
+        valid_view_num = len(mv_pn_pc_list)
+
+        for view in range(valid_view_num):
+            cur_pc = mv_pn_pc_list[view][batch_id]            
+            cur_loc = mv_loc_list[view][batch_id]
+            cur_rot = mv_rot_list[view][batch_id]
+            cur_seg = mv_seg_list[view][batch_id]
+            # cur_feature = mv_feature_list[view][batch_id]
+            if cur_pc is not None:
+                # input with shape (3, N)
+                inst_pn_pc_list.append(cur_pc.transpose(0, 1))
+                inst_seg_list.append(cur_seg)
+                inst_loc_list.append(cur_loc)
+                inst_rot_list.append(cur_rot)
+                # inst_feature_list.append(cur_feature)
+        if len(inst_pn_pc_list) == 0:
+            return None
+            # inst_pn_pc = None
+            # inst_feature = None
+        else:
+            inst_pn_pc = torch.cat(tuple(inst_pn_pc_list), dim=0)
+            inst_seg = torch.cat(tuple(inst_seg_list), dim=0)
+            # inst_feature = torch.cat(tuple(inst_feature_list), dim=1)        
+        
+        posed_pc_list = []
+        for i in range(len(inst_loc_list)):
+            loc = inst_loc_list[i]
+            rot = inst_rot_list[i]
+            # write("/workspace/debug_0_loc.xyz",loc)
+            # write("/workspace/debug_0_rot.xyz",rot)
+            rot = -rot
+
+            posed_pc = LNRNet.repose_pc(inst_pn_pc, inst_seg, loc, rot, joint_num=joint_num)
+            posed_pc = posed_pc[0].transpose(1, 0)
+            posed_pc_list.append(posed_pc)
+        
+        return posed_pc_list
+
+
     def visualize(self, FeatureVoxel):
         feature_sample = FeatureVoxel[0]
         voxel = (feature_sample != 0).sum(dim=0).to(dtype=torch.bool)
@@ -596,6 +759,8 @@ class LNRNet(nn.Module):
         # mesh_path = "/workspace/Data/IF_PN_Aug13/train/0000/frame_00000000_isosurf_scaled.off"
         # import trimesh
         # mesh = trimesh.load(mesh_path)
-        # vox = VoxelGrid.from_mesh(mesh, 128, loc=[0, 0, 0], scale=1)
+        # vox = VoxelGrid.from_mesh(mesh, self.resolution, loc=[0, 0, 0], scale=1)
         # vox.to_mesh().export(gt_path)
         exit()
+
+    

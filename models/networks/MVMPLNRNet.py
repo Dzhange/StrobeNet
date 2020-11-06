@@ -82,7 +82,7 @@ class MVMPLNRNet(MLNRNet):
         ##### aggregation, iterate through all instance #####
         pn_recon = None    
         posed_recon_list = []
-            
+
         if not self.config.STAGE_ONE:
             pn_occupancy_list = [] # list for multi instance
             batch_posed_occupancy_list = [] # value is list of multi view occupancy in each instance
@@ -91,7 +91,6 @@ class MVMPLNRNet(MLNRNet):
                 inst_pn_pc, inst_feature = self.collect_pc(mv_pn_pc_list, mv_feature_list, batch_id=i)
                 pn_occupancy = self.discretize(inst_pn_pc, inst_feature, self.resolution)
                 pn_occupancy_list.append(pn_occupancy)
-                
                 
                 # repose uniton point cloud into individual pose 
                 inst_posed_pc_list = self.pose_union(mv_pn_pc_list, mv_seg_list, mv_loc_list, mv_rot_list,\
@@ -112,9 +111,7 @@ class MVMPLNRNet(MLNRNet):
             pn_occupancies = torch.stack(tuple(pn_occupancy_list))
             pn_grid_coords = inputs['cano_grid_coords']
             pn_recon = self.IFNet(pn_grid_coords, pn_occupancies)
-
-                        
-            
+                                    
             for view_id in range(self.view_num):
                 view_occ = []
                 # accumulate across batch
@@ -129,68 +126,6 @@ class MVMPLNRNet(MLNRNet):
         return output_list, pn_recon, posed_recon_list
         
 
-    @staticmethod
-    def pose_union(mv_pn_pc_list, mv_seg_list, mv_loc_list, mv_rot_list, joint_num, batch_id):
-        """        
-        Output:
-            a list of feature enriched occupancy, each item stands for one pose
-
-        Steps:
-            1. In the input point cloud and segmentation, we get each point in the PC corresponds to
-                a seg flag in the segmentation, so if we just concate the point cloud and segmentation
-                individually, the new point cloud is still segmented
-            2. Then we call the `repose_core` function, bring the point cloud to a new pose. 
-                We do this for EACH pose
-            3. we output the list of merged and posed point clouds. 
-        """
-        inst_pn_pc_list = []
-        inst_seg_list = []
-        inst_loc_list = []
-        inst_rot_list = []
-        # inst_feature_list = []        
-        valid_view_num = len(mv_pn_pc_list)
-
-        for view in range(valid_view_num):
-            cur_pc = mv_pn_pc_list[view][batch_id]            
-            cur_loc = mv_loc_list[view][batch_id]
-            cur_rot = mv_rot_list[view][batch_id]
-            cur_seg = mv_seg_list[view][batch_id]
-            # cur_feature = mv_feature_list[view][batch_id]
-            if cur_pc is not None:
-                # input with shape (3, N)
-                inst_pn_pc_list.append(cur_pc.transpose(0, 1))
-                inst_seg_list.append(cur_seg)
-                inst_loc_list.append(cur_loc)
-                inst_rot_list.append(cur_rot)
-                # inst_feature_list.append(cur_feature)
-        if len(inst_pn_pc_list) == 0:
-            return None
-            # inst_pn_pc = None
-            # inst_feature = None
-        else:
-            inst_pn_pc = torch.cat(tuple(inst_pn_pc_list), dim=0)
-            inst_seg = torch.cat(tuple(inst_seg_list), dim=0)
-            # inst_feature = torch.cat(tuple(inst_feature_list), dim=1)        
-        
-        posed_pc_list = []
-        for i in range(len(inst_loc_list)):
-            loc = inst_loc_list[i]
-            rot = inst_rot_list[i]
-            # write("/workspace/debug_0_loc.xyz",loc)
-            # write("/workspace/debug_0_rot.xyz",rot)
-            rot = -rot
-
-            posed_pc = LNRNet.repose_pc(inst_pn_pc, inst_seg, loc, rot, joint_num=joint_num)
-            posed_pc = posed_pc[0].transpose(1, 0)
-            posed_pc_list.append(posed_pc)
-        
-        return posed_pc_list
 
 
-        
 
-
-        
-
-
-                

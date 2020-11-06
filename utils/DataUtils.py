@@ -74,6 +74,12 @@ def np2torch(ImageNP):
 def imread_rgb_torch(Path, Size=None, interp=cv2.INTER_NEAREST): # Use only for loading RGB images
     ImageCV = cv2.imread(Path, -1)
     # Discard 4th channel since we are loading as RGB
+    if ImageCV is None:
+        print("[ ERROR ]Invalid path: ", Path)
+        os.system("rm {}".format(Path))
+        os.system("cp {} {}".format(Path.replace("_uni", ""), Path))        
+        ImageCV = cv2.imread(Path, -1)
+    
     if ImageCV.shape[-1] != 3:
         ImageCV = ImageCV[:, :, :3]
 
@@ -107,6 +113,12 @@ def imread_gray_torch(Path, Size=None, interp=cv2.INTER_NEAREST): # Use only for
     ImageCV = cv2.imread(Path, -1)
     # print(ImageCV.shape)
     # Discard 4th channel since we are loading as RGB
+    if ImageCV is None:
+        print("[ ERROR ]Invalid path: ", Path)
+        os.system("rm {}".format(Path))
+        os.system("cp {} {}".format(Path.replace("_uni", ""), Path))        
+        ImageCV = cv2.imread(Path, -1)
+
     if ImageCV.shape[-1] != 3:
         ImageCV = ImageCV[:, :, :3]
 

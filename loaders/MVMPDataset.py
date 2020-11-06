@@ -13,6 +13,7 @@ FileDirPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(FileDirPath, '..'))
 from loaders.MVSAPIENDataset import MVSPDataset
 from utils.DataUtils import *
+import time
 
 class MVMPDataset(MVSPDataset):
 
@@ -38,6 +39,10 @@ class MVMPDataset(MVSPDataset):
         cano_occ = self.load_occupancies(frame_base_path)
         batch['cano_grid_coords'] = cano_occ['grid_coords']
         batch['cano_occupancies'] = cano_occ['occupancies']
+                
+        # pointsf = batch['cano_grid_coords'][batch['cano_occupancies'].astype(np.bool)]
+        # write_off("/workspace/check/z_{}.xyz".format(time.time()), pointsf)
+
         batch['cano_iso_mesh'] = cano_occ['iso_mesh']
         if self.config.TRANSFORM:
             batch['cano_translation'] = cano_occ['translation']

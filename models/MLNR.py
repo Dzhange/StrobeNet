@@ -115,7 +115,6 @@ class ModelMLNRNet(ModelLNRNET):
             loss = objective(output_recon, target)
             epoch_losses.append(loss.item())
 
-
             if not self.config.STAGE_ONE:
                 self.gen_mesh(grid_points_split, data, i)
 

@@ -353,7 +353,7 @@ class MVPMLoss(PMLoss):
         self.crr_l2 = JiahuiL2Loss()
 
     def forward(self, output, target):
-        
+
         target.pop('mesh', None)
         target.pop('iso_mesh', None)
 
@@ -401,6 +401,8 @@ class MVPMLoss(PMLoss):
             mv_loss['crr_loss'] = self.crr_loss(segnet_output, tar_mask, crr)
 
         mv_loss = self.add_up(mv_loss)
+
+
 
         return mv_loss
 

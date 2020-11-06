@@ -8,7 +8,7 @@ FileDirPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(FileDirPath, '..'))
 from loaders.SAPIENDataset import SAPIENDataset
 from utils.DataUtils import *
-
+import time
 
 class MVSPDataset(SAPIENDataset):
 
@@ -16,7 +16,7 @@ class MVSPDataset(SAPIENDataset):
         super().__init__(config, train)
         self.view_num = config.VIEW_NUM # number of cameras per frame
 
-        # same set up as from jiahui's code 
+        # same set up as from jiahui's code
         self.supervision_cap = 9102 # maximum correspondence, bigger than most cases
 
     def load_data(self):    
@@ -80,7 +80,7 @@ class MVSPDataset(SAPIENDataset):
         return len(self.frame_ids)
 
     def __getitem__(self, idx):
-        
+
         data_list = []
         batch = {}
         frame_base_path = self.frame_ids[idx]
@@ -106,6 +106,10 @@ class MVSPDataset(SAPIENDataset):
     def get_sv_data(self, frame_path, view):
         data = self.load_images(frame_path, view)
         occ = self.load_occupancies(frame_path)
+
+        pointsf = occ['grid_coords'][occ['occupancies'].astype(np.bool)]
+        write_off("/workspace/check/z_{}.xyz".format(time.time()), pointsf)
+
         data.update(occ)
         return data
 
@@ -144,17 +148,17 @@ class MVSPDataset(SAPIENDataset):
         if self.projection:
             if "laptop" in self.dataset_dir:
                 cur_pose[:, 1] = 0
-        # Create map for pixel-wise supervisoin of pose        
+        # Create map for pixel-wise supervisoin of pose
         joint_map = self.gen_joint_map(cur_pose, self.img_size)
 
         frame['joint_map'] = joint_map
         frame['pose'] = cur_pose
-        
+
         mesh_path = frame_path + '_wt_mesh.obj'
-        
+
         if not self.is_train_data:        
             frame['mesh'] = mesh_path
-        
+
         return frame
         
     def load_occupancies(self, frame_path, view_id=None):
@@ -198,6 +202,8 @@ class MVSPDataset(SAPIENDataset):
         else:
             gt_mesh_path = os.path.join(data_dir, "frame_{}_view_{}_isosurf_scaled.off".format(index_of_frame, str(view_id).zfill(2)))
         # None of the if-data would be needed if in validation mode
+
+
         if_data = {
             'grid_coords':np.array(coords, dtype=np.float32),
             'occupancies': np.array(occupancies, dtype=np.float32),                        

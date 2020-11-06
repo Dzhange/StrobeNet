@@ -113,7 +113,7 @@ class ModelMVMPLNRNet(ModelLNRNET):
         loc_diff = []
 
         for i, data in enumerate(val_dataloader, 0):  # Get each batch
-            if i > (num_samples-1): 
+            if i > (num_samples-1):
                 break
 
             # first pass generate loss
@@ -144,16 +144,16 @@ class ModelMVMPLNRNet(ModelLNRNET):
                     tar_loc = target['pose'][view_id][0, :, 0:3]
                     cur_loc_diff = self.save_joint(segnet_output[view_id], tar_loc, mask, i, self.config.LOC_LOSS, view_id=view_id)
                     loc_diff.append(cur_loc_diff)                    
-                
+
                     gt_joint_map = target["joint_map"][view_id][:,:bone_num*3]
                     self.visualize_joint_prediction(segnet_output[view_id], gt_joint_map, mask, i, view_id=view_id)
-                
+
                 if self.config.POSE_LOSS or self.config.POSE_MAP_LOSS:
                     tar_pose = target['pose'][view_id][0, :, 3:6]
                     cur_pose_diff = self.save_joint(segnet_output[view_id], tar_pose, mask, i, \
                         use_score=self.config.POSE_LOSS, loc=False, view_id=view_id)
                     pose_diff.append(cur_pose_diff)
-                    
+
                     gt_joint_map = target["joint_map"][view_id][:,bone_num*3:]
                     self.visualize_joint_prediction(segnet_output[view_id], gt_joint_map, mask, i, loc=False, view_id=view_id)
 

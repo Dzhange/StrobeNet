@@ -101,7 +101,7 @@ class DataFilter:
                 all_frames = [self.findFrameNum(p) for p in all_color_imgs]
                 all_frames = list(dict.fromkeys(all_frames))
                 all_frames.sort()
-                p = Pool(mp.cpu_count() >> 1)
+                p = Pool(mp.cpu_count())
                 p.map(self.processFrame, all_frames)
             else:
                 # self.mode = "train"
@@ -266,7 +266,7 @@ class DataFilter:
 
             boundary_points = points + sigma * \
                 np.random.randn(self.SampleNum, 3)
-            
+
             # MUST DO THIS FOR grid
             grid_coords = boundary_points.copy()
             grid_coords[:, 0], grid_coords[:, 2] = boundary_points[:, 2], boundary_points[:, 0]

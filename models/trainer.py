@@ -32,7 +32,7 @@ class Trainer:
         cur_epoch = 0
 
         all_tic = getCurrentEpochTime()
-        show_time = 1
+        show_time = 0
         while cur_epoch < self.config.EPOCH_TOTAL:
             try:
                 epoch_losses = [] # For all batches in an epoch
@@ -58,7 +58,7 @@ class Trainer:
                         print("[ ERROR ] strange loss encountered")
                     if show_time:
                         torch.cuda.synchronize()
-                        loss.backward()
+                    loss.backward()
                     time_d = time()
                     self.model.optimizer.step()
                     ####################### START MONITOR ################################
