@@ -84,18 +84,15 @@ class MVSPDataset(SAPIENDataset):
         data_list = []
         batch = {}
         frame_base_path = self.frame_ids[idx]
-
         if self.config.RANDOM_VIEW:
             views = np.random.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
         else:
             views = list(range(self.view_num))
-
         for view in views:
             data = self.get_sv_data(frame_base_path, view)                        
             data_list.append(data)
         for k in data_list[0].keys():
-            batch[k] = [item[k] for item in data_list]        
-
+            batch[k] = [item[k] for item in data_list]                
         # TODO: also include pair-wise consistency data
         if self.config.CONSISTENCY != 0:
             crr = self.get_crr(batch)
@@ -276,6 +273,7 @@ class MVSPDataset(SAPIENDataset):
 
         q_pc_list = [query_view[:, query_mask.squeeze() > 0].permute(1, 0).numpy()
                      for query_view, query_mask in zip(query_pc_list, query_mask_list)]
+
         b_pc = base_pc[:, base_mask.squeeze() > 0].permute(1, 0).numpy()
 
         neigh = NearestNeighbors(n_neighbors=1)

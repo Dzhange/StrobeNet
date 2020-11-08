@@ -131,7 +131,8 @@ class ModelLNRNET(ModelSegLBS):
                     continue
                 elif "SegNet" in k:
                     new_k = k.replace("SegNet.", "")
-                    model_dict[new_k] = check_point_dict['ModelStateDict'][k]
+                    model_dict[new_k] = check_point_dict['ModelStateDict'][k]            
+            print('[ INFO ]: Temp Use, Loading from pretrained model in {}'.format(TargetPath))
             self.net.SegNet.load_state_dict(model_dict)
 
     def validate(self, val_dataloader, objective, device):

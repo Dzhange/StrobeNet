@@ -265,8 +265,8 @@ class LNRNet(nn.Module):
                 all_pnnocs.append(torch.zeros(pred_nocs[0].size()).to(device=pred_nocs.device))
             else:
                 # m = mask.copy()                
-                pnnocs, pnnocs_map = self.repose_pm_core(nocs, loc, rot, seg, mask, self.joint_num)                                
-                # _, pnnocs_map = self.repose_pm_fast(nocs, loc, rot, seg, mask, self.joint_num)                                
+                pnnocs, pnnocs_map = self.repose_pm_core(nocs, loc, rot, seg, mask, self.joint_num)
+                # _, pnnocs_map = self.repose_pm_fast(nocs, loc, rot, seg, mask, self.joint_num)
                 if pnnocs_map is None:
                     all_pnnocs.append(torch.zeros(pred_nocs[0].size()).to(device=pred_nocs.device))
                 else:

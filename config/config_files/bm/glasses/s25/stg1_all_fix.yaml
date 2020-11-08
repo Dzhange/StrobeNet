@@ -6,7 +6,7 @@
 # 4. random views
 
 
-DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/glasses/mv8_fix_scale_mpf_uni/'
+DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/glasses/scale_2.5/mv8_fix_scale_mpf_uni/'
 OUTPUT_DIR: '/workspace/dev_nrnocs/output/benchmark/glasses/'
 VIEW_NUM: 2 # we use random views this time
 RANDOM_VIEW: True
@@ -21,8 +21,8 @@ VAL_DATA_LIMIT: 5
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
-TASK: "mvmp"
-# TASK: "mlnrnet"
+# TASK: "mvmp"
+TASK: "mlnrnet"
 EXPT_NAME: "stg1_fix"
 BONE_NUM: 2
 GPU: 3

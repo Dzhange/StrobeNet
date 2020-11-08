@@ -434,9 +434,15 @@ class MVPMLoss(PMLoss):
                     paired_pc_from_base_to_query = paired_pc_from_base_to_query.squeeze(0)
                     # paired_pc_from_base_to_query = torch.gather(base_pn_pc.squeeze(3), dim=2,
                     #                                             index=pair_idx.repeat(1, 3, 1)).unsqueeze(3)
-                    # write_off("/workspace/crr/pred_crr_0.xyz", query_pn_pc)
-                    # write_off("/workspace/crr/pred_crr_1.xyz", paired_pc_from_base_to_query)
+                    
+                    # points_num = query_pn_pc.shape[0]
+                    # size = 20
+                    # step = points_num // size
+                    # for i in range(step):
+                    #     write_off("/workspace/crr/pred_crr_0_{}.xyz".format(i), query_pn_pc[i*size:(i+1)*size])
+                    #     write_off("/workspace/crr/pred_crr_1_{}.xyz".format(i), paired_pc_from_base_to_query[i*size:(i+1)*size])
                     # exit()
+
                     _p1_list.append(paired_pc_from_base_to_query)
                     _p2_list.append(query_pn_pc)
                     _m_list.append(crr['crr-mask-mtx'][base_view_id][query_view_id][b_id].squeeze())

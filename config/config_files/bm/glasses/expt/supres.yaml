@@ -5,14 +5,14 @@
 # 3. multi view
 # 4. random views
 
-DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/glasses/scale_2.5/mv4_scale_nobg_debug_IF/'
+DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/glasses/mv8_fix_scale_mpf_nobg_uni/'
 OUTPUT_DIR: '/workspace/dev_nrnocs/output/benchmark/glasses/'
 VIEW_NUM: 2 # we use random views this time
-# RANDOM_VIEW: True
-TOTAL_VIEW: 4
+RANDOM_VIEW: True
+TOTAL_VIEW: 8
 
 BATCHSIZE: 1
-DATALOADER_WORKERS: 5
+DATALOADER_WORKERS: 2
 EPOCH_TOTAL: 20
 
 DATA_LIMIT: 100
@@ -22,9 +22,13 @@ TARGETS: ["default"]
 
 # TASK: "mvmp"
 TASK: "mlnrnet"
-EXPT_NAME: "cano_v4_IF"
+EXPT_NAME: "supres"
+RESOLUTION: 128
+SUPER_RES: True
+
+
 BONE_NUM: 2
-GPU: 3
+GPU: 7
 OUT_CHANNELS: 12 #4 + 1*8
 # TEST_ON_TRAIN: True
 TEST_ON_TRAIN: False
@@ -56,6 +60,5 @@ RECON_LOSS: 0.1
 
 AGGR_SCATTER: True
 NRNET_PRETRAIN: True
-NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/glasses/glasses_stg1_fix_nobg_s2_5/stg1_fix_nobg_9999-12-31T23-59-59.tar"
-# NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/stg1_all/stg1_all_9999-12-31T23-59-59.tar"
+NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/glasses/big_stg1_fix_nobg/big_stg1_fix_nobg_9999-12-31T23-59-59.tar"
 

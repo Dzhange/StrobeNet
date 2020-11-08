@@ -39,21 +39,28 @@ cnt = 0
 #     if int(frame_nunm) > 1000:
 #         os.remove(path)
 
-def simplify(path):
-    if "split" not in path:
-        # command = "{} {} {} 5000".format("/workspace/Manifol/build/manifold", path, path)
-        mt = "meshlabserver -i {} -o {} -m wt".format(path, path)
-        command = "xvfb-run -a -s '-screen 0 1000x1000x24' meshlabserver -i {} -o {} -s {}".format(path, path, './utils/meshlab_scripts/simplify.mlx')
-        os.system(mt)
-        os.system(command)
+# def simplify(path):
+#     if "split" not in path:
+#         # command = "{} {} {} 5000".format("/workspace/Manifol/build/manifold", path, path)
+#         mt = "meshlabserver -i {} -o {} -m wt".format(path, path)
+#         command = "xvfb-run -a -s '-screen 0 1000x1000x24' meshlabserver -i {} -o {} -s {}".format(path, path, './utils/meshlab_scripts/simplify.mlx')
+#         os.system(mt)
+#         os.system(command)
+
+def crt(frame):
+    v = np.loadtxt(frame)
+    if v.shape[0] == 0:
+        os.system("rm {}".format(frame))
+        os.system("cp {} {}".format(frame.replace('_uni', ''), frame ))
 
 if __name__ == "__main__":
     # with open(cache_path, 'rb') as fp:
         # frames = pickle.load(fp)
     import glob
-    frames = glob.glob("/workspace/Data/assets/agmt_assets/s2m_oven/*/part_objs/*obj")
+    frames = glob.glob("/workspace/Data/SAPIEN/benchmark/glasses/mv8_fix_scale_mpf_nobg_uni/*/*/*pose*")
     p = Pool(mp.cpu_count())
     # p.map(simplify, frames)
     for i in range(len(frames)):
-        print(frames[i])
-        simplify(frames[i])
+        # print(frames[i])
+        # simplify(frames[i])
+        crt(frames[i])

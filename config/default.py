@@ -20,6 +20,9 @@ def get_default_cfg():
     cfg.RANDOM_VIEW = False
     cfg.TOTAL_VIEW = 4
 
+    cfg.GEN_OUTPUT = 'None'
+    cfg.GEN_INPUT = 'None'
+
     # fundamental setting
     cfg.ROOT_DIR = os.getcwd()
     cfg.CONFIG_FILE = 'None'

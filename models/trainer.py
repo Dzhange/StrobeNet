@@ -27,7 +27,7 @@ class Trainer:
         self.model.net.to(device)
 
     def train(self):
-        self.model.setup_checkpoint(self.device)
+        self.model.setup_checkpoint(self.device)        
         self.model.net.train()
         cur_epoch = 0
 
@@ -37,8 +37,9 @@ class Trainer:
             try:
                 epoch_losses = [] # For all batches in an epoch
                 tic = getCurrentEpochTime()
-                # for data in self.train_data_loader:
+                # for data in self.train_data_loader:                
                 for i, data in enumerate(self.train_data_loader, 0):  # Get each batch          
+                    
                     # break
                     ################### START WEIGHT UPDATE ################################
                     self.model.optimizer.zero_grad()

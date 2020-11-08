@@ -47,7 +47,7 @@ class MLNRNet(LNRNet):
     def forward(self, inputs):
 
         img_list = inputs['color00']
-        batch_size = self.config.BATCHSIZE
+        batch_size = img_list[0].shape[0]
 
         # DEBUG: try old network
         
@@ -138,12 +138,13 @@ class MLNRNet(LNRNet):
 
         return sv_output, nocs_feature
 
-    def collect_pc(self, mv_pc_list, mv_feature_list, batch_id):                
+    def collect_pc(self, mv_pc_list, mv_feature_list, batch_id):
         # we aggregate for each item in the batch
         instance_pc_list = []
         instance_feature_list = []
         valid_view_num = len(mv_pc_list)
         for view in range(valid_view_num):
+            # print(len(mv_pc_list[view]))
             cur_pc = mv_pc_list[view][batch_id]
             cur_feature = mv_feature_list[view][batch_id]
             if cur_pc is not None and cur_feature is not None:

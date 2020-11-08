@@ -94,14 +94,22 @@ class DataFilter:
                 os.mkdir(cur_out_dir)
             if 1:
                 self.mode = mode
-                all_color_imgs = glob.glob(os.path.join(
-                    self.inputDir, mode, '**/frame_*_view_*_color00.*'))
-                all_color_imgs = glob.glob(os.path.join(
-                    self.inputDir, mode, '**/frame_*_color00.*'))
+                # all_color_imgs = glob.glob(os.path.join(
+                #     self.inputDir, mode, '**/frame_*_view_*_color00.*'))                
+                all_subdirs = glob.glob(os.path.join(
+                    self.inputDir, mode, '*'))
+                all_subdirs.sort()
+                all_color_imgs = []
+                for subdir in all_subdirs:
+                    print("globing on ", subdir)
+                    cur_color_imgs = glob.glob(os.path.join(
+                        self.inputDir, mode, '{}/frame_*_color00.*'.format(subdir)))
+                    all_color_imgs.extend(cur_color_imgs)
+
                 all_frames = [self.findFrameNum(p) for p in all_color_imgs]
                 all_frames = list(dict.fromkeys(all_frames))
                 all_frames.sort()
-                p = Pool(mp.cpu_count())
+                p = Pool(mp.cpu_count() >> 3)
                 p.map(self.processFrame, all_frames)
             else:
                 # self.mode = "train"
@@ -202,7 +210,8 @@ class DataFilter:
         translation = 0
         scale = 1
         try:
-            os.system("{} {} {} 10000".format("/workspace/Manifold/build/manifold", orig_mesh_path, orig_mesh_path))
+            if self.config.manifold_each_mesh:
+                os.system("{} {} {} 10000".format("/workspace/Manifold/build/manifold", orig_mesh_path, orig_mesh_path))
             mesh = trimesh.load(orig_mesh_path, process=False)
             if self.transform:
                 # print("WRONG!!")
@@ -327,6 +336,8 @@ if __name__ == "__main__":
                         type=ast.literal_eval, help="SAPIEN dataset is a little different")
     parser.add_argument('-mpf','--mesh_per_frame', default=False,
                         type=ast.literal_eval, help="decide if there is a corresponding mesh for [ EACH VIEW ]")
+    parser.add_argument('-mem','--manifold_each_mesh', default=True,
+                        type=ast.literal_eval, help="decide if run manifold script for mesh for [ EACH VIEW ]")
     parser.add_argument('-c', '--category', default='laptop', required=True, choices=['laptop', 'oven', 'eyeglass'],
                         help='the category of the dataset')
     parser.add_argument('--write-over', default=False, type=ast.literal_eval,
