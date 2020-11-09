@@ -5,41 +5,40 @@
 # 3. multi view
 # 4. random views
 
-DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/glasses/mv8_fix_scale_mpf_nobg_uni/'
-OUTPUT_DIR: '/workspace/dev_nrnocs/output/benchmark/glasses/'
+
+DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/oven/benchmark_v2_uni/'
+OUTPUT_DIR: '/workspace/dev_nrnocs/output/benchmark/oven/'
 VIEW_NUM: 2 # we use random views this time
 RANDOM_VIEW: True
 TOTAL_VIEW: 8
 
 BATCHSIZE: 1
-DATALOADER_WORKERS: 2
-EPOCH_TOTAL: 20
+DATALOADER_WORKERS: 5
+EPOCH_TOTAL: 50
 
 DATA_LIMIT: 100
-VAL_DATA_LIMIT: 20
+VAL_DATA_LIMIT: 5
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
 # TASK: "mvmp"
 TASK: "mlnrnet"
-EXPT_NAME: "big_recon_base"
-RESOLUTION: 128
-
-BONE_NUM: 2
-GPU: 2
+EXPT_NAME: "stg1_bm1" ## This is the result with back ground! I wrote it wrong! V2 actually
+BONE_NUM: 1
+GPU: 1
 OUT_CHANNELS: 12 #4 + 1*8
 # TEST_ON_TRAIN: True
 TEST_ON_TRAIN: False
 
 REPOSE: True
-# STAGE_ONE: True
-STAGE_ONE: False
+STAGE_ONE: True
+
 
 ###################################################
 MODES: ['train','val']
 # MODES: ['val']
 LR: 1e-4
-SAVE_FREQ: 1
+SAVE_FREQ: 5
 MH: True
 BN: False
 
@@ -57,6 +56,6 @@ RECON_LOSS: 0.1
 
 
 AGGR_SCATTER: True
-NRNET_PRETRAIN: True
-NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/glasses/big_stg1_fix_nobg/big_stg1_fix_nobg_9999-12-31T23-59-59.tar"
+# NRNET_PRETRAIN: True
+# NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/glasses_aug1_bkup/scale_1_9999-12-31T23-59-59.tar"
 

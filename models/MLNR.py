@@ -170,10 +170,10 @@ class ModelMLNRNet(ModelLNRNET):
 
                     self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i, transform =transform, view_id=view_id)
 
-                str_loc_diff = "avg loc diff is {:.6f} ".format(np.mean(np.asarray(loc_diff)))
-                str_angle_diff = "avg diff is {:.6f} degree ".format(np.degrees(np.mean(np.asarray(pose_diff))))
-                str_loss = "avg validation loss is {:6f}".format(np.mean(np.asarray(epoch_losses)))
-                sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loc_diff + str_angle_diff + str_loss)
-                # sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loss)
-                sys.stdout.flush()
+            str_loc_diff = "avg loc diff is {:.6f} ".format(np.mean(np.asarray(loc_diff)))
+            str_angle_diff = "avg diff is {:.6f} degree ".format(np.degrees(np.mean(np.asarray(pose_diff))))
+            str_loss = "avg validation loss is {:6f}".format(np.mean(np.asarray(epoch_losses)))
+            sys.stdout.write("\r[ VAL ] {}th data loss {:6f} ".format(i, loss.item()) + str_loc_diff + str_angle_diff + str_loss)
+            # sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loss)
+            sys.stdout.flush()
             print("\n")

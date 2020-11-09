@@ -5,15 +5,14 @@
 # 3. multi view
 # 4. random views
 
-
-DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/oven/benchmark_v1_uni/'
-OUTPUT_DIR: '/workspace/dev_nrnocs/output/benchmark/oven/'
+DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/laptop/benchmark_v1_uni/'
+OUTPUT_DIR: '/workspace/dev_nrnocs/output/benchmark/laptop/'
 VIEW_NUM: 2 # we use random views this time
 RANDOM_VIEW: True
 TOTAL_VIEW: 8
 
 BATCHSIZE: 1
-DATALOADER_WORKERS: 5
+DATALOADER_WORKERS: 2
 EPOCH_TOTAL: 50
 
 DATA_LIMIT: 100
@@ -25,7 +24,7 @@ TARGETS: ["default"]
 TASK: "mlnrnet"
 EXPT_NAME: "stg1_bm1"
 BONE_NUM: 1
-GPU: 1
+GPU: 2
 OUT_CHANNELS: 12 #4 + 1*8
 # TEST_ON_TRAIN: True
 TEST_ON_TRAIN: False
@@ -33,12 +32,11 @@ TEST_ON_TRAIN: False
 REPOSE: True
 STAGE_ONE: True
 
-
 ###################################################
 MODES: ['train','val']
 # MODES: ['val']
 LR: 1e-4
-SAVE_FREQ: 5
+SAVE_FREQ: 1
 MH: True
 BN: False
 

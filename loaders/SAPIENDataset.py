@@ -38,8 +38,8 @@ class SAPIENDataset(torch.utils.data.Dataset):
         self.load_data()
         ##############################################
         # if "laptop" in self.dataset_dir:        
-        # self.projection = True
-        self.projection = False
+        self.projection = True
+        # self.projection = False
         ##############################################
 
     def init(self, root, train=True, 

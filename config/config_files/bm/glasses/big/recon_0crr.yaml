@@ -16,17 +16,17 @@ DATALOADER_WORKERS: 5
 EPOCH_TOTAL: 20
 
 DATA_LIMIT: 100
-VAL_DATA_LIMIT: 5
+VAL_DATA_LIMIT: 20
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
 # TASK: "mvmp"
 TASK: "mlnrnet"
-EXPT_NAME: "big_recon_base"
+EXPT_NAME: "big_recon_0crr"
 RESOLUTION: 128
 
 BONE_NUM: 2
-GPU: 2
+GPU: 6
 OUT_CHANNELS: 12 #4 + 1*8
 # TEST_ON_TRAIN: True
 TEST_ON_TRAIN: False
@@ -43,9 +43,8 @@ SAVE_FREQ: 1
 MH: True
 BN: False
 
-# CONSISTENCY: 1
-CONSISTENCY: 1
-# Try training with CRR loss *10 from the  middle of training
+
+CONSISTENCY: 0
 # NOCS_LOSS: 10
 NOCS_LOSS: 1
 POSE_LOSS: 1
@@ -58,5 +57,5 @@ RECON_LOSS: 0.1
 
 AGGR_SCATTER: True
 NRNET_PRETRAIN: True
-NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/glasses/big_stg1_fix_nobg/big_stg1_fix_nobg_9999-12-31T23-59-59.tar"
+NRNET_PRETRAIN_PATH: "/workspace/dev_nrnocs/output/benchmark/glasses/big_stg1_fix_nobg_0crr/big_stg1_fix_nobg_0crr_9999-12-31T23-59-59.tar"
 

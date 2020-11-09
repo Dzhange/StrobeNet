@@ -114,7 +114,7 @@ class DataFilter:
             else:
                 # self.mode = "train"
                 self.mode = "train"
-                self.processFrame("00000001")
+                self.processFrame("00003555")
 
     def processFrame(self, Frame):
         print(mp.current_process(), "operaint on ", Frame)

@@ -75,16 +75,8 @@ if __name__ == "__main__":
             view_num = len(imgs)
             data = {}
             data['colr00'] = imgs
-            
-                        
-            
+            data['translation'] = [torch.Tensor((-0.5, -0.5, -0.5)), ] * view_num
+            data['scale'] = [torch.Tensor([1]), ] * view_num
 
-    
-
-
-
-
-
-
-
-
+            grid_coords = Model.net.grid_coords
+            grid_points_split = torch.split(grid_coords, 100000, dim=1)

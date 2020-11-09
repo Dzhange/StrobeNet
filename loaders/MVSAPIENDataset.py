@@ -15,7 +15,8 @@ class MVSPDataset(SAPIENDataset):
     def __init__(self, config, train):
         super().__init__(config, train)
         self.view_num = config.VIEW_NUM # number of cameras per frame
-
+        
+        self.rng = np.random.RandomState(0)
         # same set up as from jiahui's code
         self.supervision_cap = 9102 # maximum correspondence, bigger than most cases
 
@@ -85,7 +86,7 @@ class MVSPDataset(SAPIENDataset):
         batch = {}
         frame_base_path = self.frame_ids[idx]
         if self.config.RANDOM_VIEW:
-            views = np.random.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
+            views = self.rng.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
         else:
             views = list(range(self.view_num))
         for view in views:
@@ -145,6 +146,7 @@ class MVSPDataset(SAPIENDataset):
         if self.projection:
             if "laptop" in self.dataset_dir:
                 cur_pose[:, 1] = 0
+
         # Create map for pixel-wise supervisoin of pose
         joint_map = self.gen_joint_map(cur_pose, self.img_size)
 
