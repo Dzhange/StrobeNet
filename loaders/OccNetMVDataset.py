@@ -32,7 +32,8 @@ class OccNetMVDataset(torch.utils.data.Dataset):
         self.init(root, train, img_size, limit, self.frame_load_str, required)
         self.load_data()
         self.view_num = config.VIEW_NUM
-
+        self.rng = np.random.RandomState(0)
+        
     def init(self, root, train=True,
              img_size=(320, 240), limit=100, frame_load_str=None, required='VertexColors'):
         self.dataset_dir = root
@@ -56,7 +57,7 @@ class OccNetMVDataset(torch.utils.data.Dataset):
         # self.num_sample_points = 100000
 
         self.shuffle_in_limit = True
-        print(limit)
+        # print(limit)
         if limit <= 0.0 or limit > 100.0:
             raise RuntimeError('Data limit percent has to be >0% and <=100%')
         self.data_limit = limit
@@ -81,7 +82,10 @@ class OccNetMVDataset(torch.utils.data.Dataset):
         frame_base_path = self.frame_ids[idx]
 
         if self.config.RANDOM_VIEW:
-            views = np.random.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
+            if self.is_train_data:
+                views = np.random.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
+            else:
+                views = self.rng.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
         else:
             views = list(range(self.view_num))
         for view in views:

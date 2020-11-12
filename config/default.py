@@ -19,6 +19,7 @@ def get_default_cfg():
     cfg.VIEW_NUM = 1
     cfg.RANDOM_VIEW = False
     cfg.TOTAL_VIEW = 4
+    cfg.NUM_SAMPLE_POINTS = 50000
 
     cfg.GEN_OUTPUT = 'None'
     cfg.GEN_INPUT = 'None'
@@ -58,7 +59,7 @@ def get_default_cfg():
     cfg.VIS_PER_N_EPOCH = 1
     cfg.VIS_PER_N_BATCH = 1
     cfg.VIS_ONE_PER_BATCH = True
-    cfg.VIS_TRAIN_PER_BATCH = 20
+    cfg.VIS_TRAIN_PER_BATCH = 20    
 
     cfg.BACKUP_FILES = []
 
@@ -81,12 +82,14 @@ def get_default_cfg():
     cfg.NRNET_PRETRAIN = False
     cfg.NRNET_PRETRAIN_PATH = "./"
 
+    
     cfg.UPDATE_SEG = True
     cfg.IF_BN = False
     cfg.BN = False
     cfg.AGGR_SCATTER = False
     cfg.RESOLUTION = 128
 
+    cfg.USE_FEATURE = True # ablation: see how network performs when we do not give it feature
     cfg.PRED_FEATURE = True
     cfg.FEATURE_CHANNELS = 64
 
@@ -105,7 +108,8 @@ def get_default_cfg():
     cfg.RECON_LOSS = 1.0
 
     cfg.CONSISTENCY = 0
-    
+
+    cfg.GLOBAL_FEATURE = False # use global feature from SegNet
     cfg.IF_SHALLOW = False
     cfg.SUPER_RES = False
     cfg.IF_IN_DIM = 16

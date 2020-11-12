@@ -19,7 +19,10 @@ class SVR(nn.Module):
         super(SVR, self).__init__()
 
         self.config = config
-        input_dim = config.FEATURE_CHANNELS
+        if self.config.USE_FEATURE:
+            input_dim = config.FEATURE_CHANNELS
+        else:
+            input_dim = 1 # no feature, only occupancy
 
         self.conv_in = nn.Conv3d(input_dim, self.config.IF_IN_DIM, 3, padding=1, padding_mode='replicate')  # out: 256 ->m.p. 128
         self.conv_0 = nn.Conv3d(self.config.IF_IN_DIM, 32, 3, padding=1, padding_mode='replicate')  # out: 128
@@ -34,6 +37,11 @@ class SVR(nn.Module):
         self.conv_4_1 = nn.Conv3d(128, 128, 3, padding=1, padding_mode='replicate')  # out: 8
         
         feature_size = (input_dim + self.config.IF_IN_DIM + 32 + 64 + 128 + 128 + 128) * 7 + 3
+        
+        self.use_global_feature = config.GLOBAL_FEATURE
+        if self.use_global_feature:
+            feature_size += 1024
+
         self.fc_0 = nn.Conv1d(feature_size, hidden_dim * 2, 1)
         self.fc_1 = nn.Conv1d(hidden_dim *2, hidden_dim, 1)
         self.fc_2 = nn.Conv1d(hidden_dim , hidden_dim, 1)
@@ -65,7 +73,7 @@ class SVR(nn.Module):
 
         self.displacments = torch.Tensor(displacments).to(device)
 
-    def forward(self, p, x):
+    def forward(self, p, x, global_feature=None):
         # x = x.unsqueeze(1)
 
         p_features = p.transpose(1, -1)
@@ -117,14 +125,26 @@ class SVR(nn.Module):
 
         features = torch.cat((feature_0, feature_1, feature_2, feature_3, feature_4, feature_5, feature_6),
                              dim=1)  # (B, features, 1,7,sample_num)
+
+        
+
+
         shape = features.shape
         features = torch.reshape(features,
                                  (shape[0], shape[1] * shape[3], shape[4]))  # (B, featues_per_sample, samples_num)
         features = torch.cat((features, p_features), dim=1)  # (B, featue_size, samples_num)
-
+        
+        if self.use_global_feature:
+            global_feature = global_feature.view(-1, 1).repeat(1, 1, features.shape[2])
+            # print(global_feature.shape, features.shape)
+            features = torch.cat((features, global_feature), dim=1)
+        # print(features.shape)
         net = self.actvn(self.fc_0(features))
+        # print(net.shape)
         net = self.actvn(self.fc_1(net))
+        # print(net.shape)
         net = self.actvn(self.fc_2(net))
+        # print(net.shape)
         net = self.fc_out(net)
         out = net.squeeze(1)
 

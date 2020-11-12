@@ -33,6 +33,7 @@ class Validater:
         # if self.config.TASK == "occupancy":
             # self.validate_occ()
         # else:
+        self.model.setup_checkpoint(self.device)
         self.model.validate(self.val_dataloader, self.objective, self.device)
 
     ############ DISCARDED #############

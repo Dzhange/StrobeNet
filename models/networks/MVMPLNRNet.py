@@ -37,7 +37,7 @@ class MVMPLNRNet(MLNRNet):
 
         # DEBUG: try old network
         
-        if isinstance(self.SegNet, MVTHSegNet):
+        if isinstance(self.SegNet, MVTHSegNet):            
             pred_list = self.SegNet(img_list)
         else:
             sv_output = self.SegNet(img_list[0])
@@ -106,10 +106,13 @@ class MVMPLNRNet(MLNRNet):
                     posed_occupancy_list.append(posed_occupancy)
                 batch_posed_occupancy_list.append(posed_occupancy_list)
 
-            # self.visualize(occupancies)
+            
             # and then feed into IF-Net. The ground truth shouled be used in the back projection
             pn_occupancies = torch.stack(tuple(pn_occupancy_list))
-            pn_grid_coords = inputs['cano_grid_coords']
+
+            self.visualize(pn_occupancies)
+
+            pn_grid_coords = inputs['cano_grid_coords']            
             pn_recon = self.IFNet(pn_grid_coords, pn_occupancies)
                                     
             for view_id in range(self.view_num):

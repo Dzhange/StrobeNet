@@ -31,7 +31,7 @@ class MLNRNet(LNRNet):
     def init_network(self):
         self.SegNet = MVTHSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, \
             feature_channels=self.config.FEATURE_CHANNELS, pred_feature=self.config.PRED_FEATURE,\
-            bn=self.config.BN)
+            bn=self.config.BN, return_code=self.config.GLOBAL_FEATURE)
         # self.SegNet = THSegNet(pose_channels=self.joint_num*(3+3+1+1)+2, bn=self.config.BN)
         self.SegNet.to(self.device)
         if self.config.IF_SHALLOW:
@@ -41,6 +41,15 @@ class MLNRNet(LNRNet):
         else:
             self.IFNet = SVR(self.config, self.device)
         
+        if self.config.GLOBAL_FEATURE:
+            # from Jiahui
+            self.concentrate = nn.Sequential(
+                nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=0, stride=1),
+                nn.BatchNorm2d(512),
+                nn.ELU(),
+                nn.Conv2d(in_channels=512, out_channels=1024, kernel_size=3, padding=0, stride=1),
+                nn.MaxPool2d(kernel_size=(3, 6))
+            )
         # if not self.config.PRED_FEATURE:
             # torch.backends.cudnn.enabled = False
 
@@ -52,9 +61,19 @@ class MLNRNet(LNRNet):
         # DEBUG: try old network
         
         if isinstance(self.SegNet, MVTHSegNet):
-            pred_list = self.SegNet(img_list)
+            if self.config.GLOBAL_FEATURE:
+                pred_list, featuremap_list = self.SegNet(img_list)
+                code_list = []
+                for fm in featuremap_list:  # do for each view
+                    code_list.append(self.concentrate(fm).reshape(batch_size, -1, 1).contiguous())
+                global_z = torch.max(torch.cat(code_list, 2), dim=2).values.contiguous()
+                # print(global_z.shape)
+            else:
+                pred_list = self.SegNet(img_list)
+            
         else:
-            sv_output = self.SegNet(img_list[0])
+            sv_output = self.SegNet(img_list[0])            
+    
         mv_pc_list = []
         mv_feature_list = []
         b_mv_occupancy_list = [] # occupancy stored in it are batch wise
@@ -102,8 +121,13 @@ class MLNRNet(LNRNet):
                 occupancy_list = []
                 for i in range(batch_size):
                     # we aggregate for each item in the batch
-                    instance_pc, instance_feature = self.collect_pc(mv_pc_list, mv_feature_list, batch_id=i)
-                    occupancy = self.discretize(instance_pc, instance_feature, self.resolution)
+                    instance_pc, instance_feature = self.collect_pc(mv_pc_list, mv_feature_list, batch_id=i)                    
+                    # write_off("/workspace/test.xyz", instance_pc.transpose(1,0))
+                    if self.config.USE_FEATURE:
+                        occupancy = self.discretize(instance_pc, instance_feature, self.resolution)
+                    else:
+                        occupancy = self.discretize_no_feature(instance_pc, self.resolution)
+                        # occupancy = occupancy.unsqueeze(dim=0)
                     occupancy_list.append(occupancy)
                 occupancies = torch.stack(tuple(occupancy_list))
             else:
@@ -112,7 +136,10 @@ class MLNRNet(LNRNet):
 
             # self.visualize(occupancies)
             # and then feed into IF-Net. The ground truth shouled be used in the back projection
-            recon = self.IFNet(grid_coords, occupancies)
+            if self.config.GLOBAL_FEATURE:
+                recon = self.IFNet(grid_coords, occupancies, global_z)
+            else:
+                recon = self.IFNet(grid_coords, occupancies)
         
         # return output_list, recon
         if isinstance(self.SegNet, MVTHSegNet):

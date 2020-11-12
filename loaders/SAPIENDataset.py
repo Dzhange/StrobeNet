@@ -63,7 +63,9 @@ class SAPIENDataset(torch.utils.data.Dataset):
         # For occupancies
         self.occ_load_str = ['boundary_0.1_samples', 'boundary_0.01_samples']
         self.sample_distribt = np.array([0.5, 0.5])
-        self.num_sample_points = 50000
+        
+        self.num_sample_points = self.config.NUM_SAMPLE_POINTS
+
         self.num_samples = np.rint(self.sample_distribt * self.num_sample_points).astype(np.uint32)
 
         self.data_offset = 0
@@ -198,7 +200,7 @@ class SAPIENDataset(torch.utils.data.Dataset):
 
                 # print("shapes are", np.unique(frame[k].detach().cpu().numpy()))
                 continue # no need to be divided by 255
-            else:
+            else:                
                 frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)
             if (k == "nox00" or k == "pnnocs00") and not has_mask:
                 frame[k] = torch.cat((frame[k], createMask(frame[k])), 0).type(torch.FloatTensor)
@@ -236,10 +238,14 @@ class SAPIENDataset(torch.utils.data.Dataset):
             cur_pose = cur_pose.unsqueeze(0)
 
         if self.projection:
-            # if "laptop" in self.dataset_dir :
+            # if "laptop" in self.dataset_dir:
             if "category" in self.dataset_config.keys():
-                if self.dataset_config['category'] == "glasses":
+                # print(self.dataset_config['category'])
+                if self.dataset_config['category'] == "eyeglass":
                     pass
+                elif self.dataset_config['category'] in ["oven", "laptop"]:
+                    # print("\033[93m [ SERIOUS WARNING!!!!! ] SETTING ALL Y LOCATIONS INTO 0 \033[0m")                    
+                    cur_pose[:, 1] = 0
                 else:
                     print("projection not defined, exit")
                     exit()

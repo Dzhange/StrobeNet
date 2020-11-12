@@ -98,6 +98,7 @@ class CResnetBlockConv1d(nn.Module):
         nn.init.zeros_(self.fc_1.weight)
 
     def forward(self, x, c):
+
         net = self.fc_0(self.actvn(self.bn_0(x, c)))
         dx = self.fc_1(self.actvn(self.bn_1(net, c)))
 
@@ -228,7 +229,7 @@ class CBatchNorm1d(nn.Module):
     def forward(self, x, c):
         assert(x.size(0) == c.size(0))
         assert(c.size(1) == self.c_dim)
-
+        # print(x.shape, c.shape)
         # c is assumed to be of size batch_size x c_dim x T
         if len(c.size()) == 2:
             c = c.unsqueeze(2)
@@ -236,11 +237,11 @@ class CBatchNorm1d(nn.Module):
         # Affine mapping
         gamma = self.conv_gamma(c)
         beta = self.conv_beta(c)
-
+        
         # Batchnorm
         net = self.bn(x)
         out = gamma * net + beta
-
+        # print(gamma.shape, beta.shape, net.shape, out.shape)
         return out
 
 
@@ -278,6 +279,7 @@ class CBatchNorm1d_legacy(nn.Module):
         nn.init.zeros_(self.fc_beta.bias)
 
     def forward(self, x, c):
+        
         batch_size = x.size(0)
         # Affine mapping
         gamma = self.fc_gamma(c)
@@ -499,7 +501,7 @@ class DecoderCBatchNorm(nn.Module):
         batch_size, D, T = p.size()
         # print(type(p))
         net = self.fc_p(p)
-
+        
         if self.z_dim != 0:
             net_z = self.fc_z(z).unsqueeze(2)
             net = net + net_z

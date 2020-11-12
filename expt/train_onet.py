@@ -23,8 +23,6 @@ def run(config):
     else:
         train_dataset = OccNetMVDataset(config, train=True)
 
-    
-
     if config.TEST_ON_TRAIN:
         val_dataset = train_dataset
     else:
@@ -32,15 +30,13 @@ def run(config):
             val_dataset = OccNetDataset(config, train=config.TEST_ON_TRAIN)
         else:
             val_dataset = OccNetMVDataset(config, train=config.TEST_ON_TRAIN)
-            
-    
+
     train_loader = DataLoader(train_dataset, batch_size=config.BATCHSIZE,
                                 shuffle=True,
                                 num_workers=config.DATALOADER_WORKERS, drop_last=True)
     val_loader = DataLoader(val_dataset, batch_size=config.BATCHSIZE,
                                 shuffle=True,
                                 num_workers=config.DATALOADER_WORKERS, drop_last=True)
-
 
     model.setup_checkpoint(model.device)
     
@@ -79,7 +75,8 @@ def run(config):
 
                 sys.stdout.write(progress_str.ljust(100))
                 sys.stdout.flush()
-            
+                model.loss_history.append(np.mean(np.asarray(epoch_losses)))
+
             val_losses = []
             for i, batch in enumerate(val_loader):                
                 loss = model.val_step(batch)
@@ -88,6 +85,11 @@ def run(config):
                 sys.stdout.write(val_loss_str.ljust(100))
                 sys.stdout.flush()
             model.val_loss_history.append(np.mean(np.asarray(val_losses)))                        
+
+            if (cur_epoch + 1) % config.SAVE_FREQ == 0:                    
+                print("[ INFO ]: Save checkpoint for epoch {}.".format(cur_epoch + 1))
+                model.save_checkpoint(cur_epoch, print_str='~'*3)                        
+
         except (KeyboardInterrupt, SystemExit):
             print('\n[ INFO ]: KeyboardInterrupt detected. Saving checkpoint.')
             model.save_checkpoint(cur_epoch, time_string='eot', print_str='$'*3)

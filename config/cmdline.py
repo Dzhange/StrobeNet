@@ -25,7 +25,7 @@ def merge_from_cmdline(cfg):
     if cmd['gen_output'] is not None:
         cfg.GEN_OUTPUT = cmd['gen_output']
     if cmd['gen_input'] is not None:
-        cfg.GEN_OUTPUT = cmd['gen_input']
+        cfg.GEN_INPUT = cmd['gen_input']
     # if cmd['resume'] is not None:
     #     cfg.resume = cmd['resume']
     return cfg

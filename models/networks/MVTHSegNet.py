@@ -14,13 +14,14 @@ class MVTHSegNet(THSegNet):
     def __init__(self, nocs_channels=4, pose_channels=48+48+16+16,
                  input_channels=3,
                  feature_channels=64, pred_feature=True,
-                 pretrained=True, withSkipConnections=True, bn=True):
-
+                 pretrained=True, withSkipConnections=True, bn=True, return_code=False):
+        
         super().__init__(nocs_channels=nocs_channels, pose_channels=pose_channels,
                         input_channels=input_channels,
                         feature_channels=feature_channels, pred_feature=pred_feature,
                         pretrained=pretrained, withSkipConnections=withSkipConnections, bn=bn)
-    
+        self.return_code = return_code
+
     def forward(self, inputs):
         """
         From jiahui's implementation in https://github.com/JiahuiLei/Pix2Surf
@@ -28,7 +29,7 @@ class MVTHSegNet(THSegNet):
         output: prediction's cated in order of :
             NOCS, POSE, Features
         """
-        return_code=False
+        # return_code=False
         share_feature=False
         
         l1, l2, l3, l4, l5 = [], [], [], [], []
@@ -37,6 +38,7 @@ class MVTHSegNet(THSegNet):
         l3_feature = []
         l4_feature = []
         l5_feature = []
+        feature_map_list = []
         for rgb in inputs:
             down1, indices_1, unpool_shape1, FM1 = self.down1(rgb)
             down2, indices_2, unpool_shape2, FM2 = self.down2(down1)
@@ -57,7 +59,7 @@ class MVTHSegNet(THSegNet):
             l5_feature.append(down5)
 
             # unsqueeze for max pool, but we don't need that
-            # l5_feature.append(down5.unsqueeze(0))
+            # feature_map_list.append(down5.unsqueeze(0))
 
         # here cated features from the bottle neck
         # seget shares fetures among different views
@@ -99,8 +101,8 @@ class MVTHSegNet(THSegNet):
             pred_list.append(output)
 
         # feature_list = [item.squeeze(0) for item in l5_feature]
-        if return_code:
-            return pred_list, feature_list
+        if self.return_code:
+            return pred_list, l5_feature
         else:
             return pred_list
 

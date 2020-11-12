@@ -249,9 +249,9 @@ class ModelONet(object):
                         
             # inputs = data.get('inputs', torch.empty(p.size(0), 0)).to(device)
                         
-            if self.view_num == 1:
-                c = self.net.encode_inputs(inputs)
+            if self.view_num == 1:                
                 inputs = data.get('inputs').to(device) 
+                c = self.net.encode_inputs(inputs)
             else:
                 inputs = data.get('inputs')
                 con_list = []

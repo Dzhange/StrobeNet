@@ -1,0 +1,33 @@
+##################################################################################################
+# November 4th
+# this is the multi-view baseline version of OccNet.
+# We take multiple images of a frame
+# enode them, and feed the features to OccNet
+
+DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/oven/benchmark_v1_uni/'
+OUTPUT_DIR: '/workspace/dev_nrnocs/output/expt/oven'
+VIEW_NUM: 2
+
+BATCHSIZE: 1
+DATALOADER_WORKERS: 4
+EPOCH_TOTAL: 35
+SAVE_FREQ: 5
+
+LR: 1e-4
+DATA_LIMIT: 100
+# DATA_LIMIT: 1
+VAL_DATA_LIMIT: 5
+# VAL_DATA_LIMIT: 1
+
+# EXPT_NAME: "occ_baseline_b1"
+EXPT_NAME: "occ_baseline_b1"
+ONET_CANO: True
+
+GPU: 7
+TEST_ON_TRAIN: False
+# TEST_ON_TRAIN: True
+
+###################################################
+MODES: ['train','val']
+# MODES: ['val']
+LR: 1e-4

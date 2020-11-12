@@ -175,10 +175,7 @@ class PMLBSLoss(nn.Module):
             # loss += pnnocs_loss
             loss['pnnocs_loss'] = pnnocs_loss
             # print("[ DIFF ] map_loss is {:5f}; loc_loss is {:5f}".format(loc_map_loss, joint_loc_loss))
-        
-
-
-        
+            
 
             # print("PMloss time",time_a - time_0, time_b - time_a, time_c - time_b, time_d - time_c, time_e - time_d)
             # print("PMloss time",time_e - time_0)
@@ -411,6 +408,8 @@ class MVPMLoss(PMLoss):
         We do this for each instance in batch
         """        
         batch_size = output_list[0].shape[0]
+        crr_xyz_loss = 0
+        pair_cnt = 0
 
         for b_id in range(batch_size):
             _p1_list, _p2_list, _m_list = [], [], []
@@ -446,10 +445,20 @@ class MVPMLoss(PMLoss):
                     _p1_list.append(paired_pc_from_base_to_query)
                     _p2_list.append(query_pn_pc)
                     _m_list.append(crr['crr-mask-mtx'][base_view_id][query_view_id][b_id].squeeze())
+        # print(torch.stack(_p1_list, dim=0).contiguous().shape)
+        # print(_p2_list[0].shape, _p2_list[1].shape)
+                    
+                    p1 = paired_pc_from_base_to_query.unsqueeze(0)
+                    p2 = query_pn_pc.unsqueeze(0)
+                    mask = crr['crr-mask-mtx'][base_view_id][query_view_id][b_id].squeeze()
 
-        crr_xyz_loss = self.crr_l2(torch.stack(_p1_list, dim=0).contiguous(),
-                                        torch.stack(_p2_list, dim=0).contiguous(),
-                                        torch.stack(_m_list, dim=0).contiguous().squeeze(), detach=False)
+                    crr_xyz_loss += self.crr_l2(p1, p2, mask, detach=False)
+                    pair_cnt += 1
+        
+        crr_xyz_loss /= pair_cnt
+        # crr_xyz_loss = self.crr_l2(torch.stack(_p1_list, dim=0).contiguous(),
+        #                                 torch.stack(_p2_list, dim=0).contiguous(),
+        #                                 torch.stack(_m_list, dim=0).contiguous().squeeze(), detach=False)
         return crr_xyz_loss
 
 class MVMPLoss(MVPMLoss):

@@ -42,7 +42,7 @@ class evaluator():
         for i in range(self.data_num):            
             gt_path = self.gt_occ_paths[i]
             pred_path = self.pred_occ_paths[i]
-            print(pred_path)
+            # print(pred_path)
             if 1:
                 os.system("/workspace/Manifold/build/simplify -i {} -o {} -f {}".format(gt_path, gt_path, 5000))
                 os.system("/workspace/Manifold/build/simplify -i {} -o {} -f {}".format(pred_path, pred_path, 5000))
@@ -51,18 +51,25 @@ class evaluator():
             gt_mesh = trimesh.load(gt_path, process=False)
             pred_mesh = trimesh.load(pred_path, process=False)
             
+            if len(pred_mesh.vertices) == 0:
+                print("No mesh")
+                
+                continue
+                
+
             p2s = self.p2s_dis(gt_mesh, pred_mesh)
             p2s = np.sqrt(p2s)
-            print(p2s)
+            # print(p2s)
             p2s_dis_list.append(p2s)
+            # p2s_dis_list.append(0)
             
             chamfer = self.chamfer_dis(gt_mesh, pred_mesh)
             chamfer = np.sqrt(chamfer)
             chamfer_dis_list.append(chamfer)
-            print(chamfer)
+            # print(chamfer)
             
             iou = self.iou(gt_mesh, pred_mesh)
-            print("current iou ", iou)
+            # print("current iou ", iou)
             iou_list.append(iou)
 
 
@@ -74,6 +81,7 @@ class evaluator():
                                 np.mean(np.asarray(iou_list)),\
                                 ))
             sys.stdout.flush()
+        print(" ")
 
     def p2s_dis(self, gt, pred):
         # Completeness: how far are the points of the target point cloud

@@ -1,44 +1,40 @@
 ##################################################################################################
-# Nov 2
-# Use multi-view input, we supervise the model with multiple shape
-# 
+# Here we train the first stage with all the tricks:
+# 1. with enriching feature
+# 2. with consistency loss
+# 3. multi view
+# 4. random views
 
-DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/glasses/mv8_scale_mpf_uni/'
-OUTPUT_DIR: '/workspace/dev_nrnocs/output/benchmark/glasses/'
-VIEW_NUM: 1
+
+DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/oven/benchmark_v1_uni/'
+OUTPUT_DIR: '/workspace/dev_nrnocs/output/benchmark/oven/'
 
 BATCHSIZE: 1
-DATALOADER_WORKERS: 4
-EPOCH_TOTAL: 20
+DATALOADER_WORKERS: 5
+EPOCH_TOTAL: 30
 
 DATA_LIMIT: 100
 VAL_DATA_LIMIT: 5
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
-TASK: "lnrnet"
-EXPT_NAME: "stg1_sv"
-BONE_NUM: 2
-GPU: 3
+TASK: "mlnrnet"
+EXPT_NAME: "stg1_bm1_nobg_sv" ## This is the result with back ground! I wrote it wrong! V2 actually
+BONE_NUM: 1
+GPU: 0
 OUT_CHANNELS: 12 #4 + 1*8
-# TEST_ON_TRAIN: True
 TEST_ON_TRAIN: False
 
 REPOSE: True
 STAGE_ONE: True
 
-
 ###################################################
 MODES: ['train','val']
-# MODES: ['val']
 LR: 1e-4
-SAVE_FREQ: 1
+SAVE_FREQ: 5
 MH: True
 BN: False
 
-# CONSISTENCY: 1
-# Try training with CRR loss *10 from the  middle of training
-# NOCS_LOSS: 10
 NOCS_LOSS: 1
 POSE_LOSS: 1
 POSE_MAP_LOSS: 1
@@ -49,6 +45,3 @@ RECON_LOSS: 0.1
 
 
 AGGR_SCATTER: True
-# NRNET_PRETRAIN: True
-# NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/glasses_aug1_bkup/scale_1_9999-12-31T23-59-59.tar"
-

@@ -84,7 +84,7 @@ class ModelMLNRNet(ModelLNRNET):
         if os.path.exists(self.output_dir) == False:
             os.makedirs(self.output_dir)
 
-        self.setup_checkpoint(device)
+        # self.setup_checkpoint(device)
         self.net.eval()
 
         num_test_sample = 30000
@@ -119,7 +119,6 @@ class ModelMLNRNet(ModelLNRNET):
                 self.gen_mesh(grid_points_split, data, i)
 
             for view_id in range(self.view_num):
-
                 segnet_output = output_recon[0]
                 self.save_img(net_input['color00'][view_id], segnet_output[view_id][:, 0:4, :, :], target['nox00'][view_id][:, 0:4, :, :], i, view_id=view_id)
 
@@ -135,17 +134,17 @@ class ModelMLNRNet(ModelLNRNET):
                 if self.config.LOC_LOSS or self.config.LOC_MAP_LOSS:
                     tar_loc = target['pose'][view_id][0, :, 0:3]
                     cur_loc_diff = self.save_joint(segnet_output[view_id], tar_loc, mask, i, self.config.LOC_LOSS, view_id=view_id)
-                    loc_diff.append(cur_loc_diff)                    
-                
+                    loc_diff.append(cur_loc_diff)
+
                     gt_joint_map = target["joint_map"][view_id][:,:bone_num*3]
                     self.visualize_joint_prediction(segnet_output[view_id], gt_joint_map, mask, i, view_id=view_id)
-                
+
                 if self.config.POSE_LOSS or self.config.POSE_MAP_LOSS:
                     tar_pose = target['pose'][view_id][0, :, 3:6]
                     cur_pose_diff = self.save_joint(segnet_output[view_id], tar_pose, mask, i, \
                         use_score=self.config.POSE_LOSS, loc=False, view_id=view_id)
                     pose_diff.append(cur_pose_diff)
-                    
+
                     gt_joint_map = target["joint_map"][view_id][:,bone_num*3:]
                     self.visualize_joint_prediction(segnet_output[view_id], gt_joint_map, mask, i, loc=False, view_id=view_id)
 
@@ -176,4 +175,4 @@ class ModelMLNRNet(ModelLNRNET):
             sys.stdout.write("\r[ VAL ] {}th data loss {:6f} ".format(i, loss.item()) + str_loc_diff + str_angle_diff + str_loss)
             # sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loss)
             sys.stdout.flush()
-            print("\n")
+            # print("\n")

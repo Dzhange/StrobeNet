@@ -20,7 +20,7 @@ def run(config):
 
     model = ModelONet(config)
     if config.VIEW_NUM == 1:
-        val = OccNetDataset(config, train=config.TEST_ON_TRAIN)
+        val_dataset = OccNetDataset(config, train=config.TEST_ON_TRAIN)
     else:
         val_dataset = OccNetMVDataset(config, train=config.TEST_ON_TRAIN)
 

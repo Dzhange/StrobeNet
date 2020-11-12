@@ -13,20 +13,18 @@ TOTAL_VIEW: 8
 
 BATCHSIZE: 1
 DATALOADER_WORKERS: 2
-EPOCH_TOTAL: 50
+EPOCH_TOTAL: 10 # 10 + 30
 
 DATA_LIMIT: 100
 VAL_DATA_LIMIT: 5
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
-# TASK: "mvmp"
 TASK: "mlnrnet"
-EXPT_NAME: "stg1_bm1"
+EXPT_NAME: "open_stg1_bm1"
 BONE_NUM: 1
-GPU: 2
+GPU: 4
 OUT_CHANNELS: 12 #4 + 1*8
-# TEST_ON_TRAIN: True
 TEST_ON_TRAIN: False
 
 REPOSE: True
@@ -52,8 +50,4 @@ LOC_MAP_LOSS: 1
 SKIN_LOSS: 1
 RECON_LOSS: 0.1
 
-
 AGGR_SCATTER: True
-# NRNET_PRETRAIN: True
-# NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/glasses_aug1_bkup/scale_1_9999-12-31T23-59-59.tar"
-

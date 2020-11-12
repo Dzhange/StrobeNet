@@ -54,7 +54,7 @@ class OccNetDataset(torch.utils.data.Dataset):
         # self.num_sample_points = 100000
 
         self.shuffle_in_limit = True
-        print(limit)
+        # print(limit)
         if limit <= 0.0 or limit > 100.0:
             raise RuntimeError('Data limit percent has to be >0% and <=100%')
         self.data_limit = limit
@@ -198,7 +198,7 @@ class OccNetDataset(torch.utils.data.Dataset):
         file_name = os.path.basename(required_path)
         index_of_frame = find_frame_num(file_name)
         
-        gt_mesh_path = required_path.replace('color00.png', 'isosurf_scaled.off')
+        
 
         points = []
         coords = []
@@ -261,8 +261,10 @@ class OccNetDataset(torch.utils.data.Dataset):
         # boundary_samples_npz = np.load(boundary_samples_path)
         # boundary_sample_points = boundary_samples_npz['points']        
         # boundary_sample_occupancies = boundary_samples_npz['occupancies']
+        # gt_mesh_path = required_path.replace('color00.png', 'isosurf_scaled.off')
         uniform_sample_path = boundary_samples_path.replace(self.occ_load_str, "uni_sampled.npz")
-
+        gt_mesh_path = boundary_samples_path.replace(self.occ_load_str, 'isosurf_scaled.off')
+        # print(uniform_sample_path)
         if os.path.exists(uniform_sample_path):
             uniform_points = np.load(uniform_sample_path)['points']
             uniform_occ = np.load(uniform_sample_path)['occupancies']

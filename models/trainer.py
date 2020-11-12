@@ -95,7 +95,11 @@ class Trainer:
                 gc.collect()
                 self.model.loss_history.append(np.mean(np.asarray(epoch_losses)))
                 ######################  DO VALIDATION  ##########################
-                val_losses = self.validate()
+                val_losses = self.validate()                
+                # self.model.val_loss_history.append(np.mean(np.asarray(val_losses)))
+                if not self.config.STAGE_ONE:
+                    self.model.validate(self.val_data_loader, self.objective, self.device)
+                    os.system("python eval.py -i  {}".format(self.model.output_dir))
                 self.model.val_loss_history.append(np.mean(np.asarray(val_losses)))
                 ########################## SAVE CHECKPOINT ##############################
                 if (cur_epoch + 1) % self.config.SAVE_FREQ == 0:

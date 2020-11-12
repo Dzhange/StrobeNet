@@ -1,0 +1,53 @@
+##################################################################################################
+# Here we train the first stage with all the tricks:
+# 1. with enriching feature
+# 2. with consistency loss
+# 3. multi view
+# 4. random views
+
+DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/laptop/benchmark_v1_uni/'
+OUTPUT_DIR: '/workspace/dev_nrnocs/output/benchmark/laptop/'
+VIEW_NUM: 2 # we use random views this time
+RANDOM_VIEW: True
+TOTAL_VIEW: 8
+
+BATCHSIZE: 1
+DATALOADER_WORKERS: 2
+EPOCH_TOTAL: 5
+
+DATA_LIMIT: 100
+VAL_DATA_LIMIT: 5
+IMAGE_SIZE: (320,240)
+TARGETS: ["default"]
+
+TASK: "mlnrnet"
+EXPT_NAME: "open_recon_bm1_0crr"
+BONE_NUM: 1
+GPU: 4
+OUT_CHANNELS: 12 #4 + 1*8
+TEST_ON_TRAIN: False
+
+REPOSE: True
+STAGE_ONE: False
+
+###################################################
+MODES: ['train','val']
+# MODES: ['val']
+LR: 1e-4
+SAVE_FREQ: 1
+MH: True
+BN: False
+
+CONSISTENCY: 0
+NOCS_LOSS: 1
+POSE_LOSS: 1
+POSE_MAP_LOSS: 1
+LOC_LOSS: 1
+LOC_MAP_LOSS: 1
+SKIN_LOSS: 1
+RECON_LOSS: 0.1
+
+
+AGGR_SCATTER: True
+NRNET_PRETRAIN: True
+NRNET_PRETRAIN_PATH: "/workspace/dev_nrnocs/output/benchmark/laptop/open_stg1_bm1/open_stg1_bm1_9999-12-31T23-59-59.tar"

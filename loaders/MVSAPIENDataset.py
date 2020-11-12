@@ -128,7 +128,7 @@ class MVSPDataset(SAPIENDataset):
                 frame[k] = imread_gray_torch(item_path, Size=self.img_size)\
                     .type(torch.FloatTensor).unsqueeze(0) # other wise would all be zero # 1,W,H
                 continue # no need to be divided by 255
-            else:
+            else:                
                 frame[k] = imread_rgb_torch(item_path, Size=self.img_size).type(torch.FloatTensor)
             # we only create one mask create
             if (k == "nox00" or k == "pnnocs00") and not has_mask:
@@ -284,6 +284,9 @@ class MVSPDataset(SAPIENDataset):
         neigh = NearestNeighbors(n_neighbors=1)
         neigh.fit(b_pc)
         index_list, mask_list, min_dis_list = list(), list(), list()
+        # fix_len = True
+        fix_len = False
+
         for q_pc in q_pc_list:
             assert q_pc.shape[1] == b_pc.shape[1]
             distance, indices = neigh.kneighbors(q_pc, return_distance=True)
@@ -291,9 +294,16 @@ class MVSPDataset(SAPIENDataset):
             _idx = indices.ravel()
             _mask = (_min_d < th).astype(np.float)
             # make sure the output is in the same size
-            index = np.zeros((len(q_pc), 1))
-            mask = np.zeros((len(q_pc), 1)).astype(np.float)
-            min_d = np.zeros((len(q_pc), 1)).astype(np.float)
+            
+
+            if fix_len:
+                index = np.zeros((8192, 1))
+                mask = np.zeros((8192, 1)).astype(np.float)
+                min_d = np.zeros((8192, 1)).astype(np.float)
+            else:
+                index = np.zeros((len(q_pc), 1))
+                mask = np.zeros((len(q_pc), 1)).astype(np.float)
+                min_d = np.zeros((len(q_pc), 1)).astype(np.float)
 
             # crr_idx = np.where(_min_d < th)[0] # here crr_idx stores the index
 

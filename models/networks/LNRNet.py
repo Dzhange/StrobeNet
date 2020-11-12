@@ -50,6 +50,16 @@ class LNRNet(nn.Module):
         self.SegNet.to(self.device)
         self.IFNet = SVR(self.config, self.device)
 
+        if self.config.GLOBAL_FEATURE:
+            # from Jiahui
+            self.concentrate = nn.Sequential(
+                nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=0, stride=1),
+                nn.BatchNorm2d(512),
+                nn.ELU(),
+                nn.Conv2d(in_channels=512, out_channels=1024, kernel_size=3, padding=0, stride=1),
+                nn.MaxPool2d(kernel_size=(3, 6))
+            )
+
     def init_hp(self):
         self.sample = True        
         self.max_point = 30000
@@ -128,7 +138,7 @@ class LNRNet(nn.Module):
                 self.visualize(occupancies)
             # and then feed into IF-Net. The ground truth shouled be used in the back projection
 
-            
+                        
             recon = self.IFNet(grid_coords, occupancies)
         return output, recon
 
@@ -562,6 +572,7 @@ class LNRNet(nn.Module):
         if point_cloud is None:
             feature_dim = self.SegNet.feature_channels
             return torch.ones(feature_dim, *(self.resolution,)*3).to(device=self.device)        
+
         feature_dim = FeatureCloud.shape[0]
         point_num = point_cloud.shape[1]
 
@@ -712,7 +723,7 @@ class LNRNet(nn.Module):
             cur_loc = mv_loc_list[view][batch_id]
             cur_rot = mv_rot_list[view][batch_id]
             cur_seg = mv_seg_list[view][batch_id]
-            # cur_feature = mv_feature_list[view][batch_id]
+            # cur_feature = mv_feature_list[view][batch_id]            
             if cur_pc is not None:
                 # input with shape (3, N)
                 inst_pn_pc_list.append(cur_pc.transpose(0, 1))
@@ -743,15 +754,15 @@ class LNRNet(nn.Module):
         
         return posed_pc_list
 
-
     def visualize(self, FeatureVoxel):
-        feature_sample = FeatureVoxel[0]
+        feature_sample = FeatureVoxel[0].clone()
         voxel = (feature_sample != 0).sum(dim=0).to(dtype=torch.bool)
         
         self.debug_dir = os.path.join(self.config.OUTPUT_DIR, self.config.EXPT_NAME, "debug")
         if not os.path.exists(self.debug_dir):
             os.mkdir(self.debug_dir)
-        off_path = os.path.join(self.debug_dir, "mid.off")
+        # off_path = os.path.join(self.debug_dir, "mid.off")
+        off_path = "/workspace/debug/mid.obj"
         # gt_path = "/workspace/dev_nrnocs/debug/gt.off"
 
         VoxelGrid(voxel.cpu().detach(), (0, 0, 0), 1).to_mesh().export(off_path)
@@ -761,6 +772,27 @@ class LNRNet(nn.Module):
         # mesh = trimesh.load(mesh_path)
         # vox = VoxelGrid.from_mesh(mesh, self.resolution, loc=[0, 0, 0], scale=1)
         # vox.to_mesh().export(gt_path)
-        exit()
+        # exit()
 
-    
+    def discretize_no_feature(self, point_cloud, Res):
+        c, n = point_cloud.shape
+        
+        psudo_feature_cloud = torch.ones((1, n)).to(device=point_cloud.device)
+
+        point_cloud = torch.where(point_cloud < 0, torch.zeros(1, device=point_cloud.device), point_cloud)
+        point_cloud = torch.where(point_cloud > 1, torch.ones(1, device=point_cloud.device), point_cloud)
+
+        voxels = torch.floor(point_cloud*Res)
+        index = voxels[0, :]*Res**2 + voxels[1, :]*Res + voxels[2, :]
+        index = index.unsqueeze(0).to(dtype=torch.long)
+        
+        voxel_feature = torch_scatter.scatter(src=psudo_feature_cloud, index=index)
+        # VoxFeature = torch_scatter.segment_coo(src=FeatureCloud,index=Index,reduce='mean')
+        pad_size = (0, Res**3 - voxel_feature.size(1))
+        voxel_feature = F.pad(voxel_feature, pad_size, 'constant', 0)
+        voxel_feature = voxel_feature.view(1, Res, Res, Res)
+        
+        # point_cloud = point_cloud.view(1, n, c)
+        # voxel = pc2vox(point_cloud, self.resolution)
+        
+        return voxel_feature                

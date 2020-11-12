@@ -141,14 +141,14 @@ class ModelLNRNET(ModelSegLBS):
         if os.path.exists(self.output_dir) == False:
             os.makedirs(self.output_dir)
 
-        self.setup_checkpoint(device)
+        # self.setup_checkpoint(device)
         self.net.eval()
 
         num_test_sample = 30000
 
         grid_coords = self.net.grid_coords
 
-        grid_coords = self.net.init_grids(256)
+        grid_coords = self.net.init_grids(self.net.resolution)
         # print(grid_coords.shape)
         # grid_path = os.path.join(self.output_dir, 'grid_coords.xyz')
         # write_off(grid_path, grid_coords[0].cpu().numpy())
@@ -260,8 +260,9 @@ class ModelLNRNET(ModelSegLBS):
             with torch.no_grad():
                 net_input, target = self.preprocess(data, device)
                 net_input['grid_coords'] = points.to(device)
-                output = self.net(net_input)
+                output = self.net(net_input)                
                 # self.save_img(net_input['RGB'], output[0], target['NOCS'], i)
+                # print(output[1].shape)
                 logits_list.append(output[1].squeeze(0).detach().cpu())
 
         # generate predicted mesh from occupancy and save
