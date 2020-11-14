@@ -41,6 +41,8 @@ class SVR(nn.Module):
         self.use_global_feature = config.GLOBAL_FEATURE
         if self.use_global_feature:
             feature_size += 1024
+        if self.config.GLOBAL_ONLY:
+            feature_size = 1024
 
         self.fc_0 = nn.Conv1d(feature_size, hidden_dim * 2, 1)
         self.fc_1 = nn.Conv1d(hidden_dim *2, hidden_dim, 1)
@@ -133,11 +135,15 @@ class SVR(nn.Module):
         features = torch.reshape(features,
                                  (shape[0], shape[1] * shape[3], shape[4]))  # (B, featues_per_sample, samples_num)
         features = torch.cat((features, p_features), dim=1)  # (B, featue_size, samples_num)
-        
-        if self.use_global_feature:
+                
+        if self.config.GLOBAL_ONLY:
+            features = global_feature.view(-1, 1).repeat(1, 1, features.shape[2])
+        elif self.use_global_feature:
             global_feature = global_feature.view(-1, 1).repeat(1, 1, features.shape[2])
             # print(global_feature.shape, features.shape)
             features = torch.cat((features, global_feature), dim=1)
+        
+
         # print(features.shape)
         net = self.actvn(self.fc_0(features))
         # print(net.shape)

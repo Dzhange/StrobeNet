@@ -92,6 +92,8 @@ def get_default_cfg():
     cfg.USE_FEATURE = True # ablation: see how network performs when we do not give it feature
     cfg.PRED_FEATURE = True
     cfg.FEATURE_CHANNELS = 64
+    cfg.SEP_POSE = False # repose the union point cloud into individual pose using individual joint position
+
 
     cfg.MH = False
     cfg.AS_SEG = False
@@ -110,6 +112,8 @@ def get_default_cfg():
     cfg.CONSISTENCY = 0
 
     cfg.GLOBAL_FEATURE = False # use global feature from SegNet
+    cfg.GLOBAL_ONLY = False # use only global feature for final reconstruction
+
     cfg.IF_SHALLOW = False
     cfg.SUPER_RES = False
     cfg.IF_IN_DIM = 16

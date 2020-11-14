@@ -8,14 +8,14 @@ OUTPUT_DIR: '/workspace/dev_nrnocs/output/expt/gls'
 
 BATCHSIZE: 1
 DATALOADER_WORKERS: 4
-EPOCH_TOTAL: 2000
+EPOCH_TOTAL: 20
 
 LR: 1e-4
 DATA_LIMIT: 100
-VAL_DATA_LIMIT: 20
-EXPT_NAME: "occ_b1_cano_check"
+VAL_DATA_LIMIT: 3
+EXPT_NAME: "occ_posed"
 
-ONET_CANO: True
+# ONET_CANO: True
 
 GPU: 7
 TEST_ON_TRAIN: False

@@ -17,8 +17,10 @@ from models.loss import MixLoss
 from models.SegLBS import ModelSegLBS
 from utils.DataUtils import *
 from utils.lbs import *
+from utils.tools.voxels import VoxelGrid
 import trimesh, mcubes
 from collections import OrderedDict
+
 
 class ModelLNRNET(ModelSegLBS):
 
@@ -267,14 +269,20 @@ class ModelLNRNET(ModelSegLBS):
 
         # generate predicted mesh from occupancy and save
         logits = torch.cat(logits_list, dim=0).numpy()
+        
+        
         mesh = self.mesh_from_logits(logits, self.net.resolution)
-        export_pred_path = os.path.join(self.output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
+        
+        export_pred_path = os.path.join(self.output_dir, "frame_{}_recon.obj".format(str(i).zfill(3)))
         mesh.export(export_pred_path)
 
         # Copy ground truth in the val results
-        export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
+        # export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
+        export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.obj".format(str(i).zfill(3)))
         # print(target['mesh'][0])
-        shutil.copyfile(target['iso_mesh'][0], export_gt_path)
+        gt_mesh = trimesh.load(target['iso_mesh'][0])
+        gt_mesh.export(export_gt_path) 
+        # shutil.copyfile(target['iso_mesh'][0], export_gt_path)
 
         if self.config.TRANSFORM:
             # Get the transformation into val results
@@ -301,7 +309,27 @@ class ModelLNRNET(ModelSegLBS):
         self.write(tar_nocs_path, tar_nocs)
         self.write(pred_nocs_path, pred_nocs)
 
+        if 0:
+            voxels = self.net.discretize_no_feature(torch.Tensor(pred_nocs).transpose(1, 0), self.net.resolution//2)
+            voxels = (voxels != 0).sum(dim=0).to(dtype=torch.bool)
 
+            if target_str == "reposed_pn":
+                voxel_recon_path = os.path.join(self.output_dir, "frame_{}_recon_v.obj".format(str(i).zfill(3)))
+            elif target_str == "nocs":
+                voxel_recon_path = os.path.join(self.output_dir, "frame_{}_view_{}_recon_v.obj".format(str(i).zfill(3), view_id))
+
+            voxel_mesh = VoxelGrid(voxels.cpu().detach(), (0, 0, 0), 1).to_mesh()
+                        
+            # uinon voxel reconstruction
+            if os.path.exists(voxel_recon_path):
+                prev = trimesh.load(voxel_recon_path)
+                voxel_mesh += prev
+
+            voxel_mesh.export(voxel_recon_path)
+                
+
+        
+        # print(type(pred_nocs))
         if transform is not None:
             # print("HERE")
             pred_nocs +=  transform['translation'][0].detach().cpu().numpy()
@@ -313,6 +341,8 @@ class ModelLNRNET(ModelSegLBS):
             pred_nocs_path = os.path.join(self.output_dir, 'frame_{}_view_{}_{}_trs_01pred.xyz').format(str(i).zfill(3), view_id, target_str)
             self.write(tar_nocs_path, tar_nocs)
             self.write(pred_nocs_path, pred_nocs)
+
+        
         
     # @staticmethod
     def mesh_from_logits(self, logits, resolution):
