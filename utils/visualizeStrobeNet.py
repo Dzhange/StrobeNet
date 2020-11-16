@@ -21,6 +21,32 @@ from tk3dv.extern import quaternions
 
 from sklearn.neighbors import NearestNeighbors
 
+class JointAngle():
+    def __init__(self, CurrentVal=45, Range=[0, 90], Increm=0.0001):
+        if CurrentVal > Range[1] or CurrentVal < Range[0]:
+            raise Exception('CurrentVal is not between range')
+
+        self.Range = Range # Both inclusive
+        self.Increm = Increm
+        self.CurrentValue = CurrentVal
+        self.Dir = 1 # or -1
+
+    def val(self):
+        return self.CurrentValue
+
+    def increm(self):
+        self.CurrentValue += self.Dir * self.Increm
+
+        if self.CurrentValue > self.Range[1]:
+            self.CurrentValue = self.Range[1]
+            self.Dir = -1
+        if self.CurrentValue < self.Range[0]:
+            self.CurrentValue = self.Range[0]
+            self.Dir = 1
+
+        if self.CurrentValue > self.Range[1] or self.CurrentValue < self.Range[0]:
+            raise Exception('Something went wrong')
+
 class StrobeNetModule(EaselModule):
     def __init__(self):
         super().__init__()
@@ -55,7 +81,8 @@ class StrobeNetModule(EaselModule):
         self.NOCSMaps = []
         self.NOCS = []
         self.AnimatableNOCS = [] # For point cloud animations
-        self.ReferenceNOCS = []  # For reference
+        self.NOCSPartColored = []  # For part reference
+        self.NOCSVertexColored = []  # For part reference
         self.SegmentIndices = []
         self.UniqueSegmentColors = []
         self.ValidAnimatableSegments = []
@@ -66,12 +93,14 @@ class StrobeNetModule(EaselModule):
         self.JtAng = []
         self.SegMaps = []
         self.PointSize = 5
-        self.AxisWidth = 5
+        self.AxisWidth = 10
         self.AxisHalfLength = 0.1
-        self.JtRadius = 0.01
-        self.AngleIncrem = 0.0001
-        self.CurrentAngle = 0
-        # self.AngleRange = []
+        self.JtRadius = 0.02
+
+        self.AngleRanges = [-math.pi/2, 1*math.pi/160]
+        self.AngleIncrems = [0.01, 0.05]
+        self.JointAngles = [JointAngle(random.uniform(self.AngleRanges[0], self.AngleRanges[1]), self.AngleRanges, self.AngleIncrems[0])
+            , JointAngle(random.uniform(self.AngleRanges[0], self.AngleRanges[1]), self.AngleRanges, self.AngleIncrems[1])] # Only for glasses. TODO
 
         sys.stdout.flush()
         self.nNM = 0
@@ -82,11 +111,13 @@ class StrobeNetModule(EaselModule):
         self.showPoints = True
         self.showWireFrame = False
         self.showOBJModels = True
-        self.showJointPos = True
-        self.showJointAng = True
-        self.showAnimation = True
+        self.showJointPos = False
+        self.showJointAng = False
+        self.showAnimation = False
         self.RotateAngle = -90
         self.RotateAxis = np.array([1, 0, 0])
+        self.showColors = True
+        self.showParts = False
 
         self.loadData()
 
@@ -164,8 +195,11 @@ class StrobeNetModule(EaselModule):
                 self.JtPos.append(JointPos)
                 self.JtAng.append(JointAng)
                 self.SegMaps.append(SegMap)
-                ReferenceNOCS = ds.NOCSMap(self.NOCSMaps[idx], RGB=SegMap)
-                self.ReferenceNOCS.append(ReferenceNOCS)
+                NOCSPartColored = ds.NOCSMap(self.NOCSMaps[idx], RGB=SegMap)
+                self.NOCSPartColored.append(NOCSPartColored)
+                NOCSVertexColored = ds.NOCSMap(self.NOCSMaps[idx])
+                self.NOCSVertexColored.append(NOCSVertexColored)
+
                 UniqueSegmentColors = np.unique(SegMap.reshape(-1, SegMap.shape[-1]), axis=0)[1:]  # Exclude the first one which is black
                 self.UniqueSegmentColors.append(UniqueSegmentColors)
                 self.ValidAnimatableSegments.append(UniqueSegmentColors[[2, 0], :])  # HACK, TODO, for glasses only
@@ -181,17 +215,16 @@ class StrobeNetModule(EaselModule):
             LoadedOBJ.vertices = VerticesNP + 0.5
             LoadedOBJ.Colors = np.asarray(LoadedOBJ.vertices)
             print('[ INFO ]: Custom normalization')
-            if len(self.ReferenceNOCS) != 0:
+            if len(self.NOCSPartColored) != 0:
                 # Find NN
-                # print('self.ReferenceNOCS.Points', self.ReferenceNOCS[idx].Points.shape)
+                # print('self.NOCSPartColored.Points', self.NOCSPartColored[idx].Points.shape)
                 # print('LoadedOBJ.vertices', LoadedOBJ.vertices.shape)
-                nbrs = NearestNeighbors(n_neighbors=1, algorithm='kd_tree').fit(self.ReferenceNOCS[idx].Points)
+                nbrs = NearestNeighbors(n_neighbors=1, algorithm='kd_tree').fit(self.NOCSPartColored[idx].Points)
                 _, M2NIndices = nbrs.kneighbors(LoadedOBJ.vertices)
                 self.M2NIndices.append(M2NIndices)
                 LoadedOBJ.Colors = self.NOCS[idx].Colors[M2NIndices]
-                # print(distances.shape)
-            AnimatableLoadedOBJ.vertices = LoadedOBJ.vertices
-            AnimatableLoadedOBJ.Colors = LoadedOBJ.Colors
+            AnimatableLoadedOBJ.vertices = LoadedOBJ.vertices.copy()
+            AnimatableLoadedOBJ.Colors = LoadedOBJ.Colors.copy()
             LoadedOBJ.update()
             AnimatableLoadedOBJ.update()
             self.OBJModels.append(LoadedOBJ)
@@ -228,42 +261,42 @@ class StrobeNetModule(EaselModule):
 
         return R
 
-    def rotateNOCS(self, AnimatableNOCS, ReferenceNOCS, SegmentColor, JointPosition, Axis, Angle):
-        # print(np.max(ReferenceNOCS.Colors))
-        SegmentIndices = np.where(np.all(ReferenceNOCS.Colors == SegmentColor/255, axis=-1))
+    def rotateNOCS(self, AnimatableNOCS, NOCSPartColored, SegmentColor, JointPosition, Axis, Angle):
+        # print(np.max(NOCSPartColored.Colors))
+        SegmentIndices = np.where(np.all(NOCSPartColored.Colors == SegmentColor/255, axis=-1))
         # print(len(AnimatableNOCS))
         # print(SegmentIndices)
-        AnimatableNOCS.Points[SegmentIndices] = ((AnimatableNOCS.Points[SegmentIndices]-JointPosition) @ self.createAxisAngleRotationMatrix(Axis, Angle)) + JointPosition
+        AnimatableNOCS.Points[SegmentIndices] = ((NOCSPartColored.Points[SegmentIndices]-JointPosition) @ self.createAxisAngleRotationMatrix(Axis, Angle)) + JointPosition
         # AnimatableNOCS.Points[SegmentIndices] = (self.createAxisAngleRotationMatrix(Axis, Angle)@(AnimatableNOCS.Points[SegmentIndices].T)).T
         AnimatableNOCS.update()
 
-    def rotateMesh(self, AnimatableMesh, ReferenceNOCS, M2NIndices, SegmentColor, JointPosition, Axis, Angle):
-        NOCS2PartIdx = np.where(np.all(ReferenceNOCS.Colors == SegmentColor/255, axis=-1))
+    def rotateMesh(self, AnimatableMesh, ReferenceMesh, NOCSPartColored, M2NIndices, SegmentColor, JointPosition, Axis, Angle):
+        NOCS2PartIdx = np.where(np.all(NOCSPartColored.Colors == SegmentColor/255, axis=-1))
         Mesh2PartIdx = np.where(np.in1d(M2NIndices, NOCS2PartIdx))
         # print(NOCS2PartIdx[0].shape)
         # print(Mesh2PartIdx[0].shape)
         # print(Mesh2PartIdx)
         # exit()
 
-        AnimatableMesh.vertices[Mesh2PartIdx] = ((AnimatableMesh.vertices[Mesh2PartIdx]-JointPosition) @ self.createAxisAngleRotationMatrix(Axis, Angle)) + JointPosition
+        AnimatableMesh.vertices[Mesh2PartIdx] = ((ReferenceMesh.vertices[Mesh2PartIdx]-JointPosition) @ self.createAxisAngleRotationMatrix(Axis, Angle)) + JointPosition
         AnimatableMesh.update()
-
 
     def animate(self):
         for idx, (JP, JA, SegMap, ValidAnimatableSegments) in enumerate(zip(self.JtPos, self.JtAng, self.SegMaps, self.ValidAnimatableSegments)):
-            self.CurrentAngle += self.AngleIncrem
-            self.CurrentAngle = self.CurrentAngle%math.pi
-            # print('self.CurrentAngle', self.CurrentAngle)
             for r in range(JP.shape[0]):
+                self.JointAngles[r].increm()
+                SetAngle = self.JointAngles[r].val()# % math.pi
+
                 JointPosition = JP[r, :]
                 DefaultAngle = np.linalg.norm(JA[r, :])
                 Axis = JA[r, :] / DefaultAngle
                 SegmentColor = ValidAnimatableSegments[r]
-                self.rotateNOCS(self.AnimatableNOCS[idx], self.ReferenceNOCS[idx], SegmentColor, JointPosition, Axis, Angle=self.CurrentAngle)
-                self.rotateMesh(self.AnimatableOBJModels[idx], self.ReferenceNOCS[idx], self.M2NIndices[idx], SegmentColor, JointPosition, Axis, Angle=self.CurrentAngle)
+                self.rotateNOCS(self.AnimatableNOCS[idx], self.NOCSPartColored[idx], SegmentColor, JointPosition, Axis, Angle=SetAngle)
+                self.rotateMesh(self.AnimatableOBJModels[idx], self.OBJModels[idx], self.NOCSPartColored[idx], self.M2NIndices[idx], SegmentColor, JointPosition, Axis, Angle=SetAngle)
 
     def draw(self):
-        self.animate()
+        if self.showAnimation:
+            self.animate()
         gl.glMatrixMode(gl.GL_MODELVIEW)
         gl.glPushMatrix()
 
@@ -272,12 +305,18 @@ class StrobeNetModule(EaselModule):
         gl.glTranslate(-ScaleFact / 2, -ScaleFact / 2, -ScaleFact / 2)
         gl.glScale(ScaleFact, ScaleFact, ScaleFact)
 
-        for Idx, (NOCS, AnimatableNOCS) in enumerate(zip(self.NOCS, self.AnimatableNOCS)):
+        for Idx, (NOCS, NOCSPartColored, NOCSVertexColored, AnimatableNOCS) in enumerate(zip(self.NOCS, self.NOCSPartColored, self.NOCSVertexColored, self.AnimatableNOCS)):
             if self.activeNMIdx != self.nNM:
                 if Idx != self.activeNMIdx:
                     continue
 
-            DispNOCS = NOCS
+            if self.showColors:
+                DispNOCS = NOCS
+            elif self.showParts:
+                DispNOCS = NOCSPartColored
+            else:
+                DispNOCS = NOCSVertexColored
+
             if self.showAnimation == True:
                 DispNOCS = AnimatableNOCS
 
@@ -304,7 +343,7 @@ class StrobeNetModule(EaselModule):
                 for r in range(JP.shape[0]):
                     gl.glPushMatrix()
                     gl.glTranslate(JP[r, 0], JP[r, 1], JP[r, 2])
-                    drawing.drawSolidSphere(radius=self.JtRadius, Color=[0, 0, 0, 0.6])
+                    drawing.drawSolidSphere(radius=self.JtRadius, Color=[1, 0, 0, 0.8])
                     gl.glPopMatrix()
                     if self.showJointAng:
                         gl.glPushAttrib(gl.GL_LINE_BIT)
@@ -314,6 +353,7 @@ class StrobeNetModule(EaselModule):
                         Axis = JA[r, :] / Angle
                         Start = JP[r, :] + self.AxisHalfLength*Axis
                         End = JP[r, :] - self.AxisHalfLength*Axis
+                        gl.glColor3f(0, 0, 0)
                         gl.glVertex3f(Start[0], Start[1], Start[2])
                         gl.glVertex3f(End[0], End[1], End[2])
                         gl.glEnd()
@@ -362,6 +402,10 @@ class StrobeNetModule(EaselModule):
 
         if a0.key() == QtCore.Qt.Key_N:
             self.showNOCS = not self.showNOCS
+        if a0.key() == QtCore.Qt.Key_C:
+            self.showColors = not self.showColors
+        if a0.key() == QtCore.Qt.Key_T:
+            self.showParts = not self.showParts
         if a0.key() == QtCore.Qt.Key_B:
             self.showBB = not self.showBB
         if a0.key() == QtCore.Qt.Key_M:
@@ -385,5 +429,6 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     mainWindow = Easel([StrobeNetModule()], sys.argv[1:])
+    mainWindow.isUpdateEveryStep = True # A bit hacky
     mainWindow.show()
     sys.exit(app.exec_())
