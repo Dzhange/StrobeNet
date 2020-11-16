@@ -93,8 +93,12 @@ class MVMPLNRNet(MLNRNet):
                 pn_occupancy_list.append(pn_occupancy)
                 
                 # repose uniton point cloud into individual pose 
-                inst_posed_pc_list = self.pose_union(mv_pn_pc_list, mv_seg_list, mv_loc_list, mv_rot_list,\
-                                                         joint_num=self.joint_num, batch_id=i)
+                if self.config.SEP_POSE:
+                    inst_posed_pc_list = self.pose_union_sep(mv_pn_pc_list, mv_seg_list, mv_loc_list, mv_rot_list,\
+                                                            joint_num=self.joint_num, batch_id=i)
+                else:
+                    inst_posed_pc_list = self.pose_union(mv_pn_pc_list, mv_seg_list, mv_loc_list, mv_rot_list,\
+                                                            joint_num=self.joint_num, batch_id=i)
 
                 posed_occupancy_list = [] # value is occupancy of multi view of 1 instance
                 # print((inst_posed_pc_list[0] - inst_posed_pc_list[1]).sum())
@@ -110,7 +114,7 @@ class MVMPLNRNet(MLNRNet):
             # and then feed into IF-Net. The ground truth shouled be used in the back projection
             pn_occupancies = torch.stack(tuple(pn_occupancy_list))
 
-            self.visualize(pn_occupancies)
+            # self.visualize(pn_occupancies)
 
             pn_grid_coords = inputs['cano_grid_coords']            
             pn_recon = self.IFNet(pn_grid_coords, pn_occupancies)

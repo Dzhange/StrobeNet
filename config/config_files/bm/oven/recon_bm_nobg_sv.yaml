@@ -14,7 +14,7 @@ DATALOADER_WORKERS: 5
 EPOCH_TOTAL: 4 # 4 + 1
 
 DATA_LIMIT: 20 # make the shuffle thing to make sure we have seen every view
-VAL_DATA_LIMIT: 5
+VAL_DATA_LIMIT: 3
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 

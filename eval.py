@@ -16,11 +16,18 @@ class evaluator():
     def load(self):
         self.gt_occ_postfix = "gt.off"
         self.pred_occ_postfix = "recon.off"
+
         self.gt_occ_paths = glob.glob(
             os.path.join(self.input_dir, "*" + self.gt_occ_postfix)
         )
-        self.gt_occ_paths.sort()
+        if len(self.gt_occ_paths) == 0:
+            self.gt_occ_postfix = "gt.obj"
+            self.pred_occ_postfix = "recon.obj"
+            self.gt_occ_paths = glob.glob(
+                os.path.join(self.input_dir, "*" + self.gt_occ_postfix)
+            )
 
+        self.gt_occ_paths.sort()
         # self.pred_occ_paths = glob.glob(
         #     os.path.join(self.input_dir, "*" + self.pred_occ_postfix)
         # )       
@@ -31,6 +38,7 @@ class evaluator():
             self.gt_occ_paths = [path for path in self.gt_occ_paths if "view" not in path]
             self.pred_occ_paths = [path for path in self.pred_occ_paths if "view" not in path]
 
+        # print(self.gt_occ_paths)
         assert len(self.gt_occ_paths) == len(self.pred_occ_paths)
         self.data_num = len(self.gt_occ_paths)
 
@@ -45,22 +53,29 @@ class evaluator():
             # print(pred_path)
             if 1:
                 os.system("/workspace/Manifold/build/simplify -i {} -o {} -f {}".format(gt_path, gt_path, 5000))
+                
+                # os.system("/workspace/Manifold/build/manifold {} {} {}".format(pred_path, pred_path, 10000))
                 os.system("/workspace/Manifold/build/simplify -i {} -o {} -f {}".format(pred_path, pred_path, 5000))
 
             # print("gt_path ", gt_path)
             gt_mesh = trimesh.load(gt_path, process=False)
             pred_mesh = trimesh.load(pred_path, process=False)
-            
+            # print(pred_mesh)
             if len(pred_mesh.vertices) == 0:
                 print("No mesh")
-                
+                pred_mesh = trimesh.Trimesh(vertices=np.zeros((1,3)))
+                chamfer = self.chamfer_dis(gt_mesh, pred_mesh)
+                chamfer = np.sqrt(chamfer)
+                chamfer_dis_list.append(chamfer)
+
+                iou_list.append(0)
                 continue
                 
 
-            p2s = self.p2s_dis(gt_mesh, pred_mesh)
-            p2s = np.sqrt(p2s)
-            # print(p2s)
-            p2s_dis_list.append(p2s)
+            # p2s = self.p2s_dis(gt_mesh, pred_mesh)
+            # p2s = np.sqrt(p2s)
+            # # print(p2s)
+            # p2s_dis_list.append(p2s)
             # p2s_dis_list.append(0)
             
             chamfer = self.chamfer_dis(gt_mesh, pred_mesh)
@@ -74,11 +89,11 @@ class evaluator():
 
 
             done = int(30 * (i+1) / self.data_num)
-            sys.stdout.write(('\r[{}>{}] p2s dis - {:.8f} chamfer dis - {:.8f} IoU - {:.8f}' )
+            sys.stdout.write(('\r[{}>{}] chamfer dis - {:.6f} std {:.6f} -  IoU - {:.6f} std {:.6f}' )
                              .format('+' * done, '-' * (30 - done), \
-                                np.mean(np.asarray(p2s_dis_list)), \
-                                np.mean(np.asarray(chamfer_dis_list)),\
-                                np.mean(np.asarray(iou_list)),\
+                                # np.mean(np.asarray(p2s_dis_list)), \
+                                np.mean(np.asarray(chamfer_dis_list)), np.std(np.asarray(chamfer_dis_list)),\
+                                np.mean(np.asarray(iou_list)), np.std(np.asarray(iou_list)) \
                                 ))
             sys.stdout.flush()
         print(" ")
@@ -98,7 +113,7 @@ class evaluator():
     def chamfer_dis(self, gt, pred):
         gt_pc = gt.vertices
         pred_pc = pred.vertices
-
+        # print(gt_pc.shape)
         # Completeness: how far are the points of the target point cloud
         # from thre predicted point cloud
         kdtree = KDTree(pred_pc)

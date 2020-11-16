@@ -3,7 +3,7 @@ This is the multi-view version of LNRNOCS
 We use Multi-View SegNet for the first stage
 and then use the network to predict it back.
 """
-import os, sys
+import os, sys, gc
 import shutil
 import glob
 import torch
@@ -13,6 +13,7 @@ from models.LNR import ModelLNRNET
 from models.SegLBS import ModelSegLBS
 from utils.DataUtils import *
 from utils.lbs import *
+from utils.tools.voxels import VoxelGrid
 import trimesh, mcubes
 
 class ModelMVMPLNRNet(ModelLNRNET):
@@ -123,7 +124,7 @@ class ModelMVMPLNRNet(ModelLNRNET):
             epoch_losses.append(loss.item())
 
 
-            if not self.config.STAGE_ONE:
+            if not self.config.STAGE_ONE:                
                 self.gen_mesh(grid_points_split, data, i)
 
             for view_id in range(self.view_num):
@@ -205,43 +206,54 @@ class ModelMVMPLNRNet(ModelLNRNET):
                 # posed
                 split_posed_logits = [occ.squeeze(0).detach().cpu() for occ in output[2]]
                 posed_logits_list.append(split_posed_logits)
+
         
+
+        # pos_fix = "off"
+        pos_fix = "obj"
+    
         for j in range(self.config.VIEW_NUM):
+            if self.config.VIEW_NUM >= 4 and j != 0:
+                print("skip this")
+                continue
+
             mesh_logits = []
             for i in range(len(grid_points_split)):
                 mesh_logits.append(posed_logits_list[i][j])
             
             logits = torch.cat(mesh_logits, dim=0).numpy()
             mx = logits.max()
-            mn = logits.min()
-            # print(logits)
+            mn = logits.min()            
+                                
             posed_mesh = self.mesh_from_logits(logits, self.net.resolution)
-            export_pred_path = os.path.join(self.output_dir, "frame_{}_view_{}_recon.off".format(str(frame_id).zfill(3), j))
-            # print("exported to ", export_pred_path)
+        
+            export_pred_path = os.path.join(self.output_dir, "frame_{}_view_{}_recon.{}".format(str(frame_id).zfill(3), j, pos_fix))
             posed_mesh.export(export_pred_path)
 
-            tar_grids = data['grid_coords'][j]
-            # print(tar_grids.shape)
-            export_gt_path = os.path.join(self.output_dir, "frame_{}_view_{}_gt.off".format(str(frame_id).zfill(3), j))
-            # print(str(data['iso_mesh'][j][0]))
-            shutil.copyfile(str(data['iso_mesh'][j][0]), export_gt_path)
-            # write_off(export_gt_path, tar_grids[0])
-            # gt_mesh = self.mesh_from_logits(tar_occ, self.net.resolution)
-            # export_gt_path = os.path.join(self.output_dir, "frame_{}_view_{}_gt.off".format(str(frame_id).zfill(3), j))
-            # gt_mesh.export(export_gt_path)
+            export_gt_path = os.path.join(self.output_dir, "frame_{}_view_{}_gt.{}".format(str(frame_id).zfill(3), j, pos_fix))
+            if "off" in pos_fix:
+                shutil.copyfile(str(data['iso_mesh'][j][0]), export_gt_path)
+            else:
+                gt_mesh = trimesh.load(str(data['iso_mesh'][j][0]))
+                gt_mesh.export(export_gt_path)
+            gc.collect()
+            torch.cuda.empty_cache()
 
         # generate predicted mesh from occupancy and save
         logits = torch.cat(cano_logits_list, dim=0).numpy()
         mx = logits.max()
         mn = logits.min()
         mesh = self.mesh_from_logits(logits, self.net.resolution)
-        export_pred_path = os.path.join(self.output_dir, "frame_{}_recon.off".format(str(frame_id).zfill(3)))
+        export_pred_path = os.path.join(self.output_dir, "frame_{}_recon.{}".format(str(frame_id).zfill(3), pos_fix))
         mesh.export(export_pred_path)
 
         # Copy ground truth in the val results
-        export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.off".format(str(frame_id).zfill(3)))
-        # print(target['mesh'][0])
-        shutil.copyfile(target['cano_iso_mesh'], export_gt_path)
+        export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.{}".format(str(frame_id).zfill(3), pos_fix))
+        if "off" in pos_fix:
+            shutil.copyfile(target['cano_iso_mesh'], export_gt_path)
+        else:
+            gt_mesh = trimesh.load(target['cano_iso_mesh'])
+            gt_mesh.export(export_gt_path)
 
         if self.config.TRANSFORM:
             # Get the transformation into val results

@@ -743,6 +743,7 @@ class LNRNet(nn.Module):
         posed_pc_list = []
         for i in range(len(inst_loc_list)):
             loc = inst_loc_list[i]
+            
             rot = inst_rot_list[i]
             # write("/workspace/debug_0_loc.xyz",loc)
             # write("/workspace/debug_0_rot.xyz",rot)
@@ -752,6 +753,33 @@ class LNRNet(nn.Module):
             posed_pc = posed_pc[0].transpose(1, 0)
             posed_pc_list.append(posed_pc)
         
+        return posed_pc_list
+    
+    
+    @staticmethod
+    def pose_union_sep(mv_pn_pc_list, mv_seg_list, mv_loc_list, mv_rot_list, joint_num, batch_id):
+        """
+        Different from pose_union: we do repose as to the joints' own location, and cat the reposed pc
+        """                
+        posed_pc_list = []        
+        valid_view_num = len(mv_pn_pc_list)
+        for i, pose in enumerate(mv_rot_list):            
+            # negative sign is important!!!!!!!!!
+            target_pose = -pose
+            inst_posed_pc_list = []
+            for view in range(valid_view_num):
+                cur_pc = mv_pn_pc_list[view][batch_id]            
+                cur_seg = mv_seg_list[view][batch_id]
+                
+                cur_loc = mv_loc_list[view][batch_id]                
+                if cur_pc is not None:
+                    # input with shape (3, N)
+                    cur_pc = cur_pc.transpose(0, 1)
+                    posed_pc = LNRNet.repose_pc(cur_pc, cur_seg, cur_loc, target_pose, joint_num=joint_num)
+                    posed_pc = posed_pc[0].transpose(1, 0)
+                    inst_posed_pc_list.append(posed_pc)
+            inst_posed_pc = torch.cat(tuple(inst_posed_pc_list), dim=0)     
+        posed_pc_list.append(inst_posed_pc)        
         return posed_pc_list
 
     def visualize(self, FeatureVoxel):
@@ -788,7 +816,7 @@ class LNRNet(nn.Module):
         
         voxel_feature = torch_scatter.scatter(src=psudo_feature_cloud, index=index)
         # VoxFeature = torch_scatter.segment_coo(src=FeatureCloud,index=Index,reduce='mean')
-        pad_size = (0, Res**3 - voxel_feature.size(1))
+        pad_size = (0, int(Res**3 - voxel_feature.size(1)))
         voxel_feature = F.pad(voxel_feature, pad_size, 'constant', 0)
         voxel_feature = voxel_feature.view(1, Res, Res, Res)
         

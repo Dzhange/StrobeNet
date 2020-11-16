@@ -19,10 +19,10 @@ def run(config):
 
 
     model = ModelONet(config)
-    if config.VIEW_NUM == 1:
-        val_dataset = OccNetDataset(config, train=config.TEST_ON_TRAIN)
-    else:
-        val_dataset = OccNetMVDataset(config, train=config.TEST_ON_TRAIN)
+    # if config.VIEW_NUM == 1:
+    #     val_dataset = OccNetDataset(config, train=config.TEST_ON_TRAIN)
+    # else:
+    val_dataset = OccNetMVDataset(config, train=config.TEST_ON_TRAIN)
 
 
     val_loader = DataLoader(val_dataset, batch_size=1,
@@ -36,7 +36,9 @@ def run(config):
 
     for i, batch in enumerate(val_loader):
         model.eval_step(batch, i)
-        print("{} finished".format(i))
+        # print(batch, type(batch))
+        # print("{} finished with {}".format(i, batch['img_path']))
+        print("{} finished ".format(i))
         # val_losses.append(loss.item())
         # val_loss_str = '\rmean val loss: {}'.format(np.mean(np.asarray(val_losses)))
         # sys.stdout.write(val_loss_str.ljust(100))

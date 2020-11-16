@@ -158,7 +158,7 @@ class OccNetDataset(torch.utils.data.Dataset):
             # print(self.frame_files[k][idx])
             if 0:
                 frame[k] = imread_rgb_torch("/workspace/Data/SAPIEN/eyeglasses/aug_scale_mpf_uni/train/0000/frame_00000000_view_00_color00.png", Size=self.img_size).type(torch.FloatTensor)
-            else:
+            else:                
                 frame[k] = imread_rgb_torch(self.frame_files[k][idx], Size=self.img_size).type(torch.FloatTensor)                        
             # frame[k] = imread_rgb_torch('/workspace/Data/shapenet_sample/img_choy2016/000.jpg', Size=self.img_size).type(torch.FloatTensor)                        
             frame[k] /= 255.0
@@ -297,7 +297,8 @@ class OccNetDataset(torch.utils.data.Dataset):
         if_data = {            
             'grid_coords':np.array(points, dtype=np.float32),
             'occupancies': np.array(occupancies, dtype=np.float32),
-            'iso_mesh': gt_mesh_path
+            'iso_mesh': gt_mesh_path,
+            'img_path': required_path
             }
 
         return if_data

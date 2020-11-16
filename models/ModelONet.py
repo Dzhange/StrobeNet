@@ -104,14 +104,14 @@ class ModelONet(object):
         put data onto the right device
         """
 
-        if self.view_num > 1:
-            inputs = [img.to(device=device) for img in data['color00']]
-            points = data['grid_coords'][0].to(device=device)
-            occ = data['occupancies'][0].to(device=device)
-        else:
-            inputs = data[0].to(device=device)        
-            points = data[1]['grid_coords'].to(device=device)
-            occ = data[1]['occupancies'].to(device=device)
+        # if 1 or self.view_num > 1:
+        inputs = [img.to(device=device) for img in data['color00']]
+        points = data['grid_coords'][0].to(device=device)
+        occ = data['occupancies'][0].to(device=device)
+        # else:
+        #     inputs = data[0].to(device=device)        
+        #     points = data[1]['grid_coords'].to(device=device)
+        #     occ = data[1]['occupancies'].to(device=device)
 
         data = {}
         data['inputs'] = inputs
@@ -140,16 +140,16 @@ class ModelONet(object):
         occ = data.get('occupancies').to(device)
         
                 
-        if self.view_num == 1:
-            inputs = data.get('inputs').to(device)
-            c = self.net.encode_inputs(inputs)
-        else:
-            inputs = data.get('inputs')
-            con_list = []
-            for img in inputs:
-                c = self.net.encode_inputs(img)
-                con_list.append(c)
-            c = torch.cat(tuple(con_list), dim=1)
+        # if 0 andself.view_num == 1:
+        #     inputs = data.get('inputs').to(device)
+        #     c = self.net.encode_inputs(inputs)
+        # else:
+        inputs = data.get('inputs')
+        con_list = []
+        for img in inputs:
+            c = self.net.encode_inputs(img)
+            con_list.append(c)
+        c = torch.cat(tuple(con_list), dim=1)
 
         # q_z = self.net.infer_z(p, occ, c)
         # z = q_z.rsample()
@@ -249,16 +249,16 @@ class ModelONet(object):
                         
             # inputs = data.get('inputs', torch.empty(p.size(0), 0)).to(device)
                         
-            if self.view_num == 1:                
-                inputs = data.get('inputs').to(device) 
-                c = self.net.encode_inputs(inputs)
-            else:
-                inputs = data.get('inputs')
-                con_list = []
-                for img in inputs:
-                    c = self.net.encode_inputs(img)
-                    con_list.append(c)
-                c = torch.cat(tuple(con_list), dim=1)
+            # if self.view_num == 1:                
+            #     inputs = data.get('inputs').to(device) 
+            #     c = self.net.encode_inputs(inputs)
+            # else:
+            inputs = data.get('inputs')
+            con_list = []
+            for img in inputs:
+                c = self.net.encode_inputs(img)
+                con_list.append(c)
+            c = torch.cat(tuple(con_list), dim=1)
 
             # q_z = self.net.infer_z(p, occ, c)
             # z = q_z.rsample()
@@ -291,11 +291,11 @@ class ModelONet(object):
         # Copy ground truth in the val results
         export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.off".format(str(i).zfill(3)))
         # print(target['mesh'][0])
-        if self.config.VIEW_NUM == 1:
-            shutil.copyfile(batch_data[1]['iso_mesh'][0], export_gt_path)        
-        else:
-            print(batch_data['iso_mesh'][0])
-            shutil.copyfile(batch_data['iso_mesh'][0][0], export_gt_path)
+        # if self.config.VIEW_NUM == 1:
+        #     shutil.copyfile(batch_data[1]['iso_mesh'][0], export_gt_path)        
+        # else:
+        print(batch_data['iso_mesh'][0])
+        shutil.copyfile(batch_data['iso_mesh'][0][0], export_gt_path)
 
     def mesh_from_logits(self, logits, resolution):
         logits = np.reshape(logits, (resolution,) * 3)

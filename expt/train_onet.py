@@ -26,10 +26,10 @@ def run(config):
     if config.TEST_ON_TRAIN:
         val_dataset = train_dataset
     else:
-        if config.VIEW_NUM == 1:
-            val_dataset = OccNetDataset(config, train=config.TEST_ON_TRAIN)
-        else:
-            val_dataset = OccNetMVDataset(config, train=config.TEST_ON_TRAIN)
+        # if config.VIEW_NUM == 1:
+        #     val_dataset = OccNetDataset(config, train=config.TEST_ON_TRAIN)
+        # else:
+        val_dataset = OccNetMVDataset(config, train=config.TEST_ON_TRAIN)
 
     train_loader = DataLoader(train_dataset, batch_size=config.BATCHSIZE,
                                 shuffle=True,

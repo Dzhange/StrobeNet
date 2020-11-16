@@ -23,7 +23,7 @@ TARGETS: ["default"]
 TASK: "mlnrnet"
 EXPT_NAME: "stg1_bm1_nobg_4v" ## This is the result with back ground! I wrote it wrong! V2 actually
 BONE_NUM: 1
-GPU: 7
+GPU: 4
 OUT_CHANNELS: 12 #4 + 1*8
 # TEST_ON_TRAIN: True
 TEST_ON_TRAIN: False
