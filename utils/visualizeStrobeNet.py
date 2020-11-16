@@ -71,6 +71,7 @@ class StrobeNetModule(EaselModule):
         self.JtRadius = 0.01
         self.AngleIncrem = 0.0001
         self.CurrentAngle = 0
+        # self.AngleRange = []
 
         sys.stdout.flush()
         self.nNM = 0
@@ -84,6 +85,9 @@ class StrobeNetModule(EaselModule):
         self.showJointPos = True
         self.showJointAng = True
         self.showAnimation = True
+        self.RotateAngle = -90
+        self.RotateAxis = np.array([1, 0, 0])
+
         self.loadData()
 
     def drawNOCS(self, lineWidth=2.0, ScaleX=1, ScaleY=1, ScaleZ=1, OffsetX=0, OffsetY=0, OffsetZ=0):
@@ -264,6 +268,7 @@ class StrobeNetModule(EaselModule):
         gl.glPushMatrix()
 
         ScaleFact = 500
+        gl.glRotate(self.RotateAngle, self.RotateAxis[0], self.RotateAxis[1], self.RotateAxis[2])
         gl.glTranslate(-ScaleFact / 2, -ScaleFact / 2, -ScaleFact / 2)
         gl.glScale(ScaleFact, ScaleFact, ScaleFact)
 
