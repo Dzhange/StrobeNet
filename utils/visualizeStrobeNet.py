@@ -109,7 +109,7 @@ class StrobeNetModule(EaselModule):
             self.JointAngles = [JointAngle(random.uniform(self.AngleRanges[0], self.AngleRanges[1]), self.AngleRanges,
                                            self.AngleIncrems[0])]
         elif self.Args.category == 'oven':
-            self.AngleRanges = [-math.pi/2, math.pi/2]
+            self.AngleRanges = [-math.pi/2, 0]
             self.AngleIncrems = [0.03]
             self.JointAngles = [JointAngle(random.uniform(self.AngleRanges[0], self.AngleRanges[1]), self.AngleRanges, self.AngleIncrems[0])]
 
@@ -219,7 +219,7 @@ class StrobeNetModule(EaselModule):
                 elif self.Args.category == 'laptop':
                     self.ValidAnimatableSegments.append(UniqueSegmentColors[[1, 0], :])
                 elif self.Args.category == 'oven':
-                    self.ValidAnimatableSegments.append(UniqueSegmentColors[[1, 0], :])
+                    self.ValidAnimatableSegments.append(UniqueSegmentColors[[2, 0], :])
 
         # Load OBJ models
         ModelFiles = self.getFileNames(self.Args.models)
