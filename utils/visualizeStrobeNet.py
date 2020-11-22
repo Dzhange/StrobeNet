@@ -72,6 +72,7 @@ class StrobeNetModule(EaselModule):
         ArgGroup.add_argument('--jt-ang', nargs='+',
                               help='Specify joint angles to load. * globbing is supported.',
                               required=False)
+        ArgGroup.add_argument('--category', help='Specify the class.', type=str, choices=['glasses', 'laptop', 'oven'], default='glasses', required=True)
 
         self.Args, _ = self.Parser.parse_known_args(InputArgs)
         if len(sys.argv) <= 1:
@@ -97,10 +98,20 @@ class StrobeNetModule(EaselModule):
         self.AxisHalfLength = 0.1
         self.JtRadius = 0.02
 
-        self.AngleRanges = [-math.pi/2, 1*math.pi/160]
-        self.AngleIncrems = [0.01, 0.05]
-        self.JointAngles = [JointAngle(random.uniform(self.AngleRanges[0], self.AngleRanges[1]), self.AngleRanges, self.AngleIncrems[0])
-            , JointAngle(random.uniform(self.AngleRanges[0], self.AngleRanges[1]), self.AngleRanges, self.AngleIncrems[1])] # Only for glasses. TODO
+        if self.Args.category == 'glasses':
+            self.AngleRanges = [-math.pi/2, 1*math.pi/160]
+            self.AngleIncrems = [0.01, 0.05]
+            self.JointAngles = [JointAngle(random.uniform(self.AngleRanges[0], self.AngleRanges[1]), self.AngleRanges, self.AngleIncrems[0])
+                , JointAngle(random.uniform(self.AngleRanges[0], self.AngleRanges[1]), self.AngleRanges, self.AngleIncrems[1])]
+        elif self.Args.category == 'laptop':
+            self.AngleRanges = [-math.pi / 2,   math.pi / 2]
+            self.AngleIncrems = [0.03]
+            self.JointAngles = [JointAngle(random.uniform(self.AngleRanges[0], self.AngleRanges[1]), self.AngleRanges,
+                                           self.AngleIncrems[0])]
+        elif self.Args.category == 'oven':
+            self.AngleRanges = [-math.pi/2, math.pi/2]
+            self.AngleIncrems = [0.03]
+            self.JointAngles = [JointAngle(random.uniform(self.AngleRanges[0], self.AngleRanges[1]), self.AngleRanges, self.AngleIncrems[0])]
 
         sys.stdout.flush()
         self.nNM = 0
@@ -202,8 +213,13 @@ class StrobeNetModule(EaselModule):
 
                 UniqueSegmentColors = np.unique(SegMap.reshape(-1, SegMap.shape[-1]), axis=0)[1:]  # Exclude the first one which is black
                 self.UniqueSegmentColors.append(UniqueSegmentColors)
-                self.ValidAnimatableSegments.append(UniqueSegmentColors[[2, 0], :])  # HACK, TODO, for glasses only
-                # print('ValidAnimatableSegments:', ValidAnimatableSegments) # HACK TODO, for glasses only
+                if self.Args.category == 'glasses':
+                    self.ValidAnimatableSegments.append(UniqueSegmentColors[[2, 0], :])  # for glasses only
+                    # print('ValidAnimatableSegments:', ValidAnimatableSegments) # for glasses only
+                elif self.Args.category == 'laptop':
+                    self.ValidAnimatableSegments.append(UniqueSegmentColors[[1, 0], :])
+                elif self.Args.category == 'oven':
+                    self.ValidAnimatableSegments.append(UniqueSegmentColors[[1, 0], :])
 
         # Load OBJ models
         ModelFiles = self.getFileNames(self.Args.models)
@@ -283,13 +299,18 @@ class StrobeNetModule(EaselModule):
 
     def animate(self):
         for idx, (JP, JA, SegMap, ValidAnimatableSegments) in enumerate(zip(self.JtPos, self.JtAng, self.SegMaps, self.ValidAnimatableSegments)):
-            for r in range(JP.shape[0]):
+            JPReshaped = JP
+            JAReshaped = JA
+            if self.Args.category == 'oven' or self.Args.category == 'laptop':
+                JPReshaped = np.reshape(JP, (-1, JP.size))
+                JAReshaped = np.reshape(JA, (-1, JA.size))
+            for r in range(JPReshaped.shape[0]):
                 self.JointAngles[r].increm()
                 SetAngle = self.JointAngles[r].val()# % math.pi
 
-                JointPosition = JP[r, :]
-                DefaultAngle = np.linalg.norm(JA[r, :])
-                Axis = JA[r, :] / DefaultAngle
+                JointPosition = JPReshaped[r, :]
+                DefaultAngle = np.linalg.norm(JAReshaped[r, :])
+                Axis = JAReshaped[r, :] / DefaultAngle
                 SegmentColor = ValidAnimatableSegments[r]
                 self.rotateNOCS(self.AnimatableNOCS[idx], self.NOCSPartColored[idx], SegmentColor, JointPosition, Axis, Angle=SetAngle)
                 self.rotateMesh(self.AnimatableOBJModels[idx], self.OBJModels[idx], self.NOCSPartColored[idx], self.M2NIndices[idx], SegmentColor, JointPosition, Axis, Angle=SetAngle)
@@ -322,8 +343,8 @@ class StrobeNetModule(EaselModule):
 
             if self.showPoints:
                 DispNOCS.draw(self.PointSize)
-            else:
-                DispNOCS.drawConn(isWireFrame=self.showWireFrame)
+            # else:
+            #     DispNOCS.drawConn(isWireFrame=self.showWireFrame)
             if self.showBB:
                 DispNOCS.drawBB()
 
