@@ -89,6 +89,11 @@ class ModelMVMPLNRNet(ModelLNRNET):
     def validate(self, val_dataloader, objective, device):
         # pass
         self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
+        
+        if self.config.ANIM_MODEL:
+            self.output_dir = os.path.join(self.expt_dir_path, "animation_frame_{}_start_{}_step{}".\
+            format(self.config.ANIM_MODEL_ID, self.config.ANGLE_START, self.config.ANGLE_STEP))
+
         if os.path.exists(self.output_dir) == False:
             os.makedirs(self.output_dir)
 
@@ -115,22 +120,34 @@ class ModelMVMPLNRNet(ModelLNRNET):
 
         for i, data in enumerate(val_dataloader, 0):  # Get each batch
             if i > (num_samples-1):
-                break
-
+                break            
+            # if i < 190:
+            #     continue
             # first pass generate loss
             net_input, target = self.preprocess(data, device)
-            output_recon = self.net(net_input)
-            loss = objective(output_recon, target)
-            epoch_losses.append(loss.item())
+
+            if self.config.ANIM_MODEL or self.config.FIX_HACK:                    
+                angle = self.config.ANGLE_START + self.config.ANGLE_STEP * i
+                output_recon = self.net(net_input, angle)          
+            else:
+                output_recon = self.net(net_input)
 
 
-            if not self.config.STAGE_ONE:                
+            if not self.config.VIEW_NUM > self.config.VIEW_RECON:                
+                loss = objective(output_recon, target)
+                epoch_losses.append(loss.item())
+
+            if not self.config.STAGE_ONE:
                 self.gen_mesh(grid_points_split, data, i)
+
 
             for view_id in range(self.view_num):
 
                 segnet_output = output_recon[0]
-                self.save_img(net_input['color00'][view_id], segnet_output[view_id][:, 0:4, :, :], target['nox00'][view_id][:, 0:4, :, :], i)
+                self.save_img(net_input['color00'][view_id], segnet_output[view_id][:, 0:4, :, :], target['nox00'][view_id][:, 0:4, :, :], i, view_id=view_id)
+
+                # if self.config.VIEW_NUM > self.config.VIEW_RECON:
+                #     continue
 
                 self.gen_NOCS_pc(segnet_output[view_id][:, 0:3, :, :], target['nox00'][view_id][:, 0:3, :, :], \
                     target['nox00'][view_id][:, 3, :, :], "nocs", i)
@@ -144,7 +161,7 @@ class ModelMVMPLNRNet(ModelLNRNET):
                 if self.config.LOC_LOSS or self.config.LOC_MAP_LOSS:
                     tar_loc = target['pose'][view_id][0, :, 0:3]
                     cur_loc_diff = self.save_joint(segnet_output[view_id], tar_loc, mask, i, self.config.LOC_LOSS, view_id=view_id)
-                    loc_diff.append(cur_loc_diff)                    
+                    loc_diff.append(cur_loc_diff)
 
                     gt_joint_map = target["joint_map"][view_id][:,:bone_num*3]
                     self.visualize_joint_prediction(segnet_output[view_id], gt_joint_map, mask, i, view_id=view_id)
@@ -188,7 +205,7 @@ class ModelMVMPLNRNet(ModelLNRNET):
             print("\n")
 
     def gen_mesh(self, grid_points_split, data, frame_id):
-        
+
         device = self.net.device
         cano_logits_list = []
         posed_logits_list = []
@@ -196,9 +213,12 @@ class ModelMVMPLNRNet(ModelLNRNET):
             with torch.no_grad():
                 net_input, target = self.preprocess(data, device)
                 net_input['grid_coords'] = [points.to(device), ] * self.config.VIEW_NUM
-                net_input['cano_grid_coords'] = points.to(device)
-                output = self.net(net_input)
-                # self.save_img(net_input['RGB'], output[0], target['NOCS'], i)
+                net_input['cano_grid_coords'] = points.to(device)                
+                if self.config.ANIM_MODEL or self.config.FIX_HACK:                    
+                    angle = self.config.ANGLE_START + self.config.ANGLE_STEP * frame_id
+                    output = self.net(net_input, angle)
+                else:
+                    output = self.net(net_input)
 
                 # cano
                 cano_logits_list.append(output[1].squeeze(0).detach().cpu())
@@ -207,14 +227,12 @@ class ModelMVMPLNRNet(ModelLNRNET):
                 split_posed_logits = [occ.squeeze(0).detach().cpu() for occ in output[2]]
                 posed_logits_list.append(split_posed_logits)
 
-        
-
         # pos_fix = "off"
         pos_fix = "obj"
-    
+
         for j in range(self.config.VIEW_NUM):
-            if self.config.VIEW_NUM >= 4 and j != 0:
-                print("skip this")
+            if j >= self.config.VIEW_RECON:
+                print("[ skipping view {} ]".format(j))
                 continue
 
             mesh_logits = []
@@ -225,27 +243,38 @@ class ModelMVMPLNRNet(ModelLNRNET):
             mx = logits.max()
             mn = logits.min()            
                                 
-            posed_mesh = self.mesh_from_logits(logits, self.net.resolution)
-        
-            export_pred_path = os.path.join(self.output_dir, "frame_{}_view_{}_recon.{}".format(str(frame_id).zfill(3), j, pos_fix))
+            # posed_mesh = self.mesh_from_logits(logits, self.net.resolution)
+            # posed_mesh = self.mesh_from_logits(logits, self.net.resolution, initThreshold=0.45)
+            posed_mesh = self.mesh_from_logits(logits, self.net.resolution, initThreshold=0.5)
+
+            if self.config.ANIM_MODEL or self.config.FIX_HACK:
+                export_pred_path = os.path.join(self.output_dir, "frame_{}_angle_{}_recon.{}".format(str(frame_id).zfill(3), self.config.ANGLE_START + self.config.ANGLE_STEP * frame_id, pos_fix))
+            else:
+                export_pred_path = os.path.join(self.output_dir, "frame_{}_view_{}_recon.{}".format(str(frame_id).zfill(3), j, pos_fix))
+
             posed_mesh.export(export_pred_path)
+            
+            # print("gt is ", data['iso_mesh'][j])
+            iso_orig = os.path.basename(str(data['iso_mesh'][j][0])).split('.')[0]
 
             export_gt_path = os.path.join(self.output_dir, "frame_{}_view_{}_gt.{}".format(str(frame_id).zfill(3), j, pos_fix))
-            if "off" in pos_fix:
+            # print("gt is ", data['iso_mesh'][j][0])
+            if "off" in pos_fix:                
                 shutil.copyfile(str(data['iso_mesh'][j][0]), export_gt_path)
             else:
                 gt_mesh = trimesh.load(str(data['iso_mesh'][j][0]))
                 gt_mesh.export(export_gt_path)
             gc.collect()
             torch.cuda.empty_cache()
-
-        # generate predicted mesh from occupancy and save
-        logits = torch.cat(cano_logits_list, dim=0).numpy()
-        mx = logits.max()
-        mn = logits.min()
-        mesh = self.mesh_from_logits(logits, self.net.resolution)
-        export_pred_path = os.path.join(self.output_dir, "frame_{}_recon.{}".format(str(frame_id).zfill(3), pos_fix))
-        mesh.export(export_pred_path)
+        
+        if not self.config.ANIM_MODEL:
+            # generate predicted mesh from occupancy and save
+            logits = torch.cat(cano_logits_list, dim=0).numpy()
+            mx = logits.max()
+            mn = logits.min()
+            mesh = self.mesh_from_logits(logits, self.net.resolution)
+            export_pred_path = os.path.join(self.output_dir, "frame_{}_recon.{}".format(str(frame_id).zfill(3), pos_fix))        
+            mesh.export(export_pred_path)
 
         # Copy ground truth in the val results
         export_gt_path = os.path.join(self.output_dir, "frame_{}_gt.{}".format(str(frame_id).zfill(3), pos_fix))

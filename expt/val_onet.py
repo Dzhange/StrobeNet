@@ -26,7 +26,7 @@ def run(config):
 
 
     val_loader = DataLoader(val_dataset, batch_size=1,
-                                shuffle=True,
+                                shuffle=False,
                                 num_workers=config.DATALOADER_WORKERS, drop_last=True)
 
     model.setup_checkpoint(model.device)

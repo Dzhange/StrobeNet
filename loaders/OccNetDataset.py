@@ -20,7 +20,7 @@ class OccNetDataset(torch.utils.data.Dataset):
     A basic dataloader for HandOccDataset
     """
     def __init__(self, config, train=True, required='color00'):
-        
+
         self.config = config
         root = config.DATASET_ROOT
         limit = config.DATA_LIMIT if train else config.VAL_DATA_LIMIT

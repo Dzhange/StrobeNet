@@ -13,11 +13,12 @@ DATALOADER_WORKERS: 2
 EPOCH_TOTAL: 5
 
 DATA_LIMIT: 100
-VAL_DATA_LIMIT: 3
+VAL_DATA_LIMIT: 100
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
-TASK: "lnrnet"
+TASK: "mlnrnet"
+# TASK: "lnrnet"
 EXPT_NAME: "open_recon_bm1_sv"
 BONE_NUM: 1
 GPU: 7

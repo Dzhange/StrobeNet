@@ -30,7 +30,7 @@ class MVMPLNRNet(MLNRNet):
         # self.view_num = config.VIEW_NUM
         assert self.aggr_scatter
 
-    def forward(self, inputs):
+    def forward(self, inputs, novel_angle=None):
 
         img_list = inputs['color00']
         batch_size = self.config.BATCHSIZE
@@ -91,35 +91,65 @@ class MVMPLNRNet(MLNRNet):
                 inst_pn_pc, inst_feature = self.collect_pc(mv_pn_pc_list, mv_feature_list, batch_id=i)
                 pn_occupancy = self.discretize(inst_pn_pc, inst_feature, self.resolution)
                 pn_occupancy_list.append(pn_occupancy)
-                
+
+                fix = self.config.FIX_HACK or self.config.ANIM_MODEL
+                if novel_angle is not None:
+                    # fp = [torch.Tensor([[0,0,1],[0,0,-1]]).to(device=pn_occupancy.device), ]
+                    old_aa = mv_rot_list[0][0]
+                    mag = torch.norm(old_aa, dim=1, keepdim=True)
+                    # print(old_aa, mag)
+                    axis = old_aa / mag
+                    # fp = [torch.Tensor([[0,1.05,0],]).to(device=pn_occupancy.device), ]
+                    axis_angle = novel_angle * axis
+                    # mv_rot_list[0] = fp
+                    mv_rot_list[0] = [axis_angle, ]
+
                 # repose uniton point cloud into individual pose 
-                if self.config.SEP_POSE:
+                if self.config.SEP_POSE:                    
                     inst_posed_pc_list = self.pose_union_sep(mv_pn_pc_list, mv_seg_list, mv_loc_list, mv_rot_list,\
                                                             joint_num=self.joint_num, batch_id=i)
                 else:
                     inst_posed_pc_list = self.pose_union(mv_pn_pc_list, mv_seg_list, mv_loc_list, mv_rot_list,\
                                                             joint_num=self.joint_num, batch_id=i)
 
+                if novel_angle is not None:
+                    view_posed_pc_list = self.pose_novel_sep(mv_pn_pc_list, mv_seg_list, mv_loc_list, mv_rot_list,\
+                                                            joint_num=self.joint_num, batch_id=i)
+                    # print(len(view_posed_pc_list))
+                    for vi, posed_pc in enumerate(view_posed_pc_list):
+                        out_mask = output_list[vi][0, self.nocs_end:self.mask_end, :, :]
+                        out_mask = out_mask.sigmoid()
+                        cur_mask = out_mask[0].squeeze()
+                        masked = cur_mask > 0.7
+                        # print(posed_pc.shape, output_list[vi][0, :self.nocs_end, masked].shape)
+                        write_off('/workspace/debug_{}.xyz'.format(vi), posed_pc.transpose(0, 1).cpu().detach().numpy())
+                        output_list[vi][0, :self.nocs_end, masked] = posed_pc
+
+
                 posed_occupancy_list = [] # value is occupancy of multi view of 1 instance
                 # print((inst_posed_pc_list[0] - inst_posed_pc_list[1]).sum())
                 for posed_pc in inst_posed_pc_list:
                     # print(posed_pc.shape)
-                    # write_off('/workspace/debug_0.xyz', posed_pc.transpose(0, 1).cpu().detach().numpy())
+                    # write_off('/workspace/debug_0.xyz', posed_pc.transpose(0, 1).cpu().detach().numpy())                    
                     # exit()
                     posed_occupancy = self.discretize(posed_pc, inst_feature, self.resolution)
                     posed_occupancy_list.append(posed_occupancy)
+                    
                 batch_posed_occupancy_list.append(posed_occupancy_list)
-
             
             # and then feed into IF-Net. The ground truth shouled be used in the back projection
             pn_occupancies = torch.stack(tuple(pn_occupancy_list))
 
             # self.visualize(pn_occupancies)
-
             pn_grid_coords = inputs['cano_grid_coords']            
             pn_recon = self.IFNet(pn_grid_coords, pn_occupancies)
                                     
             for view_id in range(self.view_num):
+                
+                # comment it after validation
+                if view_id >= self.config.VIEW_RECON:
+                    continue
+
                 view_occ = []
                 # accumulate across batch
                 for b_id in range(batch_size):

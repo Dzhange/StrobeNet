@@ -10,7 +10,6 @@ import torch.nn.functional as F
 # batch_size (N) = #3D objects , channels = features, signal_lengt (L) (convolution dimension) = #point samples
 # kernel_size = 1 i.e. every convolution is done over only all features of one point sample, this makes it a FC.
 
-
 # 3D Single View Reconsturction (for 256**3 input voxelization) --------------------------------------
 # ----------------------------------------------------------------------------------------------------
 class SVR(nn.Module):

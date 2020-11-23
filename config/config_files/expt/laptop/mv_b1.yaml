@@ -7,6 +7,8 @@
 DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/laptop/benchmark_v1_uni/'
 OUTPUT_DIR: '/workspace/dev_nrnocs/output/expt/laptop'
 VIEW_NUM: 2
+RANDOM_VIEW: True
+TOTAL_VIEW: 8
 
 BATCHSIZE: 1
 DATALOADER_WORKERS: 4
@@ -16,14 +18,14 @@ SAVE_FREQ: 5
 LR: 1e-4
 DATA_LIMIT: 100
 # DATA_LIMIT: 1
-VAL_DATA_LIMIT: 5
+VAL_DATA_LIMIT: 100
 # VAL_DATA_LIMIT: 1
 
 # EXPT_NAME: "occ_baseline_b1"
-EXPT_NAME: "occ_baseline_b1"
+EXPT_NAME: "r8_v2"
 ONET_CANO: True
 
-GPU: 7
+GPU: 6
 TEST_ON_TRAIN: False
 # TEST_ON_TRAIN: True
 

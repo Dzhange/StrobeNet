@@ -14,15 +14,15 @@ class evaluator():
         self.load()
 
     def load(self):
-        self.gt_occ_postfix = "gt.off"
-        self.pred_occ_postfix = "recon.off"
+        self.gt_occ_postfix = "gt.obj"
+        self.pred_occ_postfix = "recon.obj"
 
         self.gt_occ_paths = glob.glob(
             os.path.join(self.input_dir, "*" + self.gt_occ_postfix)
         )
         if len(self.gt_occ_paths) == 0:
-            self.gt_occ_postfix = "gt.obj"
-            self.pred_occ_postfix = "recon.obj"
+            self.gt_occ_postfix = "gt.off"
+            self.pred_occ_postfix = "recon.off"
             self.gt_occ_paths = glob.glob(
                 os.path.join(self.input_dir, "*" + self.gt_occ_postfix)
             )
@@ -34,14 +34,21 @@ class evaluator():
         # self.pred_occ_paths.sort()
         self.pred_occ_paths = [path.replace(self.gt_occ_postfix, self.pred_occ_postfix) for path in self.gt_occ_paths]
 
-        if 0:
+        if args.cano:
             self.gt_occ_paths = [path for path in self.gt_occ_paths if "view" not in path]
             self.pred_occ_paths = [path for path in self.pred_occ_paths if "view" not in path]
+        
+        certain_view = args.cv
+        if certain_view > -1:
+            self.gt_occ_paths = [path for path in self.gt_occ_paths if "view_{}".format(certain_view) in path]
+            self.pred_occ_paths = [path for path in self.pred_occ_paths if "view_{}".format(certain_view) in path]
 
-        # print(self.gt_occ_paths)
+        print(self.gt_occ_paths[:5])
+        print(self.pred_occ_paths[:5])
         assert len(self.gt_occ_paths) == len(self.pred_occ_paths)
         self.data_num = len(self.gt_occ_paths)
-
+        print(self.data_num)
+        
     def eval(self):
 
         p2s_dis_list = [0]
@@ -51,24 +58,28 @@ class evaluator():
             gt_path = self.gt_occ_paths[i]
             pred_path = self.pred_occ_paths[i]
             # print(pred_path)
-            if 1:
-                os.system("/workspace/Manifold/build/simplify -i {} -o {} -f {}".format(gt_path, gt_path, 5000))
+            # if 1:
+            #     os.system("/workspace/Manifold/build/simplify -i {} -o {} -f {}".format(gt_path, gt_path, 5000))
                 
-                # os.system("/workspace/Manifold/build/manifold {} {} {}".format(pred_path, pred_path, 10000))
-                os.system("/workspace/Manifold/build/simplify -i {} -o {} -f {}".format(pred_path, pred_path, 5000))
+            #     # os.system("/workspace/Manifold/build/manifold {} {} {}".format(pred_path, pred_path, 10000))
+            #     os.system("/workspace/Manifold/build/simplify -i {} -o {} -f {}".format(pred_path, pred_path, 5000))
 
             # print("gt_path ", gt_path)
             gt_mesh = trimesh.load(gt_path, process=False)
             pred_mesh = trimesh.load(pred_path, process=False)
-            # print(pred_mesh)
-            if len(pred_mesh.vertices) == 0:
-                print("No mesh")
-                pred_mesh = trimesh.Trimesh(vertices=np.zeros((1,3)))
-                chamfer = self.chamfer_dis(gt_mesh, pred_mesh)
-                chamfer = np.sqrt(chamfer)
-                chamfer_dis_list.append(chamfer)
+            
+            try:
+                if len(pred_mesh.vertices) == 0:
+                    print("No mesh")
+                    pred_mesh = trimesh.Trimesh(vertices=np.zeros((1,3)))
+                    chamfer = self.chamfer_dis(gt_mesh, pred_mesh)
+                    chamfer = np.sqrt(chamfer)
+                    chamfer_dis_list.append(chamfer)
 
-                iou_list.append(0)
+                    iou_list.append(0)
+                    continue
+            except Exception:
+                print(Exception)
                 continue
                 
 
@@ -86,7 +97,6 @@ class evaluator():
             iou = self.iou(gt_mesh, pred_mesh)
             # print("current iou ", iou)
             iou_list.append(iou)
-
 
             done = int(30 * (i+1) / self.data_num)
             sys.stdout.write(('\r[{}>{}] chamfer dis - {:.6f} std {:.6f} -  IoU - {:.6f} std {:.6f}' )
@@ -149,6 +159,8 @@ class evaluator():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()    
     parser.add_argument('-i', '--input-dir', help='Specify the location of the directory of data to evaluate', required=True)
+    parser.add_argument('-cv', type=int, default=-1)
+    parser.add_argument('-cano', type=bool, default=False)
     args, _ = parser.parse_known_args()
 
     eval = evaluator(args)

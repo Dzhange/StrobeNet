@@ -70,10 +70,12 @@ class OccNetMVDataset(torch.utils.data.Dataset):
     
     def get_sv_data(self, frame_path, view):
         data = self.load_images(frame_path, view)
-        occ = self.load_occupancies(frame_path)
+        if not self.config.ONET_MV_CANO:
+            occ = self.load_occupancies(frame_path, view)            
+        else:
+            occ = self.load_occupancies(frame_path)
         data.update(occ)
         return data
-
 
     def __getitem__(self, idx):
         
@@ -134,7 +136,7 @@ class OccNetMVDataset(torch.utils.data.Dataset):
                 if len(sample_index) >= dataset_length or cur_idx >= total_size:
                     break
                 sample_index.append(cur_idx)
-                cur_idx += step                                    
+                cur_idx += step
             print('[ INFO ]: Loading {} / {} items.'.format(len(sample_index), total_size))
 
             
@@ -191,7 +193,7 @@ class OccNetMVDataset(torch.utils.data.Dataset):
 
         return p
     
-    def load_occupancies(self, frame_path):
+    def load_occupancies(self, frame_path, view_id=None):
         """
         load the occupancy data for the 2nd part(IF-Net)
             coords: position to be queried
@@ -200,17 +202,21 @@ class OccNetMVDataset(torch.utils.data.Dataset):
         data_dir = os.path.dirname(frame_path)
         file_name = os.path.basename(frame_path)
         index_of_frame = find_frame_num(file_name)
-        index_of_frame = str(int(index_of_frame) // self.pose_num * self.pose_num).zfill(8)
 
-        gt_mesh_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
+        if view_id is None:
+            index_of_frame = str(int(index_of_frame) // self.pose_num * self.pose_num).zfill(8)        
+            gt_mesh_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' +\
                                                     "isosurf_scaled.off")
+            uniform_sample_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' + "uni_sampled.npz")
+        else:
+            gt_mesh_path = os.path.join(data_dir, "frame_{}_view_{}_isosurf_scaled.off".format(index_of_frame, str(view_id).zfill(2)))            
+            uniform_sample_path = os.path.join(data_dir, "frame_{}_view_{}_uni_sampled.npz".format(index_of_frame, str(view_id).zfill(2)))
 
         points = []
         coords = []
         occupancies = []
                 
-        # uniform_sample_path = required_path.replace('color00.png', "uni_sampled.npz")
-        uniform_sample_path = os.path.join(data_dir, "frame_" + index_of_frame + '_' + "uni_sampled.npz")
+        
         if os.path.exists(uniform_sample_path):
             uniform_points = np.load(uniform_sample_path)['points']
             uniform_occ = np.load(uniform_sample_path)['occupancies']

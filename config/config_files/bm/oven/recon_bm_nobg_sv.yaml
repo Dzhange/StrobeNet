@@ -14,11 +14,11 @@ DATALOADER_WORKERS: 5
 EPOCH_TOTAL: 4 # 4 + 1
 
 DATA_LIMIT: 20 # make the shuffle thing to make sure we have seen every view
-VAL_DATA_LIMIT: 3
+VAL_DATA_LIMIT: 100
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
-TASK: "lnrnet"
+TASK: "mlnrnet"
 EXPT_NAME: "recon_bm1_nobg_sv" ## This is the result with back ground! I wrote it wrong! V2 actually
 BONE_NUM: 1
 GPU: 3

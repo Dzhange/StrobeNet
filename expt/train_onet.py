@@ -18,11 +18,10 @@ from utils.DataUtils import *
 def run(config):
 
     model = ModelONet(config)
-    if config.VIEW_NUM == 1:
-        train_dataset = OccNetDataset(config, train=True)
-    else:
-        train_dataset = OccNetMVDataset(config, train=True)
-
+    # if config.VIEW_NUM == 1:
+    #     train_dataset = OccNetDataset(config, train=True)
+    # else:
+    train_dataset = OccNetMVDataset(config, train=True)
     if config.TEST_ON_TRAIN:
         val_dataset = train_dataset
     else:

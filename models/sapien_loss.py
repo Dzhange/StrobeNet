@@ -92,13 +92,13 @@ class PMLBSLoss(nn.Module):
         pred_skin_seg = output[:, 4+bone_num*6:4+bone_num*7+2, :, :].clone().requires_grad_(True)
         pred_joint_score = output[:, 4+bone_num*7+2:4+bone_num*8+2, :, :].clone().requires_grad_(True)
 
-        tar_maps = target['maps']
+        tar_maps = target['maps']        
         target_nocs = tar_maps[:, 0:3, :, :] # nocs
         target_mask = tar_maps[:, 3, :, :] # mask
         tar_loc_map = tar_maps[:, 4:4+bone_num*3, :, :].sigmoid() # location
         tar_rot_map = tar_maps[:, 4+bone_num*3:4+bone_num*6, :, :].sigmoid() # rotation, angle axis
         tar_skin_seg = tar_maps[:, 4+bone_num*6:4+bone_num*6+1, :, :]
-
+        # print(tar_maps.shape, tar_skin_seg.shape)
         # nocs_pc = pred_nocs[0, :, target_mask.squeeze() > 0].permute(1, 0)
 
         tar_pose = target['pose']
@@ -133,7 +133,7 @@ class PMLBSLoss(nn.Module):
         # skin_loss = self.masked_l2_loss(self.sigmoid(pred_skin_seg), tar_skin_weights, target_mask)
         pred_seg = pred_skin_seg.transpose(1, 2).transpose(2, 3).contiguous().view(-1, bone_num+2)
         tar_seg = tar_skin_seg.long().squeeze(1).view(-1)
-                
+        # print(pred_seg.shape)
         skin_loss = self.seg_loss(pred_seg, tar_seg)
 
         loc_map_loss = self.l2_loss(pred_loc_map, tar_loc_map, target_mask)

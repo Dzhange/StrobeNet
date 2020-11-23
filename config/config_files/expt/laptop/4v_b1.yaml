@@ -18,12 +18,13 @@ SAVE_FREQ: 5
 
 LR: 1e-4
 DATA_LIMIT: 100
-VAL_DATA_LIMIT: 20
+VAL_DATA_LIMIT: 100
 
-EXPT_NAME: "occ_4v_b1"
+# EXPT_NAME: "occ_4v_b1"
+EXPT_NAME: "r8_v4"
 ONET_CANO: True
 
-GPU: 1
+GPU: 0
 TEST_ON_TRAIN: False
 
 ###################################################

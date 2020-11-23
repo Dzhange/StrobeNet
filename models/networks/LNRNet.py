@@ -764,23 +764,47 @@ class LNRNet(nn.Module):
         posed_pc_list = []        
         valid_view_num = len(mv_pn_pc_list)
         for i, pose in enumerate(mv_rot_list):            
+            # mv_rot_list[view][batch_id]
             # negative sign is important!!!!!!!!!
             target_pose = -pose
             inst_posed_pc_list = []
             for view in range(valid_view_num):
-                cur_pc = mv_pn_pc_list[view][batch_id]            
+                cur_pc = mv_pn_pc_list[view][batch_id]
                 cur_seg = mv_seg_list[view][batch_id]
-                
-                cur_loc = mv_loc_list[view][batch_id]                
+                cur_loc = mv_loc_list[view][batch_id]
                 if cur_pc is not None:
                     # input with shape (3, N)
                     cur_pc = cur_pc.transpose(0, 1)
                     posed_pc = LNRNet.repose_pc(cur_pc, cur_seg, cur_loc, target_pose, joint_num=joint_num)
                     posed_pc = posed_pc[0].transpose(1, 0)
                     inst_posed_pc_list.append(posed_pc)
-            inst_posed_pc = torch.cat(tuple(inst_posed_pc_list), dim=0)     
-        posed_pc_list.append(inst_posed_pc)        
+            inst_posed_pc = torch.cat(tuple(inst_posed_pc_list), dim=0)
+            posed_pc_list.append(inst_posed_pc)
         return posed_pc_list
+
+
+    @staticmethod
+    def pose_novel_sep(mv_pn_pc_list, mv_seg_list, mv_loc_list, mv_rot_list, joint_num, batch_id):
+        """
+        For animation in novel pose
+        """                        
+        valid_view_num = len(mv_pn_pc_list)
+        pose = mv_rot_list[0][batch_id]
+        # negative sign is important!!!!!!!!!
+        target_pose = -pose
+        inst_posed_pc_list = []
+        for view in range(valid_view_num):
+            cur_pc = mv_pn_pc_list[view][batch_id]
+            cur_seg = mv_seg_list[view][batch_id]
+            cur_loc = mv_loc_list[view][batch_id]
+            if cur_pc is not None:
+                # input with shape (3, N)
+                cur_pc = cur_pc.transpose(0, 1)
+                posed_pc = LNRNet.repose_pc(cur_pc, cur_seg, cur_loc, target_pose, joint_num=joint_num)
+                posed_pc = posed_pc[0].transpose(1, 0)
+                inst_posed_pc_list.append(posed_pc)
+                
+        return inst_posed_pc_list
 
     def visualize(self, FeatureVoxel):
         feature_sample = FeatureVoxel[0].clone()

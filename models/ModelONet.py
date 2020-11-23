@@ -103,9 +103,11 @@ class ModelONet(object):
         """
         put data onto the right device
         """
-
+        # print(data)
         # if 1 or self.view_num > 1:
         inputs = [img.to(device=device) for img in data['color00']]
+
+        #  only reconstruct the first shape
         points = data['grid_coords'][0].to(device=device)
         occ = data['occupancies'][0].to(device=device)
         # else:

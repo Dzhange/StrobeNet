@@ -1,0 +1,67 @@
+##################################################################################################
+# Here we train the first stage with all the tricks:
+# 1. with enriching feature
+# 2. with consistency loss
+# 3. multi view
+# 4. random views
+
+FIX_HACK: True
+
+
+DATASET_ROOT: '/workspace/Data/SAPIEN/benchmark/oven/benchmark_v1_uni/'
+OUTPUT_DIR: '/workspace/dev_nrnocs/output/benchmark/oven/'
+VIEW_NUM: 4 # we use random views this time
+RANDOM_VIEW: True
+TOTAL_VIEW: 8
+
+ANIM_MODEL: True
+ANIM_MODEL_ID: 569
+ANGLE_START: 1.05
+ANGLE_STEP: 0.0
+
+
+VIEW_RECON: 1
+
+BATCHSIZE: 1
+DATALOADER_WORKERS: 3
+EPOCH_TOTAL: 5
+
+DATA_LIMIT: 100
+VAL_DATA_LIMIT: 100
+IMAGE_SIZE: (320,240)
+TARGETS: ["default"]
+
+TASK: "mvmp"
+EXPT_NAME: "sep_pose_mvmp_v4"
+RESOLUTION: 128
+
+BONE_NUM: 1
+GPU: 1
+OUT_CHANNELS: 12 #4 + 1*8
+TEST_ON_TRAIN: False
+
+REPOSE: True
+STAGE_ONE: False
+  
+###################################################
+MODES: ['train','val']
+LR: 1e-4
+SAVE_FREQ: 1
+MH: True
+BN: False
+
+CONSISTENCY: 1
+# Try training with CRR loss *10 from the  middle of training
+# NOCS_LOSS: 10
+NOCS_LOSS: 1
+POSE_LOSS: 1
+POSE_MAP_LOSS: 1
+LOC_LOSS: 1
+LOC_MAP_LOSS: 1
+SKIN_LOSS: 1
+RECON_LOSS: 0.1
+
+
+AGGR_SCATTER: True
+NRNET_PRETRAIN: True
+NRNET_PRETRAIN_PATH: "/workspace/dev_nrnocs/output/benchmark/oven/stg1_bm1_nobg/stg1_bm1_nobg_9999-12-31T23-59-59.tar"

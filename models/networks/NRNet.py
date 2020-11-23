@@ -120,7 +120,7 @@ class NRNet(nn.Module):
         upsampled_feature = F.interpolate(feature, size=img_size)
 
         all_occupancies = []
-        for i in range(batch_size):            
+        for i in range(batch_size):
             img = masked_nocs[i, :].cpu().detach().numpy()
             valid_idx = np.where(np.all(img > np.zeros((3, 1, 1)), axis=0)) # Only white BG
             # valid_idx = masked_nocs[i] > 0

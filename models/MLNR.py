@@ -20,8 +20,8 @@ class ModelMLNRNet(ModelLNRNET):
     def __init__(self, config):
         super().__init__(config)
         self.view_num = config.VIEW_NUM
-    
-    def init_net(self, device):        
+
+    def init_net(self, device):
         config = self.config
         self.net = MLNRNet(config, device=device)
         self.optimizer = torch.optim.Adam(params=self.net.parameters(), lr=self.lr,
@@ -80,7 +80,8 @@ class ModelMLNRNet(ModelLNRNET):
 
     def validate(self, val_dataloader, objective, device):
 
-        self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
+        # self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
+        self.output_dir = os.path.join(self.expt_dir_path, self.config.VAL_DIR)
         if os.path.exists(self.output_dir) == False:
             os.makedirs(self.output_dir)
 
@@ -105,7 +106,10 @@ class ModelMLNRNet(ModelLNRNET):
         pose_diff = []
         loc_diff = []
 
-        for i, data in enumerate(val_dataloader, 0):  # Get each batch
+        for i, data in enumerate(val_dataloader, 0):  # Get each batch            
+            # if i < 319:
+            #     continue
+
             if i > (num_samples-1): 
                 break
 
@@ -121,6 +125,9 @@ class ModelMLNRNet(ModelLNRNET):
             for view_id in range(self.view_num):
                 segnet_output = output_recon[0]
                 self.save_img(net_input['color00'][view_id], segnet_output[view_id][:, 0:4, :, :], target['nox00'][view_id][:, 0:4, :, :], i, view_id=view_id)
+
+                if self.config.VAL_DIR != "ValResults":
+                    continue
 
                 self.gen_NOCS_pc(segnet_output[view_id][:, 0:3, :, :], target['nox00'][view_id][:, 0:3, :, :], \
                     target['nox00'][view_id][:, 3, :, :], "nocs", i)

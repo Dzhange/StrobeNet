@@ -17,6 +17,15 @@ def get_default_cfg():
     cfg.PROPORTION = 1.0  # how many of the first K samples in the dataset list
     cfg.TRANSFORM = True # if set too true, we use the dataset where all mesh/occupancy are transformed into [-0.5, 0.5]
     cfg.VIEW_NUM = 1
+    cfg.VIEW_RECON = 8
+
+    cfg.FIX_HACK = False
+    
+    cfg.ANIM_MODEL = False
+    cfg.ANIM_MODEL_ID = 0    
+    cfg.ANGLE_START = 0.0 
+    cfg.ANGLE_STEP = 0.1
+
     cfg.RANDOM_VIEW = False
     cfg.TOTAL_VIEW = 4
     cfg.NUM_SAMPLE_POINTS = 50000
@@ -65,6 +74,7 @@ def get_default_cfg():
 
     #added by Ge
     cfg.OUTPUT_DIR = ''
+    cfg.VAL_DIR = 'ValResults'
     cfg.SAVE_FREQ = 1
     cfg.DATA_LIMIT = 10
     cfg.VAL_DATA_LIMIT = 10
@@ -119,6 +129,7 @@ def get_default_cfg():
     cfg.IF_IN_DIM = 16
     cfg.CANO_IF = True # if set to True, we use only the canonical occupancy as supervision
     cfg.ONET_CANO = False
+    cfg.ONET_MV_CANO = True
 
     # for final pipeline
     cfg.STAGE_ONE = True # if set to true, we do not supervise the occupancy

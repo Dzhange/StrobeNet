@@ -84,7 +84,9 @@ class MVSPDataset(SAPIENDataset):
 
         data_list = []
         batch = {}
-        frame_base_path = self.frame_ids[idx]
+
+
+        frame_base_path = self.frame_ids[idx]        
         if self.config.RANDOM_VIEW:
             if self.is_train_data:
                 views = np.random.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
@@ -92,6 +94,9 @@ class MVSPDataset(SAPIENDataset):
                 views = self.rng.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
         else:
             views = list(range(self.view_num))
+
+
+        
         for view in views:
             data = self.get_sv_data(frame_base_path, view)                        
             data_list.append(data)
@@ -204,7 +209,7 @@ class MVSPDataset(SAPIENDataset):
         else:
             gt_mesh_path = os.path.join(data_dir, "frame_{}_view_{}_isosurf_scaled.off".format(index_of_frame, str(view_id).zfill(2)))
         # None of the if-data would be needed if in validation mode
-
+        # print("loaded", gt_mesh_path)
 
         if_data = {
             'grid_coords':np.array(coords, dtype=np.float32),

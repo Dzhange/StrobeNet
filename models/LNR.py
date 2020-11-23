@@ -345,18 +345,18 @@ class ModelLNRNET(ModelSegLBS):
         
         
     # @staticmethod
-    def mesh_from_logits(self, logits, resolution):
-        logits = np.reshape(logits, (resolution,) * 3)
-        initThreshold = 0.5
+    def mesh_from_logits(self, logits, resolution, initThreshold = 0.5):
+        logits = np.reshape(logits, (resolution,) * 3)        
         if self.config.TRANSFORM:
             pmax = 0.5
             pmin = -0.5
         else:
             pmax = 1
             pmin = 0
-        # padding to ba able to retrieve object close to bounding box bondary
-        logits = np.pad(logits, ((1, 1), (1, 1), (1, 1)), 'constant', constant_values=0)
+        # padding to ba able to retrieve object close to bounding box bondary        
         threshold = np.log(initThreshold) - np.log(1. - initThreshold)
+        # logits = np.pad(logits, ((1, 1), (1, 1), (1, 1)), 'constant', constant_values=0)
+        logits = np.pad(logits, ((1, 1), (1, 1), (1, 1)), 'constant', constant_values=threshold)
         vertices, triangles = mcubes.marching_cubes(
             logits, threshold)
         # remove translation due to padding

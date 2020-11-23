@@ -23,12 +23,26 @@ class MVMPDataset(MVSPDataset):
     def __getitem__(self, idx):        
         data_list = []
         batch = {}
+
         frame_base_path = self.frame_ids[idx]
 
         if self.config.RANDOM_VIEW:
             views = np.random.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
         else:
             views = list(range(self.view_num))
+
+        fix = self.config.FIX_HACK or self.config.ANIM_MODEL
+        if fix:
+            # idx = 569
+            idx = self.config.ANIM_MODEL_ID
+            frame_base_path = self.frame_ids[idx]
+
+            rng = np.random.RandomState(0)
+            views = []
+            for i in range(idx+1):
+                v = rng.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
+                if i == idx:
+                    views = v
 
         for view_id in views:
             data = self.get_sv_data(frame_base_path, view_id)
@@ -39,7 +53,7 @@ class MVMPDataset(MVSPDataset):
         cano_occ = self.load_occupancies(frame_base_path)
         batch['cano_grid_coords'] = cano_occ['grid_coords']
         batch['cano_occupancies'] = cano_occ['occupancies']
-                
+
         # pointsf = batch['cano_grid_coords'][batch['cano_occupancies'].astype(np.bool)]
         # write_off("/workspace/check/z_{}.xyz".format(time.time()), pointsf)
 
@@ -54,7 +68,7 @@ class MVMPDataset(MVSPDataset):
             data.update(crr)
 
         return batch
-    
+
     def get_sv_data(self, frame_path, view):
         data = self.load_images(frame_path, view)
         # occ = self.load_occupancies(frame_path) # for the wrongly trained model
