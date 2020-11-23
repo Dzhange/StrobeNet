@@ -226,6 +226,15 @@ class StrobeNetModule(EaselModule):
                 elif self.Args.category == 'oven':
                     self.ValidAnimatableSegments.append(UniqueSegmentColors[[1, 0], :])
 
+            # print(self.NOCSPartColored)
+            AllNOCSPartColoredPoints = [NPC.Points for NPC in self.NOCSPartColored]
+            self.AllNOCSPartColoredPoints = np.concatenate(tuple(AllNOCSPartColoredPoints))
+            AllNOCSPartColors = [NPC.Colors for NPC in self.NOCSPartColored]
+            self.AllNOCSPartColors = np.concatenate(tuple(AllNOCSPartColors))
+            AllColors = [NOCS.Colors for NOCS in self.NOCS]
+            self.AllColors = np.concatenate(tuple(AllColors))
+            # print(self.AllColors.shape, self.AllNOCSPartColoredPoints.shape)
+            # print(self.NOCSPartColored[0].Points.shape, self.AllNOCSPartColored.shape)
         # Load OBJ models
         ModelFiles = self.getFileNames(self.Args.models)
         for idx, MF in enumerate(ModelFiles):
@@ -240,10 +249,14 @@ class StrobeNetModule(EaselModule):
                 # Find NN
                 # print('self.NOCSPartColored.Points', self.NOCSPartColored[idx].Points.shape)
                 # print('LoadedOBJ.vertices', LoadedOBJ.vertices.shape)
-                nbrs = NearestNeighbors(n_neighbors=1, algorithm='kd_tree').fit(self.NOCSPartColored[idx].Points)
+                # nbrs = NearestNeighbors(n_neighbors=1, algorithm='kd_tree').fit(self.NOCSPartColored[idx].Points)                
+                nbrs = NearestNeighbors(n_neighbors=1, algorithm='kd_tree').fit(self.AllNOCSPartColoredPoints)
                 _, M2NIndices = nbrs.kneighbors(LoadedOBJ.vertices)
-                self.M2NIndices.append(M2NIndices)
-                LoadedOBJ.Colors = self.NOCS[idx].Colors[M2NIndices]
+                # print(M2NIndices)
+                # self.M2NIndices.append(M2NIndices)
+                self.M2NIndices = M2NIndices
+                # LoadedOBJ.Colors = self.NOCS[idx].Colors[M2NIndices]
+                LoadedOBJ.Colors = self.AllColors[M2NIndices]                
             AnimatableLoadedOBJ.vertices = LoadedOBJ.vertices.copy()
             AnimatableLoadedOBJ.Colors = LoadedOBJ.Colors.copy()
             LoadedOBJ.update()
@@ -292,8 +305,9 @@ class StrobeNetModule(EaselModule):
         AnimatableNOCS.update()
 
     def rotateMesh(self, AnimatableMesh, ReferenceMesh, NOCSPartColored, M2NIndices, SegmentColor, JointPosition, Axis, Angle):
-        NOCS2PartIdx = np.where(np.all(NOCSPartColored.Colors == SegmentColor/255, axis=-1))
-        Mesh2PartIdx = np.where(np.in1d(M2NIndices, NOCS2PartIdx))
+        # NOCS2PartIdx = np.where(np.all(NOCSPartColored.Colors == SegmentColor/255, axis=-1))
+        NOCS2PartIdx = np.where(np.all(NOCSPartColored == SegmentColor/255, axis=-1))
+        Mesh2PartIdx = np.where(np.in1d(M2NIndices, NOCS2PartIdx))        
         # print(NOCS2PartIdx[0].shape)
         # print(Mesh2PartIdx[0].shape)
         # print(Mesh2PartIdx)
@@ -318,7 +332,8 @@ class StrobeNetModule(EaselModule):
                 Axis = JAReshaped[r, :] / DefaultAngle
                 SegmentColor = ValidAnimatableSegments[r]
                 self.rotateNOCS(self.AnimatableNOCS[idx], self.NOCSPartColored[idx], SegmentColor, JointPosition, Axis, Angle=SetAngle)
-                self.rotateMesh(self.AnimatableOBJModels[idx], self.OBJModels[idx], self.NOCSPartColored[idx], self.M2NIndices[idx], SegmentColor, JointPosition, Axis, Angle=SetAngle)
+                # self.rotateMesh(self.AnimatableOBJModels[idx], self.OBJModels[idx], self.NOCSPartColored[idx], self.M2NIndices[idx], SegmentColor, JointPosition, Axis, Angle=SetAngle)
+                self.rotateMesh(self.AnimatableOBJModels[0], self.OBJModels[0], self.AllNOCSPartColors, self.M2NIndices, SegmentColor, JointPosition, Axis, Angle=SetAngle)
 
     def draw(self):
         if self.showAnimation:
