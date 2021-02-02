@@ -1,14 +1,14 @@
-import cv2
-import numpy as np
-import pickle
+# import cv2
+# import numpy as np
+# import pickle
 import multiprocessing as mp
 from multiprocessing import Pool
 import re
 import os, shutil
 import argparse
 
-cache_path = '/workspace/Data/SAPIEN/laptop/mv_laptop_500_4_IF/val/all_glob_frames.cache'
-cnt = 0
+# cache_path = '/workspace/Data/SAPIEN/laptop/mv_laptop_500_4_IF/val/all_glob_frames.cache'
+# cnt = 0
 
 
 def remove(path):
@@ -25,14 +25,11 @@ if __name__ == "__main__":
         # frames = pickle.load(fp)
     import glob
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--target-dir', help='Specify the location of the directory to download and store HandRigDatasetV2', required=True)
-    
+    parser.add_argument('-t', '--target-dir',required=True)    
     Args, _ = parser.parse_known_args()
-
     paths = []
     all_subdirs = glob.glob(os.path.join(
                     Args.target_dir, '*'))
-    
     print(all_subdirs)
     if len(all_subdirs) < 10:
         all_subdirs = glob.glob(os.path.join(Args.target_dir, "*/*"))
@@ -47,14 +44,11 @@ if __name__ == "__main__":
         paths.extend(cur_items)
         print(len(paths))
 
-
     # paths.extend(glob.glob(os.path.join(Args.target_dir, "*")))
     # paths.extend(glob.glob(os.path.join(Args.target_dir, "*/*")))
     # paths.extend(glob.glob(os.path.join(Args.target_dir, "*/*/*")))
-    
-    
+        
     p = Pool(mp.cpu_count()*4)
     # p.map(recolor, frames)
-    
     p.map(remove, paths)
     shutil.rmtree(Args.target_dir)
