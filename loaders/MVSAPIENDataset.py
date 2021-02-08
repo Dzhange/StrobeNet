@@ -113,8 +113,8 @@ class MVSPDataset(SAPIENDataset):
         data = self.load_images(frame_path, view)
         occ = self.load_occupancies(frame_path)
 
-        pointsf = occ['grid_coords'][occ['occupancies'].astype(np.bool)]
-        write_off("/workspace/check/z_{}.xyz".format(time.time()), pointsf)
+        # pointsf = occ['grid_coords'][occ['occupancies'].astype(np.bool)]
+        # write_off("/workspace/check/z_{}.xyz".format(time.time()), pointsf)
 
         data.update(occ)
         return data

@@ -109,7 +109,7 @@ class DataFilter:
                 all_frames = [self.findFrameNum(p) for p in all_color_imgs]
                 all_frames = list(dict.fromkeys(all_frames))
                 all_frames.sort()
-                p = Pool(mp.cpu_count() >> 3)
+                p = Pool(mp.cpu_count() >> 1)
                 p.map(self.processFrame, all_frames)
             else:
                 # self.mode = "train"
@@ -348,6 +348,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     df = DataFilter(args)
     df.filter()
-
+    
 ## Example
 # python utils/DataFilter.py -i /workspace/Data/SAPIEN/benchmark/glasses/mv8_scale_mpf/ -o /workspace/Data/SAPIEN/benchmark/glasses/mv8_scale_mpf_uni/ -p 20 -v 8 -mpf True -c eyeglass -s True -t False

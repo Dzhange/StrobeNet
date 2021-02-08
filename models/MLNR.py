@@ -14,6 +14,7 @@ from models.SegLBS import ModelSegLBS
 from utils.DataUtils import *
 from utils.lbs import *
 import trimesh, mcubes
+from models.loss import *
 
 class ModelMLNRNet(ModelLNRNET):
 
@@ -105,6 +106,8 @@ class ModelMLNRNet(ModelLNRNET):
         epoch_losses = []
         pose_diff = []
         loc_diff = []
+        nocs_diff = [] # record the estimation error of nocs map
+        masked_l2_loss = JiahuiL2Loss()
 
         for i, data in enumerate(val_dataloader, 0):  # Get each batch            
             # if i < 319:
@@ -133,6 +136,8 @@ class ModelMLNRNet(ModelLNRNET):
                     target['nox00'][view_id][:, 3, :, :], "nocs", i)
 
                 mask = target['nox00'][view_id][:, 3, :, :].cpu()
+                pred_mask = segnet_output[view_id][:, 3, :, :].sigmoid().cpu()
+
                 bone_num = self.bone_num
 
                 if self.config.SKIN_LOSS or self.config.TASK == "lbs_seg":
@@ -174,12 +179,20 @@ class ModelMLNRNet(ModelLNRNET):
                     else:
                         transform = None
 
+                    # print(pred_pnnocs.shape)
+                    # print(pred_mask.max())
+                    pnnocs_error = masked_l2_loss(pred_pnnocs.cpu(), tar_pnnocs.cpu(), pred_mask).item()
+                    # pnnocs_error = torch.norm(pred_pnnocs - tar_pnnocs, p=1).mean().item()
+                    print(pnnocs_error)
+                    nocs_diff.append(pnnocs_error)
                     self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i, transform =transform, view_id=view_id)
 
-            str_loc_diff = "avg loc diff is {:.6f} ".format(np.mean(np.asarray(loc_diff)))
-            str_angle_diff = "avg diff is {:.6f} degree ".format(np.degrees(np.mean(np.asarray(pose_diff))))
+            str_nocs_diff = "avg nocs diff is {:.6f} ".format(np.mean(np.asarray(nocs_diff)))
+            str_joint_diff = "avg loc/angle diff is {:.6f}/{:.6f} ".format(np.mean(np.asarray(loc_diff)), np.degrees(np.mean(np.asarray(pose_diff))))
+            # str_angle_diff = "avg diff is {:.6f} degree ".format(np.degrees(np.mean(np.asarray(pose_diff))))
             str_loss = "avg validation loss is {:6f}".format(np.mean(np.asarray(epoch_losses)))
-            sys.stdout.write("\r[ VAL ] {}th data loss {:6f} ".format(i, loss.item()) + str_loc_diff + str_angle_diff + str_loss)
+            sys.stdout.write("\r[ VAL ] {}th data loss {:6f} ".format(i, loss.item()) + str_nocs_diff + str_joint_diff + str_loss)
             # sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loss)
             sys.stdout.flush()
-            # print("\n")
+        
+        print("\n")

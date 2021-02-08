@@ -1,0 +1,52 @@
+DATASET_ROOT: '/data/new_disk2/zhangge/Data/SAPIEN/benchmark/glasses/mv8_fix_scale_mpf_nobg_uni/'
+OUTPUT_DIR: '/workspace/StrobeNet/output/mv/'
+VIEW_NUM: 8
+RANDOM_VIEW: True
+TOTAL_VIEW: 8
+
+BATCHSIZE: 1
+DATALOADER_WORKERS: 5
+EPOCH_TOTAL: 50
+
+DATA_LIMIT: 100
+VAL_DATA_LIMIT: 5
+IMAGE_SIZE: (320,240)
+TARGETS: ["default"]
+
+# TASK: "mvmp"
+TASK: "mlnrnet"
+EXPT_NAME: "card_occupy"
+RESOLUTION: 128
+
+BONE_NUM: 2
+GPU: 1
+OUT_CHANNELS: 12 #4 + 1*8
+
+# TEST_ON_TRAIN: True
+TEST_ON_TRAIN: False
+
+REPOSE: True
+STAGE_ONE: True
+
+###################################################
+MODES: ['train','val']
+
+LR: 1e-4
+SAVE_FREQ: 1
+MH: True
+BN: False
+
+CONSISTENCY: 1
+
+NOCS_LOSS: 1
+POSE_LOSS: 1
+POSE_MAP_LOSS: 1
+LOC_LOSS: 1
+LOC_MAP_LOSS: 1
+SKIN_LOSS: 1
+RECON_LOSS: 0.1
+
+AGGR_SCATTER: True
+# NRNET_PRETRAIN: True
+# NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/glasses_aug1_bkup/scale_1_9999-12-31T23-59-59.tar"
+

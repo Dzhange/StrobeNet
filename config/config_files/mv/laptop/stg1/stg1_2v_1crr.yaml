@@ -1,0 +1,50 @@
+DATASET_ROOT: '/data/new_disk2/zhangge/Data/SAPIEN/benchmark/laptop/benchmark_v1_uni/'
+OUTPUT_DIR: '/workspace/StrobeNet/output/mv/laptop/'
+VIEW_NUM: 2
+RANDOM_VIEW: True
+TOTAL_VIEW: 8
+
+BATCHSIZE: 1
+DATALOADER_WORKERS: 5
+EPOCH_TOTAL: 30
+
+DATA_LIMIT: 100
+VAL_DATA_LIMIT: 5
+IMAGE_SIZE: (320,240)
+TARGETS: ["default"]
+
+TASK: "mlnrnet"
+EXPT_NAME: "stg1_0crr_2v"
+RESOLUTION: 128
+
+BONE_NUM: 1
+GPU: 2
+
+# TEST_ON_TRAIN: True
+TEST_ON_TRAIN: False
+
+REPOSE: True
+STAGE_ONE: True
+
+###################################################
+MODES: ['train','val']
+
+LR: 1e-4
+SAVE_FREQ: 1
+MH: True
+BN: False
+
+CONSISTENCY: 0
+
+NOCS_LOSS: 1
+POSE_LOSS: 1
+POSE_MAP_LOSS: 1
+LOC_LOSS: 1
+LOC_MAP_LOSS: 1
+SKIN_LOSS: 1
+RECON_LOSS: 0.1
+
+AGGR_SCATTER: True
+# NRNET_PRETRAIN: True
+# NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/glasses_aug1_bkup/scale_1_9999-12-31T23-59-59.tar"
+
