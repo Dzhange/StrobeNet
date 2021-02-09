@@ -434,8 +434,9 @@ class MVPMLoss(PMLoss):
                     # paired_pc_from_base_to_query = torch.gather(base_pn_pc.squeeze(3), dim=2,
                     #                                             index=pair_idx.repeat(1, 3, 1)).unsqueeze(3)
                     
-                    # points_num = query_pn_pc.shape[0]
-                    # size = 20
+                    points_num = query_pn_pc.shape[0]
+                    # print("crr_points:", points_num)
+                    # size = 100
                     # step = points_num // size
                     # for i in range(step):
                     #     write_off("/workspace/crr/pred_crr_0_{}.xyz".format(i), query_pn_pc[i*size:(i+1)*size])

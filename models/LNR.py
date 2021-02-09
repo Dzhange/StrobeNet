@@ -341,8 +341,8 @@ class ModelLNRNET(ModelSegLBS):
             pred_nocs_path = os.path.join(self.output_dir, 'frame_{}_view_{}_{}_trs_01pred.xyz').format(str(i).zfill(3), view_id, target_str)
             self.write(tar_nocs_path, tar_nocs)
             self.write(pred_nocs_path, pred_nocs)
-
         
+        return pred_nocs
         
     # @staticmethod
     def mesh_from_logits(self, logits, resolution, initThreshold = 0.5):

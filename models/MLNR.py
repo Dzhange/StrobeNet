@@ -16,6 +16,9 @@ from utils.lbs import *
 import trimesh, mcubes
 from models.loss import *
 
+from pykdtree.kdtree import KDTree
+# from eval.evaluator import chamfer_dis
+
 class ModelMLNRNet(ModelLNRNET):
 
     def __init__(self, config):
@@ -106,8 +109,12 @@ class ModelMLNRNet(ModelLNRNET):
         epoch_losses = []
         pose_diff = []
         loc_diff = []
+        
         nocs_diff = [] # record the estimation error of nocs map
         masked_l2_loss = JiahuiL2Loss()
+        
+        nocs_accuracy = []
+        nocs_completeness = []
 
         for i, data in enumerate(val_dataloader, 0):  # Get each batch            
             # if i < 319:
@@ -124,6 +131,8 @@ class ModelMLNRNet(ModelLNRNET):
 
             if not self.config.STAGE_ONE:
                 self.gen_mesh(grid_points_split, data, i)
+
+            whole_pn_pc = []
 
             for view_id in range(self.view_num):
                 segnet_output = output_recon[0]
@@ -178,20 +187,40 @@ class ModelMLNRNet(ModelLNRNET):
                         'scale':net_input['scale']}
                     else:
                         transform = None
-
-                    # print(pred_pnnocs.shape)
-                    # print(pred_mask.max())
-                    pnnocs_error = masked_l2_loss(pred_pnnocs.cpu(), tar_pnnocs.cpu(), pred_mask).item()
-                    # pnnocs_error = torch.norm(pred_pnnocs - tar_pnnocs, p=1).mean().item()
-                    print(pnnocs_error)
+                                                            
+                    pnnocs_error = masked_l2_loss(pred_pnnocs.cpu(), tar_pnnocs.cpu(), pred_mask).item()                    
                     nocs_diff.append(pnnocs_error)
-                    self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i, transform =transform, view_id=view_id)
 
-            str_nocs_diff = "avg nocs diff is {:.6f} ".format(np.mean(np.asarray(nocs_diff)))
+                    pn_pc = self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i, transform =transform, view_id=view_id)
+                    whole_pn_pc.append(pn_pc)
+                    # print(pn_pc.shape)
+            
+
+            ####### calculate chamfer distance ######
+            whole_pn_pc = np.concatenate(whole_pn_pc, axis=0)
+            iso_mesh = trimesh.load(data['iso_mesh'][0][0], process=False)
+            gt_pc = iso_mesh.vertices.astype('float32')
+            # Completeness: how far are the points of the target point cloud
+            # from thre predicted point cloud
+            # print(gt_pc.dtype, whole_pn_pc.dtype)
+            kdtree = KDTree(whole_pn_pc)
+            complete, _ = kdtree.query(gt_pc)            
+            nocs_completeness.append(complete.mean())
+
+            # Accuracy: how far are th points of the predicted pointcloud
+            # from the target pointcloud                        
+            kdtree = KDTree(gt_pc)
+            accuracy, _ = kdtree.query(whole_pn_pc)            
+            nocs_accuracy.append(accuracy.mean())
+            
+
+            str_nocs_diff = "avg nocs diff is {:.6f} ".format(np.sqrt(np.mean(np.asarray(nocs_diff))))
+            str_chamfer_diff = "compl/acc is {:.6f}/{:.6f} ".format(np.mean(np.asarray(nocs_completeness)), np.mean(np.asarray(nocs_accuracy)))
             str_joint_diff = "avg loc/angle diff is {:.6f}/{:.6f} ".format(np.mean(np.asarray(loc_diff)), np.degrees(np.mean(np.asarray(pose_diff))))
             # str_angle_diff = "avg diff is {:.6f} degree ".format(np.degrees(np.mean(np.asarray(pose_diff))))
             str_loss = "avg validation loss is {:6f}".format(np.mean(np.asarray(epoch_losses)))
-            sys.stdout.write("\r[ VAL ] {}th data loss {:6f} ".format(i, loss.item()) + str_nocs_diff + str_joint_diff + str_loss)
+            str_item_loss = "{}th data loss {:6f} ".format(i, loss.item())
+            sys.stdout.write("\r[ VAL ]"  + str_nocs_diff + str_chamfer_diff + str_joint_diff)
             # sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loss)
             sys.stdout.flush()
         

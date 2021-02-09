@@ -132,8 +132,8 @@ class evaluator():
         # Accuracy: how far are th points of the predicted pointcloud
         # from the target pointcloud
         kdtree = KDTree(gt_pc)
-        dist, _ = kdtree.query(pred_pc)
-        accuracy = (dist**2).mean()
+        accuracy, _ = kdtree.query(pred_pc) # a bug, not fixed in CVPR 2021
+        # accuracy = (dist**2).mean()
         
         chamfer = (completeness**2 + accuracy**2).mean()
         return chamfer
