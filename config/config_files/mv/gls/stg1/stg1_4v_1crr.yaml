@@ -1,5 +1,5 @@
 DATASET_ROOT: '/data/new_disk2/zhangge/Data/SAPIEN/benchmark/glasses/mv8_fix_scale_mpf_nobg_uni/'
-OUTPUT_DIR: '/workspace/StrobeNet/output/mv/gls'
+OUTPUT_DIR: '/data/new_disk2/zhangge/StrobeNet/output/mv/gls'
 VIEW_NUM: 4
 RANDOM_VIEW: True
 TOTAL_VIEW: 8
@@ -18,7 +18,7 @@ EXPT_NAME: "stg1_1crr_4v"
 RESOLUTION: 128
 
 BONE_NUM: 2
-GPU: 0
+GPU: 1
 OUT_CHANNELS: 12 #4 + 1*8
 
 # TEST_ON_TRAIN: True`

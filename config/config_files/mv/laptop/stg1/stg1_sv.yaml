@@ -1,5 +1,5 @@
 DATASET_ROOT: '/data/new_disk2/zhangge/Data/SAPIEN/benchmark/laptop/benchmark_v1_uni/'
-OUTPUT_DIR: '/workspace/StrobeNet/output/mv/laptop/'
+OUTPUT_DIR: '/data/new_disk2/zhangge/StrobeNet/output/mv/laptop/'
 VIEW_NUM: 1
 RANDOM_VIEW: True
 TOTAL_VIEW: 8

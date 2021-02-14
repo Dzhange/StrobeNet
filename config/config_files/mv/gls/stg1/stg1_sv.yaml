@@ -1,5 +1,5 @@
 DATASET_ROOT: '/data/new_disk2/zhangge/Data/SAPIEN/benchmark/glasses/mv8_fix_scale_mpf_nobg_uni/'
-OUTPUT_DIR: '/workspace/StrobeNet/output/mv/gls/'
+OUTPUT_DIR: '/data/new_disk2/zhangge/StrobeNet/output/mv/gls/'
 VIEW_NUM: 1
 RANDOM_VIEW: True
 TOTAL_VIEW: 8
