@@ -223,5 +223,6 @@ class ModelMLNRNet(ModelLNRNET):
             sys.stdout.write("\r[ VAL ] {}th ".format(i) + str_nocs_diff + str_chamfer_diff + str_joint_diff)
             # sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loss)
             sys.stdout.flush()
+            # exit()
         
         print("\n")

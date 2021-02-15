@@ -212,6 +212,7 @@ class JiahuiL2Loss(nn.Module):
             # mask = mask[:, 0, :, :].unsqueeze(1)
         mask = mask.unsqueeze(1)
         assert pred.shape == target.shape
+        # print("TEST: ", (pred ** 2 * mask.float())[:100].sum()  )
         dif = (pred - target) ** 2 * (mask.float())
         loss = torch.sum(dif.reshape(mask.shape[0], -1).contiguous(), 1)
         count = torch.sum(mask.reshape(mask.shape[0], -1).contiguous(), 1).detach()

@@ -433,33 +433,46 @@ class MVPMLoss(PMLoss):
                     paired_pc_from_base_to_query = paired_pc_from_base_to_query.squeeze(0)
                     # paired_pc_from_base_to_query = torch.gather(base_pn_pc.squeeze(3), dim=2,
                     #                                             index=pair_idx.repeat(1, 3, 1)).unsqueeze(3)
-                    
-                    points_num = query_pn_pc.shape[0]
-                    # print("crr_points:", points_num)
-                    # size = 100
-                    # step = points_num // size
-                    # for i in range(step):
-                    #     write_off("/workspace/crr/pred_crr_0_{}.xyz".format(i), query_pn_pc[i*size:(i+1)*size])
-                    #     write_off("/workspace/crr/pred_crr_1_{}.xyz".format(i), paired_pc_from_base_to_query[i*size:(i+1)*size])
-                    # exit()
-
                     _p1_list.append(paired_pc_from_base_to_query)
                     _p2_list.append(query_pn_pc)
                     _m_list.append(crr['crr-mask-mtx'][base_view_id][query_view_id][b_id].squeeze())
-        # print(torch.stack(_p1_list, dim=0).contiguous().shape)
-        # print(_p2_list[0].shape, _p2_list[1].shape)
+                    # print(torch.stack(_p1_list, dim=0).contiguous().shape)
+                    # print(_p2_list[0].shape, _p2_list[1].shape)
                     
                     p1 = paired_pc_from_base_to_query.unsqueeze(0)
                     p2 = query_pn_pc.unsqueeze(0)
                     mask = crr['crr-mask-mtx'][base_view_id][query_view_id][b_id].squeeze()
 
+                    if 0:
+                        masked_p1 = p1[0, mask.to(dtype=bool), :].cpu().detach().numpy()
+                        masked_p2 = p2[0, mask.to(dtype=bool), :].cpu().detach().numpy()
+                        size = 100
+                        points_num = masked_p1.shape[0]
+                        print("crr num: ", points_num)
+                        step = points_num // size
+                        import os             
+                        crr_root = "../crr"       
+                        if not os.path.exists(crr_root):
+                            os.mkdir(crr_root)
+                        # for i in range(step):
+                        #     write_off("/data/new_disk2/zhangge/crr/pred_crr_0_{}.xyz".format(i), masked_p1[i*size:(i+1)*size])
+                        #     write_off("/data/new_disk2/zhangge/crr/pred_crr_1_{}.xyz".format(i), masked_p2[i*size:(i+1)*size])                    
+                        crr_id = len(os.listdir(crr_root))
+                        crr_dir = os.path.join(crr_root, str(crr_id))
+                        if not os.path.exists(crr_dir):
+                            os.mkdir(crr_dir)
+                        write_off(os.path.join(crr_dir, "masked_p1.xyz"), masked_p1)
+                        write_off(os.path.join(crr_dir, "masked_p2.xyz"), masked_p2)
+                        write_off(os.path.join(crr_dir, "p1.xyz"), p1[0].cpu().detach().numpy())
+                        write_off(os.path.join(crr_dir, "p2.xyz"), p2[0].cpu().detach().numpy())
+                        write_off(os.path.join(crr_dir, "p_query.xyz"), query_pn_pc.cpu().detach().numpy())
+                        # print(mask.shape)
                     crr_xyz_loss += self.crr_l2(p1, p2, mask, detach=False)
-                    pair_cnt += 1
-        
+                    pair_cnt += 1                    
+                    # exit()
+
         crr_xyz_loss /= pair_cnt
-        # crr_xyz_loss = self.crr_l2(torch.stack(_p1_list, dim=0).contiguous(),
-        #                                 torch.stack(_p2_list, dim=0).contiguous(),
-        #                                 torch.stack(_m_list, dim=0).contiguous().squeeze(), detach=False)
+
         return crr_xyz_loss
 
 class MVMPLoss(MVPMLoss):

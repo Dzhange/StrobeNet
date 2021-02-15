@@ -253,6 +253,7 @@ class MVSPDataset(SAPIENDataset):
             crr_min_d_mtx.append(mind_list)
             for mask in mask_list:
                 pair_count += mask.sum()
+                # print(pair_count)
         ave_crr_per_view = int(pair_count / self.view_num)
         batch['crr-idx-mtx'] = crr_idx_mtx
         batch['crr-mask-mtx'] = crr_mask_mtx
@@ -296,10 +297,9 @@ class MVSPDataset(SAPIENDataset):
             assert q_pc.shape[1] == b_pc.shape[1]
             distance, indices = neigh.kneighbors(q_pc, return_distance=True)
             _min_d = distance.ravel()
-            _idx = indices.ravel()
+            _idx = indices.ravel()  
             _mask = (_min_d < th).astype(np.float)
             # make sure the output is in the same size
-            
 
             if fix_len:
                 index = np.zeros((8192, 1))

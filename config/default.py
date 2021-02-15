@@ -119,7 +119,7 @@ def get_default_cfg():
     cfg.POSE_MAP_LOSS = 0
     cfg.RECON_LOSS = 1.0
 
-    cfg.CONSISTENCY = 0
+    cfg.CONSISTENCY = 0.0
 
     cfg.GLOBAL_FEATURE = False # use global feature from SegNet
     cfg.GLOBAL_ONLY = False # use only global feature for final reconstruction
