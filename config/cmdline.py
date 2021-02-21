@@ -18,8 +18,9 @@ def merge_from_cmdline(cfg):
     cmd = vars(parser.parse_args())  # use as dict
     if cmd['config'] is not 'None':
         cfg.CONFIG_FILE = cmd['config']
-    if cmd['gpu'] is not None:
-        cfg.GPU = [int(id) for id in cmd['gpu'].split(",")]
+    if cmd['gpu'] != None:        
+        cfg.GPU = int(cmd['gpu'])
+        # cfg.GPU = [int(id) for id in cmd['gpu'].split(",")]
     if cmd['logdir'] is not None:
         cfg.LOG_DIR = cmd['logdir']
     if cmd['gen_output'] is not None:

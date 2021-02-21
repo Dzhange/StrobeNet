@@ -6,32 +6,10 @@ from utils.DataUtils import *
 from models.loss import *
 from time import time
 
-class PMloss(LBSLoss):
-    """
-    Everything loss for parital mobility
-    """
-    def __init__(self, cfg, bone_num=2):
-        super().__init__(cfg, bone_num)
-        self.seg_loss = torch.nn.CrossEntropyLoss()
-
-    def forward(self, output, target):
-        bone_num = self.bone_num
-        loss = torch.Tensor([0]).to(device=output.device)
-        
-        pred_skin_seg = output[:, 4+bone_num*6:4+bone_num*7, :, :].clone().requires_grad_(True)
-        tar_maps = target['maps']
-        target_mask = tar_maps[:, 3, :, :]
-        tar_skin_seg = tar_maps[:, 4+bone_num*6:4+bone_num*6+1, :, :] ## as Seg
-        # skin_loss = self.masked_l2_loss(self.sigmoid(pred_skin_weights), tar_skin_weights, target_mask)
-        # skin_loss = self.seg_loss(pred_skin_seg, tar_skin_seg.squeeze(1).long().detach())
-        input = pred_skin_seg.transpose(1, 2).transpose(2, 3).contiguous().view(-1, bone_num)
-        skin_loss = self.seg_loss(input, tar_skin_seg.long().squeeze(1).view(-1))
-        loss += skin_loss
-        return loss
-
-
 class PMLBSLoss(nn.Module):
     """
+        Partial Mobility Linear Blend Skining Loss
+
         calculate the loss for dense pose estimation
         output structure:
             [0:3]: nocs
@@ -142,13 +120,14 @@ class PMLBSLoss(nn.Module):
         loc_loss = self.pose_nocs_loss(pred_loc_map,
                                             pred_joint_score,
                                             target_mask,
-                                            tar_loc)
+                                            tar_loc)                                    
         rot_loss = self.pose_nocs_loss(pred_rot_map,
                                             pred_joint_score,
                                             target_mask,
                                             tar_rot)
 
-   
+        # print("loc loss: ", loc_loss)
+        # print("rot loss: ", rot_loss)
         vis = 0
         if vis:
             self.vis_joint_loc(tar_loc_map, target_mask, self.frame_id)
@@ -298,6 +277,7 @@ class PMLoss(nn.Module):
         super().__init__()
         self.config = config
         self.segnet_loss = PMLBSLoss(config)
+        self.bone_num = config.BONE_NUM
 
     def forward(self, output, target):
         segnet_output = output[0]
@@ -334,16 +314,21 @@ class PMLoss(nn.Module):
 
         if cfg.REPOSE == True:
             all_loss += cfg.NOCS_LOSS * loss['pnnocs_loss']
+            
         if cfg.STAGE_ONE == False:
             all_loss += cfg.RECON_LOSS * loss['recon_loss']
         if cfg.CONSISTENCY != 0:
             all_loss += cfg.CONSISTENCY * loss['crr_loss']
+                
         # print("all loss is ", all_loss)
         # if all_loss > 3:
         #     print("error, outlier")
         return all_loss
     
 class MVPMLoss(PMLoss):
+    """
+    Multi-view version of Partial Mobility Loss
+    """
 
     def __init__(self, config):
         super().__init__(config)
@@ -393,23 +378,37 @@ class MVPMLoss(PMLoss):
         if not self.config.STAGE_ONE:
             ifnet_output = output[1]
             mv_loss['recon_loss'] = self.recon_loss(ifnet_output, target_list[0])
-        
+
         if self.config.CONSISTENCY != 0:
             mv_loss['crr_loss'] = self.crr_loss(segnet_output, tar_mask, crr)
 
+        if 0:
+            self.joint_crr_loss(segnet_output)
+        
+        # # print("crr loss {:6f}".format(mv_loss['crr_loss']))
+        # crr_loss = mv_loss['crr_loss']
         mv_loss = self.add_up(mv_loss)
-
-
-
+        
         return mv_loss
 
-    def crr_loss(self, output_list, tar_mask, crr):        
+    def crr_loss(self, output_list, tar_mask, crr):
         """
         We do this for each instance in batch
         """        
         batch_size = output_list[0].shape[0]
         crr_xyz_loss = 0
-        pair_cnt = 0
+        pair_cnt = 0        
+        
+        save_crr = False
+        if save_crr:
+            import os                                     
+            crr_root = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME, "crr")
+            if not os.path.exists(crr_root):
+                os.mkdir(crr_root)
+            crr_id = len(os.listdir(crr_root))
+            crr_dir = os.path.join(crr_root, str(crr_id))
+            if not os.path.exists(crr_dir):
+                os.mkdir(crr_dir)
 
         for b_id in range(batch_size):
             _p1_list, _p2_list, _m_list = [], [], []
@@ -443,40 +442,82 @@ class MVPMLoss(PMLoss):
                     p2 = query_pn_pc.unsqueeze(0)
                     mask = crr['crr-mask-mtx'][base_view_id][query_view_id][b_id].squeeze()
 
-                    if 0:
+                    if save_crr:
                         masked_p1 = p1[0, mask.to(dtype=bool), :].cpu().detach().numpy()
                         masked_p2 = p2[0, mask.to(dtype=bool), :].cpu().detach().numpy()
-                        size = 100
+                        
                         points_num = masked_p1.shape[0]
-                        print("crr num: ", points_num)
-                        step = points_num // size
-                        import os             
-                        crr_root = "../crr"       
-                        if not os.path.exists(crr_root):
-                            os.mkdir(crr_root)
+                        # print("[ INFO ] crr num: ", points_num)                        
+                        
+                        # size = 100
+                        # step = points_num // size
                         # for i in range(step):
                         #     write_off("/data/new_disk2/zhangge/crr/pred_crr_0_{}.xyz".format(i), masked_p1[i*size:(i+1)*size])
                         #     write_off("/data/new_disk2/zhangge/crr/pred_crr_1_{}.xyz".format(i), masked_p2[i*size:(i+1)*size])                    
-                        crr_id = len(os.listdir(crr_root))
-                        crr_dir = os.path.join(crr_root, str(crr_id))
-                        if not os.path.exists(crr_dir):
-                            os.mkdir(crr_dir)
-                        write_off(os.path.join(crr_dir, "masked_p1.xyz"), masked_p1)
-                        write_off(os.path.join(crr_dir, "masked_p2.xyz"), masked_p2)
-                        write_off(os.path.join(crr_dir, "p1.xyz"), p1[0].cpu().detach().numpy())
-                        write_off(os.path.join(crr_dir, "p2.xyz"), p2[0].cpu().detach().numpy())
-                        write_off(os.path.join(crr_dir, "p_query.xyz"), query_pn_pc.cpu().detach().numpy())
+                        
+                        write_off(os.path.join(crr_dir, "b{}_q{}_masked_p1.xyz").format(base_view_id, query_view_id), masked_p1)
+                        write_off(os.path.join(crr_dir, "b{}_q{}_masked_p2.xyz").format(base_view_id, query_view_id), masked_p2)
+                        write_off(os.path.join(crr_dir, "b{}_q{}_p1.xyz").format(base_view_id, query_view_id), p1[0].cpu().detach().numpy())
+                        write_off(os.path.join(crr_dir, "b{}_q{}_p2.xyz").format(base_view_id, query_view_id), p2[0].cpu().detach().numpy())
+                        write_off(os.path.join(crr_dir, "b{}_q{}_p_query.xyz").format(base_view_id, query_view_id), query_pn_pc.cpu().detach().numpy())
                         # print(mask.shape)
                     crr_xyz_loss += self.crr_l2(p1, p2, mask, detach=False)
                     pair_cnt += 1                    
                     # exit()
 
+        # exit()
         crr_xyz_loss /= pair_cnt
 
         return crr_xyz_loss
 
+    def joint_crr_loss(self, segnet_output):
+        
+        pred_joint_locs = []        
+        
+        n_batch = segnet_output[0].shape[0]
+        bone_num = self.bone_num
+
+        for view_id in range(self.config.VIEW_NUM):
+            pred_joint_map = segnet_output[view_id][:, 4:4+bone_num*3, :, :].clone().requires_grad_(True).sigmoid()
+            pred_joint_score = segnet_output[view_id][:, 4+bone_num*7+2:4+bone_num*8+2, :, :].clone().requires_grad_(True)
+                        
+            out_mask = segnet_output[view_id][:, 3, :, :].clone().requires_grad_(True).sigmoid()
+            
+            # get final prediction: score map summarize
+            pred_joint_map = pred_joint_map.reshape(n_batch, bone_num, 3, pred_joint_map.shape[2],
+                                                    pred_joint_map.shape[3])  # B,bone_num,3,R,R
+            pred_joint_map = pred_joint_map * out_mask.unsqueeze(1).unsqueeze(1)
+            pred_joint_score = pred_joint_score.sigmoid() * out_mask.unsqueeze(1)
+
+            pred_score_map = pred_joint_score / (torch.sum(pred_joint_score.reshape(n_batch, bone_num, -1),
+                                                        dim=2, keepdim=True).unsqueeze(3) + 1e-5)
+            pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
+            pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
+            
+            pred_joint_locs.append(pred_joint)
+            # joint_diff = torch.sum((pred_joint - tar_joints) ** 2, dim=2)  # B,22
+            # joint_loc_loss = joint_diff.sum() / (n_batch * pred_joint_map.shape[1])
+
+            # joint_diff = pred_joint - tar_joints
+            # diff_norm = torch.norm(joint_diff, p=2, dim=1)  # Same size as WxH
+            # joint_loc_loss = torch.mean(diff_norm)
+        pair_cnt = 0
+        diff_sum = 0
+        for i in range(self.config.VIEW_NUM):
+            for j in range(i+1, self.config.VIEW_NUM):
+                diff_sum += (pred_joint_locs[i] - pred_joint_locs[j]) ** 2
+                pair_cnt += 1
+        
+        diff_sum /= pair_cnt
+        # print(len(pred_joint_locs), pred_joint_locs)
+        # print("diff_sum: ", diff_sum)
+        # return joint_loc_loss
+
 class MVMPLoss(MVPMLoss):
-    
+    """
+    Multi-view Multi-pose Partial Mobility Loss
+    """
+
     def __init__(self, config):
         super().__init__(config)
     

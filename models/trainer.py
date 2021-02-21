@@ -36,6 +36,7 @@ class Trainer:
         while cur_epoch < self.config.EPOCH_TOTAL:
             try:
                 epoch_losses = [] # For all batches in an epoch
+                # crr_losses = []
                 tic = getCurrentEpochTime()
                 # for data in self.train_data_loader:                
                 for i, data in enumerate(self.train_data_loader, 0):  # Get each batch          
@@ -64,6 +65,7 @@ class Trainer:
                     self.model.optimizer.step()
                     ####################### START MONITOR ################################
                     epoch_losses.append(loss.item())
+                    # crr_losses.append(crr_loss.item())
                     toc = getCurrentEpochTime()
                     elapsed = math.floor((toc - tic) * 1e-6)
                     total_elapsed = math.floor((toc - all_tic) * 1e-6)
@@ -72,12 +74,12 @@ class Trainer:
                     time_per_batch = (toc - all_tic) / ((cur_epoch * len(self.train_data_loader)) + (i+1)) # Time per batch
                     ETA = math.floor(time_per_batch * self.config.EPOCH_TOTAL * len(self.train_data_loader) * 1e-6)
                     
-                    progress_str = ('\r[{}>{}] epoch - {}/{}, {}th step train loss - {:.8f} | epoch - {}, total - {} ETA - {} |')\
+                    progress_str = ('\r[{}>{}] epoch - {}/{}, {}th step train loss - {:.6f} | epoch - {}, total - {} ETA - {} |')\
                                             .format('=' * done, '-' * (30 - done),
                                                     self.model.start_epoch + cur_epoch + 1,
                                                     self.model.start_epoch + self.config.EPOCH_TOTAL,
                                                     i,
-                                                    np.mean(np.asarray(epoch_losses)),
+                                                    np.mean(np.asarray(epoch_losses)),  # np.mean(np.asarray(crr_losses)),                         
                                                     getTimeDur(elapsed),
                                                     getTimeDur(total_elapsed),
                                                     getTimeDur(ETA-total_elapsed))

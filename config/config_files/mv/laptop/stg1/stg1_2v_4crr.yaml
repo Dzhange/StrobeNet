@@ -1,6 +1,6 @@
 DATASET_ROOT: '/data/new_disk2/zhangge/Data/SAPIEN/benchmark/laptop/benchmark_v1_uni/'
 OUTPUT_DIR: '/data/new_disk2/zhangge/StrobeNet/output/mv/laptop/'
-VIEW_NUM: 4
+VIEW_NUM: 2
 RANDOM_VIEW: True
 TOTAL_VIEW: 8
 
@@ -9,12 +9,12 @@ DATALOADER_WORKERS: 5
 EPOCH_TOTAL: 30
 
 DATA_LIMIT: 100
-VAL_DATA_LIMIT: 25
+VAL_DATA_LIMIT: 20
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
 TASK: "mlnrnet"
-EXPT_NAME: "stg1_1crr_4v"
+EXPT_NAME: "stg1_4crr_2v"
 RESOLUTION: 128
 
 BONE_NUM: 1
@@ -34,7 +34,7 @@ SAVE_FREQ: 1
 MH: True
 BN: False
 
-CONSISTENCY: 1.0
+CONSISTENCY: 4.0
 
 NOCS_LOSS: 1
 POSE_LOSS: 1

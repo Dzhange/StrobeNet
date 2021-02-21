@@ -21,14 +21,16 @@ def get_default_cfg():
 
     cfg.FIX_HACK = False
     
+    # for animation
     cfg.ANIM_MODEL = False
     cfg.ANIM_MODEL_ID = 0    
     cfg.ANGLE_START = 0.0 
     cfg.ANGLE_STEP = 0.1
 
-    cfg.RANDOM_VIEW = False
-    cfg.TOTAL_VIEW = 4
-    cfg.NUM_SAMPLE_POINTS = 50000
+
+    cfg.RANDOM_VIEW = False # select random views from the given set
+    cfg.TOTAL_VIEW = 4 # total number of views
+    cfg.NUM_SAMPLE_POINTS = 50000 
 
     cfg.GEN_OUTPUT = 'None'
     cfg.GEN_INPUT = 'None'
@@ -56,60 +58,47 @@ def get_default_cfg():
 
     # log
     cfg.LOG_DIR = 'debug'  # All log in a dir, this param is the name under $ProjectRoot/log/
-
-    # If true, check whether the log dir exists, \
-    # if doesn't, do not resume. just start a new one
-    cfg.RESUME = False
-    cfg.RESUME_EPOCH_ID = 0
-
     cfg.LOGGER = 'logger_v1'
-    cfg.LOGGER_SELECT = ['metric']
-    cfg.MODEL_SAVE_PER_N_EPOCH = 5
-    cfg.VIS_PER_N_EPOCH = 1
-    cfg.VIS_PER_N_BATCH = 1
-    cfg.VIS_ONE_PER_BATCH = True
-    cfg.VIS_TRAIN_PER_BATCH = 20    
+    cfg.LOGGER_SELECT = ['metric']    
 
     cfg.BACKUP_FILES = []
 
     #added by Ge
-    cfg.OUTPUT_DIR = ''
-    cfg.VAL_DIR = 'ValResults'
-    cfg.SAVE_FREQ = 1
-    cfg.DATA_LIMIT = 10
-    cfg.VAL_DATA_LIMIT = 10
+    cfg.OUTPUT_DIR = '' # path to store everything
+    cfg.VAL_DIR = 'ValResults' # name of current validation 
+    cfg.SAVE_FREQ = 1 # save weights freguency
+    cfg.DATA_LIMIT = 10 # percentage of training data to use(sampled with fixed step)
+    cfg.VAL_DATA_LIMIT = 10 # percentage of validation data to use(sampled with fixed step)
     cfg.IMAGE_SIZE = (320, 240)
     cfg.EXPT_NAME = "UNKNOWN"
     
     # DATASET PART
     cfg.TEST_ON_TRAIN = False
-    cfg.OUT_CHANNELS = 4    
+    cfg.OUT_CHANNELS = 4
     cfg.TASK = "occupancy"
     cfg.TARGETS = ["nox00"]
     
-
     cfg.NRNET_TYPE = "out_feature" # inter_feature
     cfg.NRNET_PRETRAIN = False
-    cfg.NRNET_PRETRAIN_PATH = "./"
-
+    cfg.NRNET_PRETRAIN_PATH = "./" 
     
     cfg.UPDATE_SEG = True
-    cfg.IF_BN = False
-    cfg.BN = False
-    cfg.AGGR_SCATTER = False
-    cfg.RESOLUTION = 128
+    cfg.IF_BN = False # use batch normalization in IF-Net
+    cfg.BN = False # use batch normalization in SegNet
+    cfg.AGGR_SCATTER = False # first aggregate canonical point cloud among views, then use scatter to voxelize
+    cfg.RESOLUTION = 128 # axial resolution for final reconstruction
 
     cfg.USE_FEATURE = True # ablation: see how network performs when we do not give it feature
-    cfg.PRED_FEATURE = True
-    cfg.FEATURE_CHANNELS = 64
+    cfg.PRED_FEATURE = True # generate feature from segnet prediction
+    cfg.FEATURE_CHANNELS = 64 # dimension of features
     cfg.SEP_POSE = False # repose the union point cloud into individual pose using individual joint position
 
+    cfg.MH = False # use multi-headed version of segnet
+    cfg.AS_SEG = False # ??? treat skinning weights as binary(so it's segmentation)
 
-    cfg.MH = False
-    cfg.AS_SEG = False
-
-    cfg.BONE_NUM = 16
-    ## Loss for LBS
+    cfg.BONE_NUM = 16 # The number of joints of target objects
+    
+    ### Weight for losses
     cfg.NOCS_LOSS = 0
     cfg.MASK_LOSS = 0
     cfg.SKIN_LOSS = 0
@@ -119,7 +108,8 @@ def get_default_cfg():
     cfg.POSE_MAP_LOSS = 0
     cfg.RECON_LOSS = 1.0
 
-    cfg.CONSISTENCY = 0.0
+    cfg.CONSISTENCY = 0.0 # weight of consistency loss
+    cfg.DYNAMIC_CONSISTENCY = False # if set to true, will use the chamfer dist from corresponding points to generate a consistency loss
 
     cfg.GLOBAL_FEATURE = False # use global feature from SegNet
     cfg.GLOBAL_ONLY = False # use only global feature for final reconstruction

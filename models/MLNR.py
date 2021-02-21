@@ -116,6 +116,12 @@ class ModelMLNRNet(ModelLNRNET):
         nocs_accuracy = []
         nocs_completeness = []
 
+        crr_chamfers = []
+        crr_root = os.path.join(self.expt_dir_path, "crr")
+        if os.path.exists(crr_root):
+            shutil.rmtree(crr_root)
+            os.mkdir(crr_root)
+
         for i, data in enumerate(val_dataloader, 0):  # Get each batch            
             # if i < 319:
             #     continue
@@ -193,34 +199,62 @@ class ModelMLNRNet(ModelLNRNET):
 
                     pn_pc = self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i, transform =transform, view_id=view_id)
                     whole_pn_pc.append(pn_pc)
-                    # print(pn_pc.shape)
+                    # print("[ INFO ] All points num", pn_pc.shape)
             
 
             ####### calculate chamfer distance ######
+
+
+
             whole_pn_pc = np.concatenate(whole_pn_pc, axis=0)
             iso_mesh = trimesh.load(data['iso_mesh'][0][0], process=False)
+            # print(data['iso_mesh'][0][0])
             gt_pc = iso_mesh.vertices.astype('float32')
             # Completeness: how far are the points of the target point cloud
             # from thre predicted point cloud
             # print(gt_pc.dtype, whole_pn_pc.dtype)
-            kdtree = KDTree(whole_pn_pc)
-            complete, _ = kdtree.query(gt_pc)            
+            pred_kdtree = KDTree(whole_pn_pc)
+            complete, _ = pred_kdtree.query(gt_pc)
             nocs_completeness.append(complete.mean())
 
             # Accuracy: how far are th points of the predicted pointcloud
-            # from the target pointcloud                        
-            kdtree = KDTree(gt_pc)
-            accuracy, _ = kdtree.query(whole_pn_pc)            
+            # from the target pointcloud                                    
+            gt_kdtree = KDTree(gt_pc)
+            accuracy, _ = gt_kdtree.query(whole_pn_pc)            
             nocs_accuracy.append(accuracy.mean())
-            
 
+            crr_dir = os.path.join(crr_root, str(i))
+            crr_path_list = glob.glob(os.path.join(crr_dir, "*_masked_p1.xyz"))
+            # print(crr_path_list)
+            # crr_pc = ()
+            # for crr_path in crr_path_list:
+            #     cur_crr_pc = np.loadtxt(crr_path).astype('float32')
+            #     crr_pc = crr_pc + (cur_crr_pc,)
+            
+            # crr_pc = np.concatenate(crr_pc)
+            # untrsed_gt_pc = (gt_pc / transform['scale'][0].detach().cpu().numpy()) - transform['translation'][0].detach().cpu().numpy()
+            # untrsed_gt_pc = untrsed_gt_pc.astype('float32')
+
+            
+            # write_off(os.path.join(self.output_dir, 'frame_{}_gt.xyz').format(str(i).zfill(3)), untrsed_gt_pc)
+            # write_off(os.path.join(self.output_dir, 'frame_{}_pred.xyz').format(str(i).zfill(3)), whole_pn_pc)
+            # print("all crr num", crr_pc.shape)
+            # if crr_pc.shape[0] == 0:
+            #     crr_chamfers.append(1)
+            # else:
+            #     write_off(os.path.join(self.output_dir, 'frame_{}_crr.xyz').format(str(i).zfill(3)), crr_pc)
+            #     crr_kdtree = KDTree(crr_pc)            
+            #     cur_chamfer, _ = crr_kdtree.query(untrsed_gt_pc)
+            #     crr_chamfers.append(cur_chamfer.mean())
+            
             str_nocs_diff = "avg nocs diff is {:.6f} ".format(np.sqrt(np.mean(np.asarray(nocs_diff))))
             str_chamfer_diff = "compl/acc is {:.6f}/{:.6f} ".format(np.mean(np.asarray(nocs_completeness)), np.mean(np.asarray(nocs_accuracy)))
+            str_crr_chamfer = "crr chamfer is {:.6f} ".format(np.mean(np.asarray(crr_chamfers)))
             str_joint_diff = "avg loc/angle diff is {:.6f}/{:.6f} ".format(np.mean(np.asarray(loc_diff)), np.degrees(np.mean(np.asarray(pose_diff))))
             # str_angle_diff = "avg diff is {:.6f} degree ".format(np.degrees(np.mean(np.asarray(pose_diff))))
             str_loss = "avg val loss is {:6f}".format(np.mean(np.asarray(epoch_losses)))
             str_item_loss = "cur loss {:6f} ".format(loss.item())
-            sys.stdout.write("\r[ VAL ] {}th ".format(i) + str_nocs_diff + str_chamfer_diff + str_joint_diff)
+            sys.stdout.write("\r[ VAL ] {}th ".format(i) + str_nocs_diff + str_chamfer_diff + str_crr_chamfer + str_joint_diff)
             # sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loss)
             sys.stdout.flush()
             # exit()

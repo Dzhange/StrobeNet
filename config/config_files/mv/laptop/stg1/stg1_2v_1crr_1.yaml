@@ -1,6 +1,6 @@
 DATASET_ROOT: '/data/new_disk2/zhangge/Data/SAPIEN/benchmark/laptop/benchmark_v1_uni/'
 OUTPUT_DIR: '/data/new_disk2/zhangge/StrobeNet/output/mv/laptop/'
-VIEW_NUM: 4
+VIEW_NUM: 2
 RANDOM_VIEW: True
 TOTAL_VIEW: 8
 
@@ -14,11 +14,11 @@ IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
 TASK: "mlnrnet"
-EXPT_NAME: "stg1_1crr_4v"
+EXPT_NAME: "stg1_1crr_2v_1"
 RESOLUTION: 128
 
 BONE_NUM: 1
-GPU: 1
+GPU: 2
 
 # TEST_ON_TRAIN: True
 TEST_ON_TRAIN: False
