@@ -113,8 +113,13 @@ class PMLBSLoss(nn.Module):
         # print(pred_seg.shape)
         skin_loss = self.seg_loss(pred_seg, tar_seg)
 
-        loc_map_loss = self.l2_loss(pred_loc_map, tar_loc_map, target_mask)
-        rot_map_loss = self.l2_loss(pred_rot_map, tar_rot_map, target_mask)
+        # old_loc_map_loss = self.l2_loss(pred_loc_map, tar_loc_map, target_mask)
+        # old_rot_map_loss = self.l2_loss(pred_rot_map, tar_rot_map, target_mask)
+        
+        loc_map_loss = self.masked_l2_loss(pred_loc_map, tar_loc_map, target_mask)
+        rot_map_loss = self.masked_l2_loss(pred_rot_map, tar_rot_map, target_mask)
+
+        # print(old_loc_map_loss - loc_map_loss)
                 
         loc_loss = self.pose_nocs_loss(pred_loc_map,
                                             pred_joint_score,
@@ -161,13 +166,12 @@ class PMLBSLoss(nn.Module):
 
         l2_loss = 0
         for i in range(0, batch_size):
-            num_non_zero = torch.nonzero(masked_diff_norm[i]).size(0)            
+            num_non_zero = torch.nonzero(masked_diff_norm[i]).size(0)
             if num_non_zero > 0:
                 l2_loss += torch.sum(masked_diff_norm[i]) / num_non_zero
             else:
                 l2_loss += torch.mean(diff_norm[i])
-        l2_loss /= batch_size
-        # print("l2 loss ", l2_loss)
+        l2_loss /= batch_size        
         return l2_loss
 
     def pose_nocs_loss(self, pred_joint_map, pred_joint_score, out_mask, tar_joints):
@@ -183,14 +187,16 @@ class PMLBSLoss(nn.Module):
                                                     dim=2, keepdim=True).unsqueeze(3) + 1e-5)
         pred_joint_map = pred_joint_map.detach() * pred_score_map.unsqueeze(2)
         pred_joint = pred_joint_map.reshape(n_batch, bone_num, 3, -1).sum(dim=3)  # B,22,3
-        
+
+        # print(pred_joint.shape)
         joint_diff = torch.sum((pred_joint - tar_joints) ** 2, dim=2)  # B,22
         joint_loc_loss = joint_diff.sum() / (n_batch * pred_joint_map.shape[1])
 
+        joint_loc_loss = torch.norm(pred_joint - tar_joints, p=2, dim=2).sum()
         # joint_diff = pred_joint - tar_joints
         # diff_norm = torch.norm(joint_diff, p=2, dim=1)  # Same size as WxH
         # joint_loc_loss = torch.mean(diff_norm)
-
+        print(joint_loc_loss)
         return joint_loc_loss
 
     def vis_joint_map(self, joint_map, mask, frame_id):
@@ -377,12 +383,12 @@ class MVPMLoss(PMLoss):
 
         crr_gt_diff, crr_pix_diff, pix_diff = self.crr_check(segnet_output, tar_mask, tar_nocs, crr)
                 
-        rate = crr_pix_diff.cpu().detach().numpy() / pix_diff.cpu().detach().numpy()
-        rate_npy = os.path.join(self.log_root, "crr_whole_error_rate.npy")
-        np.save(rate_npy, np.load(rate_npy) + rate)
-        cnt_npy = os.path.join(self.log_root, "cnt.npy")
-        np.save(cnt_npy, np.load(cnt_npy) + 1)
-        print("crr/whole error: {:3f}, whole error: {:3f}".format(np.load(rate_npy) / np.load(cnt_npy), pix_diff.cpu().detach().numpy()))
+        # rate = crr_pix_diff.cpu().detach().numpy() / pix_diff.cpu().detach().numpy()
+        # rate_npy = os.path.join(self.log_root, "crr_whole_error_rate.npy")
+        # np.save(rate_npy, np.load(rate_npy) + rate)
+        # cnt_npy = os.path.join(self.log_root, "cnt.npy")
+        # np.save(cnt_npy, np.load(cnt_npy) + 1)
+        # print("crr/whole error: {:3f}, whole error: {:3f}".format(np.load(rate_npy) / np.load(cnt_npy), pix_diff.cpu().detach().numpy()))
         if 0:
             self.joint_crr_loss(segnet_output)
         
@@ -426,10 +432,10 @@ class MVPMLoss(PMLoss):
                     gt_p1 = gt_paired_pc.unsqueeze(0)
 
 
-                    # print(base_gt_pc.cpu().detach().numpy().shape)
-                    write_off(self.log_root + "/base_gt_pc.xyz", base_gt_pc.cpu().detach().numpy())
-                    write_off(self.log_root + "/base_pn_pc.xyz", base_pn_pc.cpu().detach().numpy())
-                    exit()
+                    # # print(base_gt_pc.cpu().detach().numpy().shape)
+                    # write_off(self.log_root + "/base_gt_pc.xyz", base_gt_pc.cpu().detach().numpy())
+                    # write_off(self.log_root + "/base_pn_pc.xyz", base_pn_pc.cpu().detach().numpy())
+                    # exit()
                     pix_loss = ((base_pn_pc - base_gt_pc) ** 2).mean()
                     crr_pix_loss += ((p1 - gt_p1) ** 2).mean()
 

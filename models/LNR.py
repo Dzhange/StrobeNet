@@ -41,8 +41,6 @@ class ModelLNRNET(ModelSegLBS):
         # generation conifgs        
         self.batch_points = 100000
 
-
-
     def init_net(self, device):
         config = self.config
         self.net = LNRNet(config, device=device)
@@ -55,8 +53,6 @@ class ModelLNRNET(ModelSegLBS):
                 pretrained_dir = config.NRNET_PRETRAIN_PATH
                 self.LoadSegNetCheckpoint(device, pretrained_dir)
 
-
-    # @staticmethod
     def preprocess(self, data, device):
         """
         put data onto the right device

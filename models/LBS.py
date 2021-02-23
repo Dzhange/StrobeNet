@@ -79,7 +79,7 @@ class ModelLBSNOCS(object):
             'OptimizerStateDict': self.optimizer.state_dict(),
             'LossHistory': self.loss_history,
             'ValLossHistory': self.val_loss_history,
-            'Epoch': self.start_epoch + epoch + 1,
+            'Epoch': self.epoch + 1,
             'SavedTimeZ': getZuluTimeString(),
         }
         out_file_path = savePyTorchCheckpoint(checkpoint_dict, self.expt_dir_path, TimeString=time_string)

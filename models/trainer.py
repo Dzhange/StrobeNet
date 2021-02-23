@@ -28,10 +28,9 @@ class Trainer:
 
     def train(self):
         self.model.setup_checkpoint(self.device)        
-        self.model.net.train()
-        # self.model.start_epoch = 2
-        cur_epoch = self.model.start_epoch + 1
-        
+        self.model.net.train()        
+        cur_epoch = self.model.start_epoch
+        print(cur_epoch)
         epoch_passed = 0
         all_tic = getCurrentEpochTime()
         show_time = 0

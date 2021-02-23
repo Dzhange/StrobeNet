@@ -210,11 +210,14 @@ class JiahuiL2Loss(nn.Module):
         mask = mask.unsqueeze(1)
         assert pred.shape == target.shape
         # print("TEST: ", (pred ** 2 * mask.float())[:100].sum()  )
-        dif = (pred - target) ** 2 * (mask.float())
+        dif = (pred - target) ** 2 * (mask.float())        
+        # new_dif = torch.norm(pred - target, p=2, dim=1) * (mask.float())        
+
         loss = torch.sum(dif.reshape(mask.shape[0], -1).contiguous(), 1)
         count = torch.sum(mask.reshape(mask.shape[0], -1).contiguous(), 1).detach()
         loss[count == 0] = loss[count == 0] * 0
         loss = loss / (count + 1)
+                
         # this normalization is only for the image dimensions but not take channel dimension into account!
         non_zero_count = torch.sum((count > 0).float())
         if non_zero_count == 0:
