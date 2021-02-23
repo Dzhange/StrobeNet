@@ -343,6 +343,7 @@ class MVPMLoss(PMLoss):
         crr['crr-idx-mtx'] = target.pop('crr-idx-mtx', None)
         crr['crr-mask-mtx'] = target.pop('crr-mask-mtx', None)
         tar_mask = [nox[:, 3] for nox in target['nox00']]
+        tar_nocs = [nox[:, :3] for nox in target['pnnocs00']]
 
         target_list = DL2LD(target)
         segnet_output = output[0]
@@ -382,6 +383,18 @@ class MVPMLoss(PMLoss):
         if self.config.CONSISTENCY != 0:
             mv_loss['crr_loss'] = self.crr_loss(segnet_output, tar_mask, crr)
 
+        crr_gt_diff, crr_pix_diff, pix_diff = self.crr_check(segnet_output, tar_mask, tar_nocs, crr)
+        
+
+        rate_root = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME, "crr_whole_error_rate")        
+        rate = crr_pix_diff.cpu().detach().numpy()/ pix_diff.cpu().detach().numpy()
+        # print("crr/whole: ", rate)
+        rate_npy = os.path.join(rate_root, "rate.npy")
+        np.save(rate_npy, np.load(rate_npy) + rate)
+        cnt_npy = os.path.join(rate_root, "cnt.npy")
+        np.save(cnt_npy, np.load(cnt_npy) + 1)
+
+        print("crr/whole error", np.load(rate_npy) / np.load(cnt_npy))
         if 0:
             self.joint_crr_loss(segnet_output)
         
@@ -390,6 +403,54 @@ class MVPMLoss(PMLoss):
         mv_loss = self.add_up(mv_loss)
         
         return mv_loss
+
+    def crr_check(self, output_list, tar_mask, tar_nocs, crr):
+        
+        batch_size = output_list[0].shape[0]        
+        pair_cnt = 0
+        crr_xyz_loss = 0
+        crr_pix_loss = 0
+
+        all_crr_points = ()
+
+        for b_id in range(batch_size):
+            for base_view_id in range(len(crr['crr-idx-mtx'])):
+                for query_view_id in range(len(crr['crr-idx-mtx'][base_view_id])):
+                    base_pn_map = output_list[base_view_id][b_id, -3:, ]
+                    base_gt_map = tar_nocs[base_view_id][b_id, -3:, ]                    
+
+                    query_pn_map = tar_nocs[base_view_id + query_view_id + 1][b_id, -3:, ]
+
+                    base_mask = tar_mask[base_view_id][b_id]
+                    query_mask = tar_mask[base_view_id + query_view_id + 1][b_id]
+
+                    base_pn_pc = base_pn_map[:, base_mask.squeeze() > 0].transpose(1, 0)
+                    base_gt_pc = base_gt_map[:, base_mask.squeeze() > 0].transpose(1, 0)
+
+                    query_pn_pc = query_pn_map[:, query_mask.squeeze() > 0].transpose(1, 0)
+
+                    pair_idx = crr['crr-idx-mtx'][base_view_id][query_view_id][b_id]
+                    # print(pair_idx[:10])
+                    paired_pc_from_base_to_query = base_pn_pc[pair_idx].squeeze(0)
+                    gt_paired_pc = base_gt_pc[pair_idx].squeeze(0)
+
+                    p1 = paired_pc_from_base_to_query.unsqueeze(0)
+                    gt_p1 = gt_paired_pc.unsqueeze(0)
+
+                    pix_loss = ((base_pn_pc - base_gt_pc) ** 2).mean()
+                    crr_pix_loss += ((p1 - gt_p1) ** 2).mean()
+
+                    p2 = query_pn_pc.unsqueeze(0)
+                    mask = crr['crr-mask-mtx'][base_view_id][query_view_id][b_id].squeeze()
+
+                    crr_xyz_loss += self.crr_l2(p1, p2, mask, detach=False)
+
+                    pair_cnt += 1
+
+        crr_xyz_loss /= pair_cnt
+        crr_pix_loss /= pair_cnt
+
+        return crr_xyz_loss, crr_pix_loss, pix_loss
 
     def crr_loss(self, output_list, tar_mask, crr):
         """
@@ -410,12 +471,10 @@ class MVPMLoss(PMLoss):
             if not os.path.exists(crr_dir):
                 os.mkdir(crr_dir)
 
-        for b_id in range(batch_size):
-            _p1_list, _p2_list, _m_list = [], [], []
+        for b_id in range(batch_size):            
             for base_view_id in range(len(crr['crr-idx-mtx'])):
                 for query_view_id in range(len(crr['crr-idx-mtx'][base_view_id])):
                     
-                    base_pn_map = output_list[base_view_id][b_id, -3:, ]
                     base_pn_map = output_list[base_view_id][b_id, -3:, ]
                     query_pn_map = output_list[base_view_id + query_view_id + 1][b_id, -3:, ]
                     base_mask = tar_mask[base_view_id][b_id]
@@ -424,20 +483,9 @@ class MVPMLoss(PMLoss):
                     base_pn_pc = base_pn_map[:, base_mask.squeeze() > 0].transpose(1, 0)
                     query_pn_pc = query_pn_map[:, query_mask.squeeze() > 0].transpose(1, 0)
 
-                    # base_pc = pred_xyz_list[base_view_id]                    
-                    # query_pc = pred_xyz_list[base_view_id + query_view_id + 1]
-
                     pair_idx = crr['crr-idx-mtx'][base_view_id][query_view_id][b_id]
-                    paired_pc_from_base_to_query = base_pn_pc[pair_idx]
-                    paired_pc_from_base_to_query = paired_pc_from_base_to_query.squeeze(0)
-                    # paired_pc_from_base_to_query = torch.gather(base_pn_pc.squeeze(3), dim=2,
-                    #                                             index=pair_idx.repeat(1, 3, 1)).unsqueeze(3)
-                    _p1_list.append(paired_pc_from_base_to_query)
-                    _p2_list.append(query_pn_pc)
-                    _m_list.append(crr['crr-mask-mtx'][base_view_id][query_view_id][b_id].squeeze())
-                    # print(torch.stack(_p1_list, dim=0).contiguous().shape)
-                    # print(_p2_list[0].shape, _p2_list[1].shape)
-                    
+                    paired_pc_from_base_to_query = base_pn_pc[pair_idx].squeeze(0)
+
                     p1 = paired_pc_from_base_to_query.unsqueeze(0)
                     p2 = query_pn_pc.unsqueeze(0)
                     mask = crr['crr-mask-mtx'][base_view_id][query_view_id][b_id].squeeze()
@@ -447,27 +495,28 @@ class MVPMLoss(PMLoss):
                         masked_p2 = p2[0, mask.to(dtype=bool), :].cpu().detach().numpy()
                         
                         points_num = masked_p1.shape[0]
-                        # print("[ INFO ] crr num: ", points_num)                        
+                        # print("[ INFO ] crr num: ", points_num)
                         
                         # size = 100
                         # step = points_num // size
                         # for i in range(step):
                         #     write_off("/data/new_disk2/zhangge/crr/pred_crr_0_{}.xyz".format(i), masked_p1[i*size:(i+1)*size])
-                        #     write_off("/data/new_disk2/zhangge/crr/pred_crr_1_{}.xyz".format(i), masked_p2[i*size:(i+1)*size])                    
+                        #     write_off("/data/new_disk2/zhangge/crr/pred_crr_1_{}.xyz".format(i), masked_p2[i*size:(i+1)*size])
                         
                         write_off(os.path.join(crr_dir, "b{}_q{}_masked_p1.xyz").format(base_view_id, query_view_id), masked_p1)
                         write_off(os.path.join(crr_dir, "b{}_q{}_masked_p2.xyz").format(base_view_id, query_view_id), masked_p2)
                         write_off(os.path.join(crr_dir, "b{}_q{}_p1.xyz").format(base_view_id, query_view_id), p1[0].cpu().detach().numpy())
                         write_off(os.path.join(crr_dir, "b{}_q{}_p2.xyz").format(base_view_id, query_view_id), p2[0].cpu().detach().numpy())
                         write_off(os.path.join(crr_dir, "b{}_q{}_p_query.xyz").format(base_view_id, query_view_id), query_pn_pc.cpu().detach().numpy())
-                        # print(mask.shape)
-                    crr_xyz_loss += self.crr_l2(p1, p2, mask, detach=False)
-                    pair_cnt += 1                    
-                    # exit()
 
-        # exit()
+                    crr_xyz_loss += self.crr_l2(p1, p2, mask, detach=False)
+                    pair_cnt += 1
+
         crr_xyz_loss /= pair_cnt
 
+        # if out_crr:
+        #     return crr_xyz_loss, np.concatenate(all_crr_points)
+        # else:
         return crr_xyz_loss
 
     def joint_crr_loss(self, segnet_output):
@@ -515,7 +564,7 @@ class MVPMLoss(PMLoss):
 
 class MVMPLoss(MVPMLoss):
     """
-    Multi-view Multi-pose Partial Mobility Loss
+    Multi-view Multi-pose(for reconstruction) Partial Mobility Loss
     """
 
     def __init__(self, config):

@@ -81,7 +81,6 @@ class ModelMLNRNet(ModelLNRNET):
 
         return inputs, targets
 
-
     def validate(self, val_dataloader, objective, device):
 
         # self.output_dir = os.path.join(self.expt_dir_path, "ValResults")
@@ -116,16 +115,22 @@ class ModelMLNRNet(ModelLNRNET):
         nocs_accuracy = []
         nocs_completeness = []
 
+        ##### temp ####
         crr_chamfers = []
         crr_root = os.path.join(self.expt_dir_path, "crr")
         if os.path.exists(crr_root):
             shutil.rmtree(crr_root)
             os.mkdir(crr_root)
+        # print("!!!!!!")
+        rate_root = os.path.join(self.expt_dir_path, "crr_whole_error_rate")
+        if os.path.exists(rate_root):
+            shutil.rmtree(rate_root)
+        os.mkdir(rate_root)
+        # exit()
+        np.save(os.path.join(rate_root, "rate.npy"), 0)
+        np.save(os.path.join(rate_root, "cnt.npy"), 0)
 
-        for i, data in enumerate(val_dataloader, 0):  # Get each batch            
-            # if i < 319:
-            #     continue
-
+        for i, data in enumerate(val_dataloader, 0):  # Get each batch
             if i > (num_samples-1): 
                 break
 
@@ -204,8 +209,6 @@ class ModelMLNRNet(ModelLNRNET):
 
             ####### calculate chamfer distance ######
 
-
-
             whole_pn_pc = np.concatenate(whole_pn_pc, axis=0)
             iso_mesh = trimesh.load(data['iso_mesh'][0][0], process=False)
             # print(data['iso_mesh'][0][0])
@@ -223,8 +226,9 @@ class ModelMLNRNet(ModelLNRNET):
             accuracy, _ = gt_kdtree.query(whole_pn_pc)            
             nocs_accuracy.append(accuracy.mean())
 
-            crr_dir = os.path.join(crr_root, str(i))
-            crr_path_list = glob.glob(os.path.join(crr_dir, "*_masked_p1.xyz"))
+            ######### load corresponding points and calculate chamfer distance
+            # crr_dir = os.path.join(crr_root, str(i))
+            # crr_path_list = glob.glob(os.path.join(crr_dir, "*_masked_p1.xyz"))
             # print(crr_path_list)
             # crr_pc = ()
             # for crr_path in crr_path_list:
@@ -234,7 +238,6 @@ class ModelMLNRNet(ModelLNRNET):
             # crr_pc = np.concatenate(crr_pc)
             # untrsed_gt_pc = (gt_pc / transform['scale'][0].detach().cpu().numpy()) - transform['translation'][0].detach().cpu().numpy()
             # untrsed_gt_pc = untrsed_gt_pc.astype('float32')
-
             
             # write_off(os.path.join(self.output_dir, 'frame_{}_gt.xyz').format(str(i).zfill(3)), untrsed_gt_pc)
             # write_off(os.path.join(self.output_dir, 'frame_{}_pred.xyz').format(str(i).zfill(3)), whole_pn_pc)
@@ -247,6 +250,8 @@ class ModelMLNRNet(ModelLNRNET):
             #     cur_chamfer, _ = crr_kdtree.query(untrsed_gt_pc)
             #     crr_chamfers.append(cur_chamfer.mean())
             
+            
+
             str_nocs_diff = "avg nocs diff is {:.6f} ".format(np.sqrt(np.mean(np.asarray(nocs_diff))))
             str_chamfer_diff = "compl/acc is {:.6f}/{:.6f} ".format(np.mean(np.asarray(nocs_completeness)), np.mean(np.asarray(nocs_accuracy)))
             str_crr_chamfer = "crr chamfer is {:.6f} ".format(np.mean(np.asarray(crr_chamfers)))
@@ -258,5 +263,5 @@ class ModelMLNRNet(ModelLNRNET):
             # sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loss)
             sys.stdout.flush()
             # exit()
-        
+            
         print("\n")

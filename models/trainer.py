@@ -29,8 +29,10 @@ class Trainer:
     def train(self):
         self.model.setup_checkpoint(self.device)        
         self.model.net.train()
-        cur_epoch = 0
-
+        # self.model.start_epoch = 2
+        cur_epoch = self.model.start_epoch + 1
+        
+        epoch_passed = 0
         all_tic = getCurrentEpochTime()
         show_time = 0
         while cur_epoch < self.config.EPOCH_TOTAL:
@@ -71,13 +73,13 @@ class Trainer:
                     total_elapsed = math.floor((toc - all_tic) * 1e-6)
                     done = int(30 * (i+1) / len(self.train_data_loader))
                     # Compute ETA
-                    time_per_batch = (toc - all_tic) / ((cur_epoch * len(self.train_data_loader)) + (i+1)) # Time per batch
+                    time_per_batch = (toc - all_tic) / ((epoch_passed * len(self.train_data_loader)) + (i+1)) # Time per batch
                     ETA = math.floor(time_per_batch * self.config.EPOCH_TOTAL * len(self.train_data_loader) * 1e-6)
                     
                     progress_str = ('\r[{}>{}] epoch - {}/{}, {}th step train loss - {:.6f} | epoch - {}, total - {} ETA - {} |')\
                                             .format('=' * done, '-' * (30 - done),
-                                                    self.model.start_epoch + cur_epoch + 1,
-                                                    self.model.start_epoch + self.config.EPOCH_TOTAL,
+                                                    cur_epoch,
+                                                    self.config.EPOCH_TOTAL,
                                                     i,
                                                     np.mean(np.asarray(epoch_losses)),  # np.mean(np.asarray(crr_losses)),                         
                                                     getTimeDur(elapsed),
@@ -97,11 +99,12 @@ class Trainer:
                 gc.collect()
                 self.model.loss_history.append(np.mean(np.asarray(epoch_losses)))
                 ######################  DO VALIDATION  ##########################
-                val_losses = self.validate()                
+                # val_losses = self.validate()
+                val_losses = []
                 # self.model.val_loss_history.append(np.mean(np.asarray(val_losses)))
-                if not self.config.STAGE_ONE:
-                    self.model.validate(self.val_data_loader, self.objective, self.device)
-                    os.system("python eval.py -i  {}".format(self.model.output_dir))
+                # if not self.config.STAGE_ONE:
+                #     self.model.validate(self.val_data_loader, self.objective, self.device)
+                #     os.system("python eval.py -i  {}".format(self.model.output_dir))
                 self.model.val_loss_history.append(np.mean(np.asarray(val_losses)))
                 ########################## SAVE CHECKPOINT ##############################
                 if (cur_epoch + 1) % self.config.SAVE_FREQ == 0:
@@ -110,6 +113,7 @@ class Trainer:
                     self.model.save_checkpoint(cur_epoch, print_str='~'*3)                        
                 
                 cur_epoch += 1
+                epoch_passed += 1
             except (KeyboardInterrupt, SystemExit):
                 print('\n[ INFO ]: KeyboardInterrupt detected. Saving checkpoint.')
                 self.model.save_checkpoint(cur_epoch, time_string='eot', print_str='$'*3)

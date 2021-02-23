@@ -15,9 +15,7 @@ def get_default_cfg():
     cfg.DATASET_CATES = []
     cfg.DATASET_INDEX = []
     cfg.PROPORTION = 1.0  # how many of the first K samples in the dataset list
-    cfg.TRANSFORM = True # if set too true, we use the dataset where all mesh/occupancy are transformed into [-0.5, 0.5]
-    cfg.VIEW_NUM = 1
-    cfg.VIEW_RECON = 8
+    cfg.TRANSFORM = True # if set too true, we use the dataset where all mesh/occupancy are transformed into [-0.5, 0.5]    
 
     cfg.FIX_HACK = False
     
@@ -27,7 +25,8 @@ def get_default_cfg():
     cfg.ANGLE_START = 0.0 
     cfg.ANGLE_STEP = 0.1
 
-
+    cfg.VIEW_NUM = 1 # number of seen views
+    cfg.VIEW_RECON = 8
     cfg.RANDOM_VIEW = False # select random views from the given set
     cfg.TOTAL_VIEW = 4 # total number of views
     cfg.NUM_SAMPLE_POINTS = 50000 
@@ -74,7 +73,7 @@ def get_default_cfg():
     
     # DATASET PART
     cfg.TEST_ON_TRAIN = False
-    cfg.OUT_CHANNELS = 4
+    # cfg.OUT_CHANNELS = 4 ## discarded! now we calculate output channels automatically
     cfg.TASK = "occupancy"
     cfg.TARGETS = ["nox00"]
     

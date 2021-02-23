@@ -103,8 +103,9 @@ class MVSPDataset(SAPIENDataset):
         for k in data_list[0].keys():
             batch[k] = [item[k] for item in data_list]                
         # TODO: also include pair-wise consistency data
-        if self.config.CONSISTENCY != 0:
-            crr = self.get_crr(batch)
+        
+        crr = self.get_crr(batch)
+        if self.config.CONSISTENCY != 0:            
             batch.update(crr)
 
         return batch

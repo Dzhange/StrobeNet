@@ -1,30 +1,31 @@
-DATASET_ROOT: '/data/new_disk2/zhangge/Data/SAPIEN/benchmark/glasses/mv8_fix_scale_mpf_nobg_uni/'
-OUTPUT_DIR: '/data/new_disk2/zhangge/StrobeNet/output/mv/gls/'
-VIEW_NUM: 2
+DATASET_ROOT: '/data/new_disk2/zhangge/Data/SAPIEN/benchmark/laptop/benchmark_v1_uni/'
+OUTPUT_DIR: '/data/new_disk2/zhangge/StrobeNet/output/mv/laptop/stg2/'
+VIEW_NUM: 2 # we use random views this time
 RANDOM_VIEW: True
 TOTAL_VIEW: 8
 
 BATCHSIZE: 1
 DATALOADER_WORKERS: 5
-EPOCH_TOTAL: 30
+EPOCH_TOTAL: 5
 
 DATA_LIMIT: 100
 VAL_DATA_LIMIT: 20
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
+# TASK: "mvmp"
 TASK: "mlnrnet"
-EXPT_NAME: "stg1_2crr_2v"
+EXPT_NAME: "2v_1crr"
 RESOLUTION: 128
 
-BONE_NUM: 2
+BONE_NUM: 1
 GPU: 1
 
-# TEST_ON_TRAIN: True
 TEST_ON_TRAIN: False
 
 REPOSE: True
-STAGE_ONE: True
+
+STAGE_ONE: False
 
 ###################################################
 MODES: ['train','val']
@@ -34,7 +35,8 @@ SAVE_FREQ: 1
 MH: True
 BN: False
 
-CONSISTENCY: 2.0
+
+CONSISTENCY: 1.0
 
 NOCS_LOSS: 1
 POSE_LOSS: 1
@@ -45,6 +47,5 @@ SKIN_LOSS: 1
 RECON_LOSS: 0.1
 
 AGGR_SCATTER: True
-# NRNET_PRETRAIN: True
-# NRNET_PRETRAIN_PATH: "/workspace/pretrained_weights/glasses_aug1_bkup/scale_1_9999-12-31T23-59-59.tar"
-
+NRNET_PRETRAIN: True
+NRNET_PRETRAIN_PATH: "/data/new_disk2/zhangge/StrobeNet/output/mv/laptop/stg1_1crr_2v/stg1_1crr_2v_9999-12-31T23-59-59.tar"
