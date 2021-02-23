@@ -387,14 +387,12 @@ class MVPMLoss(PMLoss):
 
         crr_gt_diff, crr_pix_diff, pix_diff = self.crr_check(segnet_output, tar_mask, tar_nocs, crr)
                 
-        rate = crr_pix_diff.cpu().detach().numpy() / pix_diff.cpu().detach().numpy()        
-        rate_npy = os.path.join(self.log_root, "rate.npy")
+        rate = crr_pix_diff.cpu().detach().numpy() / pix_diff.cpu().detach().numpy()
+        rate_npy = os.path.join(self.log_root, "crr_whole_error_rate.npy")
         np.save(rate_npy, np.load(rate_npy) + rate)
         cnt_npy = os.path.join(self.log_root, "cnt.npy")
         np.save(cnt_npy, np.load(cnt_npy) + 1)
-
-        # print("crr/whole error", np.load(rate_npy) / np.load(cnt_npy))
-        
+        print("crr/whole error: {:3f}, whole error: {:3f}".format(np.load(rate_npy) / np.load(cnt_npy), pix_diff.cpu().detach().numpy()))
         if 0:
             self.joint_crr_loss(segnet_output)
         

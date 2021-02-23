@@ -125,7 +125,7 @@ class ModelMLNRNet(ModelLNRNET):
             shutil.rmtree(crr_root)
             os.mkdir(crr_root)        
             
-        np.save(os.path.join(self.log_dir_path, "rate.npy"), 0)
+        np.save(os.path.join(self.log_dir_path, "crr_whole_error_rate.npy"), 0)
         np.save(os.path.join(self.log_dir_path, "cnt.npy"), 0)
 
         for i, data in enumerate(val_dataloader, 0):  # Get each batch
