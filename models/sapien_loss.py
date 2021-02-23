@@ -6,6 +6,36 @@ from utils.DataUtils import *
 from models.loss import *
 from time import time
 
+class MaskedL2Loss(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.thresh = 0.7
+    
+    def forward(self, out, tar, mask):
+        batch_size = out.shape[0]
+        
+        # print(out.shape, mask.shape)
+        out = out.clone().requires_grad_(True)
+        diff = out - tar
+        diff_norm = torch.norm(diff, 2, dim=1)
+        masked_diff_norm = torch.where(mask > self.thresh, diff_norm,
+                                        torch.zeros(diff_norm.size(), device=diff_norm.device))
+        # print(masked_diff_norm.shape)
+        # print("nocs loss {:3f}".format(masked_diff_norm.mean()))
+
+        l2_loss = 0
+        for i in range(0, batch_size):
+            num_non_zero = torch.nonzero(masked_diff_norm[i]).size(0)
+            if num_non_zero > 0:
+                l2_loss += torch.sum(masked_diff_norm[i]) / num_non_zero
+            else:
+                l2_loss += torch.mean(diff_norm[i])
+        l2_loss /= batch_size
+        return l2_loss
+
+
+
 class PMLBSLoss(nn.Module):
     """
         Partial Mobility Linear Blend Skining Loss
@@ -39,8 +69,9 @@ class PMLBSLoss(nn.Module):
         # self.sigmoid = nn.Sigmoid()
         self.Thresh = 0.7
         self.bone_num = cfg.BONE_NUM
-        self.l2_loss = JiahuiL2Loss()
+        # self.l2_loss = JiahuiL2Loss()
         self.seg_loss = torch.nn.CrossEntropyLoss()
+        self.masked_l2_loss = MaskedL2Loss()
 
         self.expt_dir_path = os.path.join(self.cfg.OUTPUT_DIR, self.cfg.EXPT_NAME)
         if os.path.exists(self.expt_dir_path) == False:
@@ -154,26 +185,6 @@ class PMLBSLoss(nn.Module):
 
         return loss
 
-    def masked_l2_loss(self, out, tar, mask):
-
-        batch_size = out.shape[0]
-        out = out.clone().requires_grad_(True)
-        diff = out - tar
-        diff_norm = torch.norm(diff, 2, dim=1)
-        masked_diff_norm = torch.where(mask > self.Thresh, diff_norm,
-                                        torch.zeros(diff_norm.size(), device=diff_norm.device))
-        # print("nocs loss {:3f}".format(masked_diff_norm.mean()))
-
-        l2_loss = 0
-        for i in range(0, batch_size):
-            num_non_zero = torch.nonzero(masked_diff_norm[i]).size(0)
-            if num_non_zero > 0:
-                l2_loss += torch.sum(masked_diff_norm[i]) / num_non_zero
-            else:
-                l2_loss += torch.mean(diff_norm[i])
-        l2_loss /= batch_size        
-        return l2_loss
-
     def pose_nocs_loss(self, pred_joint_map, pred_joint_score, out_mask, tar_joints):
 
         n_batch = pred_joint_map.shape[0]
@@ -190,13 +201,11 @@ class PMLBSLoss(nn.Module):
 
         # print(pred_joint.shape)
         joint_diff = torch.sum((pred_joint - tar_joints) ** 2, dim=2)  # B,22
-        joint_loc_loss = joint_diff.sum() / (n_batch * pred_joint_map.shape[1])
+        old_joint_loc_loss = joint_diff.sum() / (n_batch * pred_joint_map.shape[1])
 
         joint_loc_loss = torch.norm(pred_joint - tar_joints, p=2, dim=2).sum()
-        # joint_diff = pred_joint - tar_joints
-        # diff_norm = torch.norm(joint_diff, p=2, dim=1)  # Same size as WxH
-        # joint_loc_loss = torch.mean(diff_norm)
-        print(joint_loc_loss)
+        joint_loc_loss /= (n_batch * pred_joint_map.shape[1])
+        # print(joint_loc_loss**2 - old_joint_loc_loss)
         return joint_loc_loss
 
     def vis_joint_map(self, joint_map, mask, frame_id):
@@ -331,6 +340,7 @@ class MVPMLoss(PMLoss):
     def __init__(self, config):
         super().__init__(config)
         self.crr_l2 = JiahuiL2Loss()
+        self.masked_l2_loss = MaskedL2Loss()
 
     def forward(self, output, target):
 
@@ -442,7 +452,13 @@ class MVPMLoss(PMLoss):
                     p2 = query_pn_pc.unsqueeze(0)
                     mask = crr['crr-mask-mtx'][base_view_id][query_view_id][b_id].squeeze()
 
-                    crr_xyz_loss += self.crr_l2(p1, p2, mask, detach=False)
+                    # crr_xyz_loss += self.crr_l2(p1, p2, mask, detach=False)
+                    # print("here")
+                    # print("p1 mask", p1.shape, mask.shape)
+                    p1 = p1.transpose(1, 2)
+                    p2 = p2.transpose(1, 2)
+                    mask = mask.unsqueeze(0)
+                    crr_xyz_loss += self.masked_l2_loss(p1, p2, mask)
 
                     pair_cnt += 1
 
