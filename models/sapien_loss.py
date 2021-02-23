@@ -279,6 +279,8 @@ class PMLoss(nn.Module):
         self.segnet_loss = PMLBSLoss(config)
         self.bone_num = config.BONE_NUM
 
+        self.log_root = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME, "logs")
+
     def forward(self, output, target):
         segnet_output = output[0]
         loss = self.segnet_loss(segnet_output, target)
@@ -384,17 +386,15 @@ class MVPMLoss(PMLoss):
             mv_loss['crr_loss'] = self.crr_loss(segnet_output, tar_mask, crr)
 
         crr_gt_diff, crr_pix_diff, pix_diff = self.crr_check(segnet_output, tar_mask, tar_nocs, crr)
-        
-
-        rate_root = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME, "crr_whole_error_rate")        
-        rate = crr_pix_diff.cpu().detach().numpy()/ pix_diff.cpu().detach().numpy()
-        # print("crr/whole: ", rate)
-        rate_npy = os.path.join(rate_root, "rate.npy")
+                
+        rate = crr_pix_diff.cpu().detach().numpy() / pix_diff.cpu().detach().numpy()        
+        rate_npy = os.path.join(self.log_root, "rate.npy")
         np.save(rate_npy, np.load(rate_npy) + rate)
-        cnt_npy = os.path.join(rate_root, "cnt.npy")
+        cnt_npy = os.path.join(self.log_root, "cnt.npy")
         np.save(cnt_npy, np.load(cnt_npy) + 1)
 
-        print("crr/whole error", np.load(rate_npy) / np.load(cnt_npy))
+        # print("crr/whole error", np.load(rate_npy) / np.load(cnt_npy))
+        
         if 0:
             self.joint_crr_loss(segnet_output)
         

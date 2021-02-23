@@ -24,6 +24,9 @@ class ModelMLNRNet(ModelLNRNET):
     def __init__(self, config):
         super().__init__(config)
         self.view_num = config.VIEW_NUM
+        self.log_dir_path = os.path.join(self.expt_dir_path, "logs")
+        if not os.path.exists(self.log_dir_path):
+            os.mkdir(self.log_dir_path)
 
     def init_net(self, device):
         config = self.config
@@ -115,20 +118,15 @@ class ModelMLNRNet(ModelLNRNET):
         nocs_accuracy = []
         nocs_completeness = []
 
-        ##### temp ####
+        ##### temp, for checking corresponding points ####
         crr_chamfers = []
         crr_root = os.path.join(self.expt_dir_path, "crr")
         if os.path.exists(crr_root):
             shutil.rmtree(crr_root)
-            os.mkdir(crr_root)
-        # print("!!!!!!")
-        rate_root = os.path.join(self.expt_dir_path, "crr_whole_error_rate")
-        if os.path.exists(rate_root):
-            shutil.rmtree(rate_root)
-        os.mkdir(rate_root)
-        # exit()
-        np.save(os.path.join(rate_root, "rate.npy"), 0)
-        np.save(os.path.join(rate_root, "cnt.npy"), 0)
+            os.mkdir(crr_root)        
+            
+        np.save(os.path.join(self.log_dir_path, "rate.npy"), 0)
+        np.save(os.path.join(self.log_dir_path, "cnt.npy"), 0)
 
         for i, data in enumerate(val_dataloader, 0):  # Get each batch
             if i > (num_samples-1): 
