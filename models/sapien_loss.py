@@ -106,9 +106,8 @@ class PMLBSLoss(nn.Module):
             torch.cuda.synchronize()
             print(" PMLOSS ", t1.elapsed_time(t2), t2.elapsed_time(t3))
                 
-        nocs_loss = self.masked_l2_loss(pred_nocs, target_nocs, target_mask)
-        
-        # skin_loss = self.masked_l2_loss(self.sigmoid(pred_skin_seg), tar_skin_weights, target_mask)
+        nocs_loss = self.masked_l2_loss(pred_nocs, target_nocs, target_mask) # magnitude: 10-2
+
         pred_seg = pred_skin_seg.transpose(1, 2).transpose(2, 3).contiguous().view(-1, bone_num+2)
         tar_seg = tar_skin_seg.long().squeeze(1).view(-1)
         # print(pred_seg.shape)
@@ -125,9 +124,7 @@ class PMLBSLoss(nn.Module):
                                             pred_joint_score,
                                             target_mask,
                                             tar_rot)
-
-        # print("loc loss: ", loc_loss)
-        # print("rot loss: ", rot_loss)
+        
         vis = 0
         if vis:
             self.vis_joint_loc(tar_loc_map, target_mask, self.frame_id)
@@ -145,36 +142,26 @@ class PMLBSLoss(nn.Module):
         loss['skin_loss'] = skin_loss
                 
         if self.cfg.REPOSE:
-            pred_pnnocs = output[:, -3:, :, :].clone().requires_grad_(True)            
-            # pred_pnnocs = output[:, 4+bone_num*8+2:4+bone_num*8+5, :, :].clone().requires_grad_(True)
-            tar_pnnocs = tar_maps[:, -3:, :, :]
-            # tar_pnnocs = tar_maps[:, 4+bone_num*6+1:4+bone_num*6+4, :, :] #
-            # assert (tar_pnnocs == tar_pnnocs_).all()
-            pnnocs_loss = self.masked_l2_loss(pred_pnnocs, tar_pnnocs, target_mask)
-            # loss += pnnocs_loss
+            pred_pnnocs = output[:, -3:, :, :].clone().requires_grad_(True)                        
+            tar_pnnocs = tar_maps[:, -3:, :, :]            
+            pnnocs_loss = self.masked_l2_loss(pred_pnnocs, tar_pnnocs, target_mask)            
             loss['pnnocs_loss'] = pnnocs_loss
-            # print("[ DIFF ] map_loss is {:5f}; loc_loss is {:5f}".format(loc_map_loss, joint_loc_loss))
-            
 
-            # print("PMloss time",time_a - time_0, time_b - time_a, time_c - time_b, time_d - time_c, time_e - time_d)
-            # print("PMloss time",time_e - time_0)
         return loss
 
     def masked_l2_loss(self, out, tar, mask):
 
         batch_size = out.shape[0]
-
         out = out.clone().requires_grad_(True)
         diff = out - tar
-        
         diff_norm = torch.norm(diff, 2, dim=1)
         masked_diff_norm = torch.where(mask > self.Thresh, diff_norm,
                                         torch.zeros(diff_norm.size(), device=diff_norm.device))
-        
+        # print("nocs loss {:3f}".format(masked_diff_norm.mean()))
+
         l2_loss = 0
         for i in range(0, batch_size):
-            num_non_zero = torch.nonzero(masked_diff_norm[i]).size(0)
-            # print("num non zero", num_non_zero)
+            num_non_zero = torch.nonzero(masked_diff_norm[i]).size(0)            
             if num_non_zero > 0:
                 l2_loss += torch.sum(masked_diff_norm[i]) / num_non_zero
             else:
@@ -279,6 +266,8 @@ class PMLoss(nn.Module):
         self.segnet_loss = PMLBSLoss(config)
         self.bone_num = config.BONE_NUM
 
+        self.log_root = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME, "logs")
+
     def forward(self, output, target):
         segnet_output = output[0]
         loss = self.segnet_loss(segnet_output, target)
@@ -324,7 +313,10 @@ class PMLoss(nn.Module):
         # if all_loss > 3:
         #     print("error, outlier")
         return all_loss
-    
+
+"""
+Main loss used in most cases
+"""    
 class MVPMLoss(PMLoss):
     """
     Multi-view version of Partial Mobility Loss
@@ -384,17 +376,13 @@ class MVPMLoss(PMLoss):
             mv_loss['crr_loss'] = self.crr_loss(segnet_output, tar_mask, crr)
 
         crr_gt_diff, crr_pix_diff, pix_diff = self.crr_check(segnet_output, tar_mask, tar_nocs, crr)
-        
-
-        rate_root = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME, "crr_whole_error_rate")        
-        rate = crr_pix_diff.cpu().detach().numpy()/ pix_diff.cpu().detach().numpy()
-        # print("crr/whole: ", rate)
-        rate_npy = os.path.join(rate_root, "rate.npy")
+                
+        rate = crr_pix_diff.cpu().detach().numpy() / pix_diff.cpu().detach().numpy()
+        rate_npy = os.path.join(self.log_root, "crr_whole_error_rate.npy")
         np.save(rate_npy, np.load(rate_npy) + rate)
-        cnt_npy = os.path.join(rate_root, "cnt.npy")
+        cnt_npy = os.path.join(self.log_root, "cnt.npy")
         np.save(cnt_npy, np.load(cnt_npy) + 1)
-
-        print("crr/whole error", np.load(rate_npy) / np.load(cnt_npy))
+        print("crr/whole error: {:3f}, whole error: {:3f}".format(np.load(rate_npy) / np.load(cnt_npy), pix_diff.cpu().detach().numpy()))
         if 0:
             self.joint_crr_loss(segnet_output)
         
@@ -430,13 +418,18 @@ class MVPMLoss(PMLoss):
                     query_pn_pc = query_pn_map[:, query_mask.squeeze() > 0].transpose(1, 0)
 
                     pair_idx = crr['crr-idx-mtx'][base_view_id][query_view_id][b_id]
-                    # print(pair_idx[:10])
+                    
                     paired_pc_from_base_to_query = base_pn_pc[pair_idx].squeeze(0)
                     gt_paired_pc = base_gt_pc[pair_idx].squeeze(0)
 
                     p1 = paired_pc_from_base_to_query.unsqueeze(0)
                     gt_p1 = gt_paired_pc.unsqueeze(0)
 
+
+                    # print(base_gt_pc.cpu().detach().numpy().shape)
+                    write_off(self.log_root + "/base_gt_pc.xyz", base_gt_pc.cpu().detach().numpy())
+                    write_off(self.log_root + "/base_pn_pc.xyz", base_pn_pc.cpu().detach().numpy())
+                    exit()
                     pix_loss = ((base_pn_pc - base_gt_pc) ** 2).mean()
                     crr_pix_loss += ((p1 - gt_p1) ** 2).mean()
 
