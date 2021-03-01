@@ -34,8 +34,6 @@ class MaskedL2Loss(nn.Module):
         l2_loss /= batch_size
         return l2_loss
 
-
-
 class PMLBSLoss(nn.Module):
     """
         Partial Mobility Linear Blend Skining Loss
@@ -340,6 +338,19 @@ class MVPMLoss(PMLoss):
         # self.crr_l2 = JiahuiL2Loss()
         self.masked_l2_loss = MaskedL2Loss()
 
+        # save intermediate correspondent msg
+        self.save_crr = True
+        if self.save_crr:
+            import os                                     
+            crr_root = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME, "crr")
+            if not os.path.exists(crr_root):
+                os.mkdir(crr_root)
+            crr_id = len(os.listdir(crr_root))
+            crr_dir = os.path.join(crr_root, str(crr_id))
+            if not os.path.exists(crr_dir):
+                os.mkdir(crr_dir)
+            self.crr_root = crr_root
+
     def forward(self, output, target):
 
         target.pop('mesh', None)
@@ -386,6 +397,14 @@ class MVPMLoss(PMLoss):
             ifnet_output = output[1]
             mv_loss['recon_loss'] = self.recon_loss(ifnet_output, target_list[0])
 
+        if self.save_crr:
+            crr_id = len(os.listdir(self.crr_root))
+            crr_dir = os.path.join(self.crr_root, str(crr_id))
+            self.crr_dir = crr_dir
+            if not os.path.exists(crr_dir):
+                os.mkdir(crr_dir)
+            
+
         if self.config.CONSISTENCY != 0:
             mv_loss['crr_loss'] = self.crr_loss(segnet_output, tar_mask, crr)
 
@@ -413,7 +432,9 @@ class MVPMLoss(PMLoss):
         return mv_loss
 
     def crr_check(self, output_list, tar_mask, tar_nocs, crr):
-        
+        """
+        This function checks the output with the ground truth        
+        """
         batch_size = output_list[0].shape[0]        
         pair_cnt = 0
         crr_xyz_loss = 0
@@ -488,20 +509,9 @@ class MVPMLoss(PMLoss):
         """        
         batch_size = output_list[0].shape[0]
         crr_xyz_loss = 0
-        pair_cnt = 0        
+        pair_cnt = 0
         
-        save_crr = True
-        if save_crr:
-            import os                                     
-            crr_root = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME, "crr")
-            if not os.path.exists(crr_root):
-                os.mkdir(crr_root)
-            crr_id = len(os.listdir(crr_root))
-            crr_dir = os.path.join(crr_root, str(crr_id))
-            if not os.path.exists(crr_dir):
-                os.mkdir(crr_dir)
-
-        for b_id in range(batch_size):            
+        for b_id in range(batch_size):
             for base_view_id in range(len(crr['crr-idx-mtx'])):
                 for query_view_id in range(len(crr['crr-idx-mtx'][base_view_id])):
                     
@@ -520,24 +530,24 @@ class MVPMLoss(PMLoss):
                     p2 = query_pn_pc.unsqueeze(0)
                     mask = crr['crr-mask-mtx'][base_view_id][query_view_id][b_id].squeeze()
 
-                    if save_crr:
+                    if self.save_crr and not self.config.TRAIN:
                         masked_p1 = p1[0, mask.to(dtype=bool), :].cpu().detach().numpy()
                         masked_p2 = p2[0, mask.to(dtype=bool), :].cpu().detach().numpy()
                         
                         points_num = masked_p1.shape[0]
                         # print("[ INFO ] crr num: ", points_num)
-                        
+
                         # size = 100
                         # step = points_num // size
                         # for i in range(step):
                         #     write_off("/data/new_disk2/zhangge/crr/pred_crr_0_{}.xyz".format(i), masked_p1[i*size:(i+1)*size])
                         #     write_off("/data/new_disk2/zhangge/crr/pred_crr_1_{}.xyz".format(i), masked_p2[i*size:(i+1)*size])
-                        
-                        write_off(os.path.join(crr_dir, "b{}_q{}_masked_p1.xyz").format(base_view_id, query_view_id), masked_p1)
-                        write_off(os.path.join(crr_dir, "b{}_q{}_masked_p2.xyz").format(base_view_id, query_view_id), masked_p2)
-                        write_off(os.path.join(crr_dir, "b{}_q{}_p1.xyz").format(base_view_id, query_view_id), p1[0].cpu().detach().numpy())
-                        write_off(os.path.join(crr_dir, "b{}_q{}_p2.xyz").format(base_view_id, query_view_id), p2[0].cpu().detach().numpy())
-                        write_off(os.path.join(crr_dir, "b{}_q{}_p_query.xyz").format(base_view_id, query_view_id), query_pn_pc.cpu().detach().numpy())
+
+                        write_off(os.path.join(self.crr_dir, "b{}_q{}_masked_p1.xyz").format(base_view_id, query_view_id), masked_p1)
+                        write_off(os.path.join(self.crr_dir, "b{}_q{}_masked_p2.xyz").format(base_view_id, query_view_id), masked_p2)
+                        write_off(os.path.join(self.crr_dir, "b{}_q{}_p1.xyz").format(base_view_id, query_view_id), p1[0].cpu().detach().numpy())
+                        write_off(os.path.join(self.crr_dir, "b{}_q{}_p2.xyz").format(base_view_id, query_view_id), p2[0].cpu().detach().numpy())
+                        write_off(os.path.join(self.crr_dir, "b{}_q{}_p_query.xyz").format(base_view_id, query_view_id), query_pn_pc.cpu().detach().numpy())
 
                     # crr_xyz_loss += self.crr_l2(p1, p2, mask, detach=False)
                     p1 = p1.transpose(1, 2)
