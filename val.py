@@ -31,7 +31,11 @@ from config import get_cfg
 
 # preparer configuration
 cfg = get_cfg()
+# cfg.unfreeze()
+# print(dir(cfg))
+cfg.defrost()
 cfg.TRAIN = False
+cfg.freeze()
 task = cfg.TASK
 
 if task == "lbs":

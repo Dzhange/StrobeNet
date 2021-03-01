@@ -164,10 +164,7 @@ class PMLBSLoss(nn.Module):
         vis = 0
         if vis:
             self.vis_joint_loc(tar_loc_map, target_mask, self.frame_id)
-            self.frame_id += 1
-            if self.frame_id == 80:
-                import sys
-                sys.exit()
+            self.frame_id += 1            
         
         loss['nox_loss'] = nocs_loss
         loss['mask_loss'] = mask_loss
@@ -392,24 +389,20 @@ class MVPMLoss(PMLoss):
         if self.config.CONSISTENCY != 0:
             mv_loss['crr_loss'] = self.crr_loss(segnet_output, tar_mask, crr)
 
-        crr_gt_diff, crr_pix_diff, pix_diff = self.crr_check(segnet_output, tar_mask, tar_nocs, crr)
-                
-        rate = crr_pix_diff.cpu().detach().numpy() / pix_diff.cpu().detach().numpy()
-        
-        rate_npy = os.path.join(self.log_root, "crr_whole_error_rate.npy")
-        np.save(rate_npy, np.load(rate_npy) + rate)
-        
-        cnt_npy = os.path.join(self.log_root, "cnt.npy")
-        np.save(cnt_npy, np.load(cnt_npy) + 1)
-                
-        crr_npy = os.path.join(self.log_root, "crr_error.npy")
-        np.save(crr_npy, np.load(crr_npy) + crr_pix_diff.cpu().detach().numpy())
-
-        whole_npy = os.path.join(self.log_root, "whole_error.npy")
-        np.save(whole_npy, np.load(whole_npy) + pix_diff.cpu().detach().numpy())
-
-        print("crr/whole error: {:3f}, whole: {:3f}, crr: {:3f}".format(np.load(rate_npy) / np.load(cnt_npy), np.load(whole_npy), np.load(crr_npy)))
-        
+        if not self.config.TRAIN:
+            crr_gt_diff, crr_pix_diff, pix_diff = self.crr_check(segnet_output, tar_mask, tar_nocs, crr)                
+            rate = crr_pix_diff.cpu().detach().numpy() / pix_diff.cpu().detach().numpy()
+            rate_npy = os.path.join(self.log_root, "crr_whole_error_rate.npy")
+            np.save(rate_npy, np.load(rate_npy) + rate)
+            # count validation data number 
+            cnt_npy = os.path.join(self.log_root, "cnt.npy")
+            np.save(cnt_npy, np.load(cnt_npy) + 1)        
+            crr_npy = os.path.join(self.log_root, "crr_error.npy")
+            np.save(crr_npy, np.load(crr_npy) + crr_pix_diff.cpu().detach().numpy())
+            whole_npy = os.path.join(self.log_root, "whole_error.npy")
+            np.save(whole_npy, np.load(whole_npy) + pix_diff.cpu().detach().numpy())
+            print("crr/whole error: {:3f}, whole: {:3f}, crr: {:3f}".format(np.load(rate_npy) / np.load(cnt_npy), np.load(whole_npy), np.load(crr_npy)))
+            
         if 0:
             self.joint_crr_loss(segnet_output)
         

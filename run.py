@@ -34,8 +34,9 @@ from config import get_cfg
 
 # preparer configuration
 cfg = get_cfg()
-
+cfg.defrost()
 cfg.TRAIN = True
+cfg.freeze()
 
 # prepare dataset
 # DatasetClass = get_dataset(cfg.DATASET)
