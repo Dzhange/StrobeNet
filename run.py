@@ -35,6 +35,8 @@ from config import get_cfg
 # preparer configuration
 cfg = get_cfg()
 
+cfg.TRAIN = True
+
 # prepare dataset
 # DatasetClass = get_dataset(cfg.DATASET)
 dataloader_dict = dict()

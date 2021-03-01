@@ -1,0 +1,1 @@
+This folder stores config files after I've fixed the bug on l2norm -- previously used torch l2norm and **2 at the same time, making the loss not at the same magnitude

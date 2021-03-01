@@ -38,6 +38,7 @@ def get_default_cfg():
     cfg.ROOT_DIR = os.getcwd()
     cfg.CONFIG_FILE = 'None'
     cfg.MODES = ['train', 'vali']
+    cfg.TRAIN = True # train or val?
     cfg.GPU = 0
 
     cfg.BATCHSIZE = 2

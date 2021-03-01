@@ -92,6 +92,7 @@ class MVSPDataset(SAPIENDataset):
                 views = np.random.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
             else:
                 views = self.rng.choice(self.config.TOTAL_VIEW, self.view_num, replace=False)
+            print(views)
         else:
             views = list(range(self.view_num))
 

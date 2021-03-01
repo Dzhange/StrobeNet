@@ -31,8 +31,7 @@ from config import get_cfg
 
 # preparer configuration
 cfg = get_cfg()
-
-
+cfg.TRAIN = False
 task = cfg.TASK
 
 if task == "lbs":

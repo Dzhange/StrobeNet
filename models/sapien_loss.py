@@ -321,6 +321,7 @@ class PMLoss(nn.Module):
             
         if cfg.STAGE_ONE == False:
             all_loss += cfg.RECON_LOSS * loss['recon_loss']
+        
         if cfg.CONSISTENCY != 0:
             all_loss += cfg.CONSISTENCY * loss['crr_loss']
                 
@@ -339,7 +340,7 @@ class MVPMLoss(PMLoss):
 
     def __init__(self, config):
         super().__init__(config)
-        self.crr_l2 = JiahuiL2Loss()
+        # self.crr_l2 = JiahuiL2Loss()
         self.masked_l2_loss = MaskedL2Loss()
 
     def forward(self, output, target):
@@ -393,12 +394,22 @@ class MVPMLoss(PMLoss):
 
         crr_gt_diff, crr_pix_diff, pix_diff = self.crr_check(segnet_output, tar_mask, tar_nocs, crr)
                 
-        # rate = crr_pix_diff.cpu().detach().numpy() / pix_diff.cpu().detach().numpy()
-        # rate_npy = os.path.join(self.log_root, "crr_whole_error_rate.npy")
-        # np.save(rate_npy, np.load(rate_npy) + rate)
-        # cnt_npy = os.path.join(self.log_root, "cnt.npy")
-        # np.save(cnt_npy, np.load(cnt_npy) + 1)
-        # print("crr/whole error: {:3f}, whole error: {:3f}".format(np.load(rate_npy) / np.load(cnt_npy), pix_diff.cpu().detach().numpy()))
+        rate = crr_pix_diff.cpu().detach().numpy() / pix_diff.cpu().detach().numpy()
+        
+        rate_npy = os.path.join(self.log_root, "crr_whole_error_rate.npy")
+        np.save(rate_npy, np.load(rate_npy) + rate)
+        
+        cnt_npy = os.path.join(self.log_root, "cnt.npy")
+        np.save(cnt_npy, np.load(cnt_npy) + 1)
+                
+        crr_npy = os.path.join(self.log_root, "crr_error.npy")
+        np.save(crr_npy, np.load(crr_npy) + crr_pix_diff.cpu().detach().numpy())
+
+        whole_npy = os.path.join(self.log_root, "whole_error.npy")
+        np.save(whole_npy, np.load(whole_npy) + pix_diff.cpu().detach().numpy())
+
+        print("crr/whole error: {:3f}, whole: {:3f}, crr: {:3f}".format(np.load(rate_npy) / np.load(cnt_npy), np.load(whole_npy), np.load(crr_npy)))
+        
         if 0:
             self.joint_crr_loss(segnet_output)
         
@@ -414,6 +425,7 @@ class MVPMLoss(PMLoss):
         pair_cnt = 0
         crr_xyz_loss = 0
         crr_pix_loss = 0
+        whole_pix_loss = 0
 
         all_crr_points = ()
 
@@ -445,9 +457,18 @@ class MVPMLoss(PMLoss):
                     # # print(base_gt_pc.cpu().detach().numpy().shape)
                     # write_off(self.log_root + "/base_gt_pc.xyz", base_gt_pc.cpu().detach().numpy())
                     # write_off(self.log_root + "/base_pn_pc.xyz", base_pn_pc.cpu().detach().numpy())
+                    # write_off(self.log_root + "/gt_paired_pc.xyz", gt_paired_pc.cpu().detach().numpy())
+                    # write_off(self.log_root + "/paired_pc_from_base_to_query.xyz", paired_pc_from_base_to_query.cpu().detach().numpy())
+
                     # exit()
-                    pix_loss = ((base_pn_pc - base_gt_pc) ** 2).mean()
-                    crr_pix_loss += ((p1 - gt_p1) ** 2).mean()
+                    # pix_loss = ((base_pn_pc - base_gt_pc) ** 2).mean()
+                    # crr_pix_loss += ((p1 - gt_p1) ** 2).mean()
+                    # print(p1.shape, base_gt_pc.shape)
+                    whole_pix_loss += torch.norm(base_pn_pc - base_gt_pc, p=2, dim=1).mean()
+                    crr_pix_loss += torch.norm(paired_pc_from_base_to_query - gt_paired_pc, p=2, dim=1).mean()
+                    
+                    # print(whole_pix_loss, crr_pix_loss)
+                    # exit()
 
                     p2 = query_pn_pc.unsqueeze(0)
                     mask = crr['crr-mask-mtx'][base_view_id][query_view_id][b_id].squeeze()
@@ -464,8 +485,9 @@ class MVPMLoss(PMLoss):
 
         crr_xyz_loss /= pair_cnt
         crr_pix_loss /= pair_cnt
+        whole_pix_loss /= pair_cnt
 
-        return crr_xyz_loss, crr_pix_loss, pix_loss
+        return crr_xyz_loss, crr_pix_loss, whole_pix_loss
 
     def crr_loss(self, output_list, tar_mask, crr):
         """
@@ -475,7 +497,7 @@ class MVPMLoss(PMLoss):
         crr_xyz_loss = 0
         pair_cnt = 0        
         
-        save_crr = False
+        save_crr = True
         if save_crr:
             import os                                     
             crr_root = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME, "crr")
@@ -524,14 +546,16 @@ class MVPMLoss(PMLoss):
                         write_off(os.path.join(crr_dir, "b{}_q{}_p2.xyz").format(base_view_id, query_view_id), p2[0].cpu().detach().numpy())
                         write_off(os.path.join(crr_dir, "b{}_q{}_p_query.xyz").format(base_view_id, query_view_id), query_pn_pc.cpu().detach().numpy())
 
-                    crr_xyz_loss += self.crr_l2(p1, p2, mask, detach=False)
+                    # crr_xyz_loss += self.crr_l2(p1, p2, mask, detach=False)
+                    p1 = p1.transpose(1, 2)
+                    p2 = p2.transpose(1, 2)
+                    mask = mask.unsqueeze(0)
+                    crr_xyz_loss += self.masked_l2_loss(p1, p2, mask)
+
                     pair_cnt += 1
 
         crr_xyz_loss /= pair_cnt
-
-        # if out_crr:
-        #     return crr_xyz_loss, np.concatenate(all_crr_points)
-        # else:
+        
         return crr_xyz_loss
 
     def joint_crr_loss(self, segnet_output):
