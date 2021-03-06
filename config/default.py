@@ -107,9 +107,12 @@ def get_default_cfg():
     cfg.POSE_LOSS = 0
     cfg.POSE_MAP_LOSS = 0
     cfg.RECON_LOSS = 1.0
+    cfg.SMOOTH_L1 = False
+    cfg.KEEP_SQUARE = False
 
     cfg.CONSISTENCY = 0.0 # weight of consistency loss
     cfg.DYNAMIC_CONSISTENCY = False # if set to true, will use the chamfer dist from corresponding points to generate a consistency loss
+    cfg.SAVE_CRR = False # save consistency intermediate results for evaulation and debugging
 
     cfg.GLOBAL_FEATURE = False # use global feature from SegNet
     cfg.GLOBAL_ONLY = False # use only global feature for final reconstruction

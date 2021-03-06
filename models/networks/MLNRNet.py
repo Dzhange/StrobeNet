@@ -111,11 +111,13 @@ class MLNRNet(LNRNet):
                     b_mv_occupancy_list.append(b_sv_occupancy)
         
         ##### aggregation #####
+        
         recon = None
-        if isinstance(inputs['grid_coords'], list):
-            grid_coords = inputs['grid_coords'][0] # grid coords should be identical among all views
-        else:
-            grid_coords = inputs['grid_coords'] # some times(in validation time, we feed it with one tensor)
+        if not self.config.STAGE_ONE:
+            if isinstance(inputs['grid_coords'], list):
+                grid_coords = inputs['grid_coords'][0] # grid coords should be identical among all views
+            else:
+                grid_coords = inputs['grid_coords'] # some times(in validation time, we feed it with one tensor)
         if not self.config.STAGE_ONE:
             if self.aggr_scatter:
                 occupancy_list = []

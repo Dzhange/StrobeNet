@@ -211,7 +211,7 @@ class DataFilter:
         scale = 1
         try:
             if self.config.manifold_each_mesh:
-                os.system("{} {} {} 10000".format("/workspace/Manifold/build/manifold", orig_mesh_path, orig_mesh_path))
+                os.system("{} {} {} 10000".format("../Manifold/build/manifold", orig_mesh_path, orig_mesh_path))
             mesh = trimesh.load(orig_mesh_path, process=False)
             if self.transform:
                 # print("WRONG!!")
@@ -350,4 +350,5 @@ if __name__ == "__main__":
     df.filter()
     
 ## Example
-# python utils/DataFilter.py -i /workspace/Data/SAPIEN/benchmark/glasses/mv8_scale_mpf/ -o /workspace/Data/SAPIEN/benchmark/glasses/mv8_scale_mpf_uni/ -p 20 -v 8 -mpf True -c eyeglass -s True -t False
+# python utils/DataFilter.py -i /workspace/Data/SAPIEN/benchmark/glasses/mv8_scale_mpf/ -o /workspace/Data/SAPIEN/benchmark/glasses/mv8_scale_mpf_uni/ -p 20 -v 8 -mpf True -c eyeglass -s True
+# python utils/DataFilter.py -i /data/new_disk2/zhangge/Data/SAPIEN/benchmark/laptop/benchmark_realworld -o /data/new_disk2/zhangge/Data/SAPIEN/benchmark/laptop/benchmark_realworld_uni -p 20 -v 8 -mpf True -c laptop -s True

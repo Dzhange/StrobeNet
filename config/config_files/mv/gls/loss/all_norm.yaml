@@ -14,11 +14,12 @@ IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
 TASK: "mlnrnet"
-EXPT_NAME: "stg1_1crr_4v"
+EXPT_NAME: "1crr_4v_all_norm"
 RESOLUTION: 128
 
 BONE_NUM: 2
 GPU: 1
+OUT_CHANNELS: 12 #4 + 1*8
 
 # TEST_ON_TRAIN: True`
 TEST_ON_TRAIN: False

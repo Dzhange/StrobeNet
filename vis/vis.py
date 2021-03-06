@@ -5,6 +5,29 @@ import numpy as np
 import open3d as o3d
 import trimesh
 
+def render_pc(pc, path):
+    """
+    lifts nocs map into 3d pointcloud and then render
+    """
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(width=400,height=400,visible=False)
+    fronts = [(0,0,1),(0,1.0,1e-6),(1.0,1e-6,0)]
+
+    # nocs = self.nocs2pc(path)
+    # nocs_color = nocs #just color nocs with nocs
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(pc)
+    pcd.colors = o3d.utility.Vector3dVector(np.ones_like(pc))    
+    ctr = vis.get_view_control()
+    # for j, front in enumerate(fronts):
+    vis.add_geometry(pcd)
+    ctr.set_front(fronts[0])
+    vis.poll_events()
+    vis.update_renderer()
+    vis.capture_screen_image(path)
+    vis.remove_geometry(pcd)
+
+
 class DataVisualizer(object):
 
     def __init__(self, args):
@@ -85,7 +108,8 @@ class DataVisualizer(object):
                 vis.add_geometry(mesh)
                 ctr.set_front(front)
                 vis.poll_events()
-                vis.update_renderer()
+                # vis.update_renderer()
+                vis.update_geometry()
                 output_path = os.path.join(self.output_dir,\
                                 "{}_{}_{}.png".format(name, i, j))
                 vis.capture_screen_image(output_path)

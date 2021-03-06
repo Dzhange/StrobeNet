@@ -6,6 +6,32 @@ import open3d as o3d
 import pyrender
 import trimesh
 
+def render_pc(pc, output_path):
+    """
+    render a image from an numpy pc input of shape (N, 3)
+    """
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(width=400,height=400,visible=False)
+    # fronts = [(0,0,1),(0,1.0,1e-6),(1.0,1e-6,0)]
+
+    # nocs_color = nocs #just color nocs with nocs
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(pc)
+    pcd.colors = o3d.utility.Vector3dVector(np.ones_like(pc))
+    
+    # print(pcd.points)
+    # print(pcd.colors)
+    # for j, front in enumerate(fronts):                
+    vis.add_geometry(pcd)
+
+    ctr = vis.get_view_control()
+    # ctr.change_field_of_view(1)
+    vis.poll_events()
+    vis.update_renderer()            
+    vis.capture_screen_image(output_path)
+    vis.remove_geometry(pcd)
+
+
 class Visualizer(object):
 
     def __init__(self, args):
@@ -153,7 +179,7 @@ class Visualizer(object):
             # nocs_color = nocs #just color nocs with nocs
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(nocs)
-            pcd.colors = o3d.utility.Vector3dVector(nocs)            
+            pcd.colors = o3d.utility.Vector3dVector(nocs)
 
             # for j, front in enumerate(fronts):                
             vis.add_geometry(pcd)                
@@ -166,7 +192,7 @@ class Visualizer(object):
                             "{}_{}_{}.png".format(name, i, j))
             vis.capture_screen_image(output_path)
             vis.remove_geometry(pcd)
-
+    
     def cat_(self):
         for i in range(self.data_num):
             # each frame of one type of data forms one row            

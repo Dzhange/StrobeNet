@@ -120,15 +120,18 @@ class ModelMLNRNet(ModelLNRNET):
 
         ##### temp, for checking corresponding points ####
         crr_chamfers = []
-        crr_root = os.path.join(self.expt_dir_path, "crr")
-        if os.path.exists(crr_root):
-            shutil.rmtree(crr_root)
-            os.mkdir(crr_root)        
-            
-        np.save(os.path.join(self.log_dir_path, "crr_whole_error_rate.npy"), 0)
-        np.save(os.path.join(self.log_dir_path, "crr_error.npy"), 0)
-        np.save(os.path.join(self.log_dir_path, "whole_error.npy"), 0)
-        np.save(os.path.join(self.log_dir_path, "cnt.npy"), 0)
+        if self.config.SAVE_CRR:            
+            crr_root = os.path.join(self.expt_dir_path, "crr")
+            if os.path.exists(crr_root):
+                shutil.rmtree(crr_root)
+                os.mkdir(crr_root)        
+                
+            np.save(os.path.join(self.log_dir_path, "crr_whole_error_rate.npy"), 0)
+            np.save(os.path.join(self.log_dir_path, "crr_error.npy"), 0)
+            np.save(os.path.join(self.log_dir_path, "whole_error.npy"), 0)
+            np.save(os.path.join(self.log_dir_path, "cnt.npy"), 0)
+
+        losses = []
 
         for i, data in enumerate(val_dataloader, 0):  # Get each batch
             if i > (num_samples-1): 
@@ -144,13 +147,13 @@ class ModelMLNRNet(ModelLNRNET):
                 self.gen_mesh(grid_points_split, data, i)
 
             whole_pn_pc = []
-
-            for view_id in range(self.view_num):
+            # print(self.view_num)
+            for view_id in range(self.view_num):                
                 segnet_output = output_recon[0]
                 self.save_img(net_input['color00'][view_id], segnet_output[view_id][:, 0:4, :, :], target['nox00'][view_id][:, 0:4, :, :], i, view_id=view_id)
 
-                if self.config.VAL_DIR != "ValResults":
-                    continue
+                # if self.config.VAL_DIR != "ValResults":
+                #     continue
 
                 self.gen_NOCS_pc(segnet_output[view_id][:, 0:3, :, :], target['nox00'][view_id][:, 0:3, :, :], \
                     target['nox00'][view_id][:, 3, :, :], "nocs", i)
@@ -181,8 +184,8 @@ class ModelMLNRNet(ModelLNRNET):
                     self.visualize_joint_prediction(segnet_output[view_id], gt_joint_map, mask, i, loc=False, view_id=view_id)
 
                 self.visualize_confidence(segnet_output[view_id], i, view_id=view_id)
-
-                if self.config.REPOSE:
+                
+                if self.config.REPOSE:                    
                     pred_pnnocs = segnet_output[view_id][:, -3:, :, :]
                     tar_pnnocs = target['pnnocs00'][view_id]
                     self.save_single_img(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i, view_id=view_id)
@@ -202,7 +205,7 @@ class ModelMLNRNet(ModelLNRNET):
                     pnnocs_error = masked_l2_loss(pred_pnnocs.cpu(), tar_pnnocs.cpu(), pred_mask).item()                    
                     nocs_diff.append(pnnocs_error)
 
-                    pn_pc = self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i, transform =transform, view_id=view_id)
+                    pn_pc = self.gen_NOCS_pc(pred_pnnocs, tar_pnnocs, mask, "reposed_pn", i, transform=transform, view_id=view_id)                    
                     whole_pn_pc.append(pn_pc)
                     # print("[ INFO ] All points num", pn_pc.shape)
             
@@ -249,8 +252,6 @@ class ModelMLNRNet(ModelLNRNET):
             #     crr_kdtree = KDTree(crr_pc)            
             #     cur_chamfer, _ = crr_kdtree.query(untrsed_gt_pc)
             #     crr_chamfers.append(cur_chamfer.mean())
-            
-            
 
             str_nocs_diff = "avg nocs diff is {:.6f} ".format(np.sqrt(np.mean(np.asarray(nocs_diff))))
             str_chamfer_diff = "compl/acc is {:.6f}/{:.6f} ".format(np.mean(np.asarray(nocs_completeness)), np.mean(np.asarray(nocs_accuracy)))
@@ -263,5 +264,11 @@ class ModelMLNRNet(ModelLNRNET):
             # sys.stdout.write("\r[ VAL ] {}th data ".format(i) + str_loss)
             sys.stdout.flush()
             # exit()
-            
+
+        np.save(os.path.join(self.output_dir, "val_losses.npy"), np.asarray(epoch_losses))
+        np.save(os.path.join(self.output_dir, "nocs_diff.npy"), np.asarray(nocs_diff))
+        np.save(os.path.join(self.output_dir, "chamfer_completeness.npy"), np.asarray(nocs_completeness))
+        np.save(os.path.join(self.output_dir, "chamfer_accuracy.npy"), np.asarray(nocs_accuracy))
         print("\n")
+
+        

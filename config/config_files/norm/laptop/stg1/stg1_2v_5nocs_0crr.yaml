@@ -1,6 +1,6 @@
-DATASET_ROOT: '/data/new_disk2/zhangge/Data/SAPIEN/benchmark/glasses/mv8_fix_scale_mpf_nobg_uni/'
-OUTPUT_DIR: '/data/new_disk2/zhangge/StrobeNet/output/mv/gls'
-VIEW_NUM: 4
+DATASET_ROOT: '/data/new_disk2/zhangge/Data/SAPIEN/benchmark/laptop/benchmark_v1_uni/'
+OUTPUT_DIR: '/data/new_disk2/zhangge/StrobeNet/output/norm/laptop/'
+VIEW_NUM: 2
 RANDOM_VIEW: True
 TOTAL_VIEW: 8
 
@@ -9,18 +9,18 @@ DATALOADER_WORKERS: 5
 EPOCH_TOTAL: 30
 
 DATA_LIMIT: 100
-VAL_DATA_LIMIT: 20
+VAL_DATA_LIMIT: 25
 IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
 TASK: "mlnrnet"
-EXPT_NAME: "stg1_1crr_4v"
+EXPT_NAME: "stg1_2v_5nocs_0crr"
 RESOLUTION: 128
 
-BONE_NUM: 2
-GPU: 1
+BONE_NUM: 1
+GPU: 2
 
-# TEST_ON_TRAIN: True`
+# TEST_ON_TRAIN: True
 TEST_ON_TRAIN: False
 
 REPOSE: True
@@ -34,9 +34,9 @@ SAVE_FREQ: 1
 MH: True
 BN: False
 
-CONSISTENCY: 1.0
+CONSISTENCY: 0.0
 
-NOCS_LOSS: 1
+NOCS_LOSS: 5
 POSE_LOSS: 1
 POSE_MAP_LOSS: 1
 LOC_LOSS: 1
