@@ -85,7 +85,7 @@ def imread_rgb_torch(Path, Size=None, interp=cv2.INTER_NEAREST): # Use only for 
             ImageCV = ImageCV[:, :, :3]
     except AttributeError:
         print("[ ERROR ] Path is {}".format(Path))
-
+    # print(ImageCV)
     ImageCV = cv2.cvtColor(ImageCV, cv2.COLOR_BGR2RGB)
     if Size is not None:
         # Check if the aspect ratios are the same

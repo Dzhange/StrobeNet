@@ -346,13 +346,26 @@ if __name__ == '__main__':
     import argparse
     from config import get_cfg
     # preparer configuration
-    cfg = get_cfg()
-    # f_str = ["color00", "nox00", "pnnocs00", "linkseg"]
+    cfg = get_cfg()    
     f_str = None
-    Data = MVSPDataset(cfg, train=False)    
+    Data = MVSPDataset(cfg, train=True)
     DataLoader = torch.utils.data.DataLoader(Data, batch_size=1, shuffle=True, num_workers=4)
+    
+    cnt = 0
+    mean = 0
+    std = 0
+
     for i, Data in enumerate(DataLoader, 0):  # Get each batch
-        # print(Data['color00'][0].to(device="cuda:0"))
-        # print("\r {}".format(i))
+        img = Data['color00'][0][0]
+        # print(img.shape)
+        cur_mean = torch.mean(img, axis=(1,2))
+        cur_std = torch.std(img, axis=(1,2))
+        
+        mean += cur_mean
+        std += cur_std
+        cnt += 1
+
+        sys.stdout.write("\r mean {} std {}".format(mean.numpy() / cnt, std.numpy() / cnt ).ljust(40) )  
+        sys.stdout.flush()
         pass
         

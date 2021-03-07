@@ -1,12 +1,12 @@
 DATASET_ROOT: '/data/new_disk2/zhangge/Data/SAPIEN/benchmark/laptop/benchmark_v1_uni/'
-OUTPUT_DIR: '/data/new_disk2/zhangge/StrobeNet/output/'
+OUTPUT_DIR: '/data/new_disk2/zhangge/StrobeNet/output/norm/laptop/'
 VIEW_NUM: 2
 RANDOM_VIEW: True
 TOTAL_VIEW: 8
 
 BATCHSIZE: 1
 DATALOADER_WORKERS: 5
-EPOCH_TOTAL: 3000
+EPOCH_TOTAL: 30
 
 DATA_LIMIT: 100
 VAL_DATA_LIMIT: 25
@@ -14,7 +14,7 @@ IMAGE_SIZE: (320,240)
 TARGETS: ["default"]
 
 TASK: "mlnrnet"
-EXPT_NAME: "card_occupy"
+EXPT_NAME: "stg1_2v_10nocs_mse_sl1"
 RESOLUTION: 128
 
 BONE_NUM: 1
@@ -35,6 +35,7 @@ MH: True
 BN: False
 
 KEEP_SQUARE: True
+SMOOTH_L1: True
 CONSISTENCY: 10.0
 
 NOCS_LOSS: 10

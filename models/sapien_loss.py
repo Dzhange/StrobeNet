@@ -300,7 +300,7 @@ class MVPMLoss(nn.Module):
     """
 
     def __init__(self, config):
-        super().__init__(config)
+        super().__init__()
         # self.crr_l2 = JiahuiL2Loss()
         self.config = config
         self.segnet_loss = SegNetLoss(config)
@@ -319,7 +319,7 @@ class MVPMLoss(nn.Module):
         # save intermediate correspondent msg
         self.save_crr = self.config.SAVE_CRR
         if self.save_crr:
-            import os                                     
+            # import os                                     
             crr_root = os.path.join(expandTilde(self.config.OUTPUT_DIR), self.config.EXPT_NAME, "crr")
             if not os.path.exists(crr_root):
                 os.mkdir(crr_root)            

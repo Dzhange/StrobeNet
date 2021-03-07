@@ -5,6 +5,7 @@ generate mesh from input img and pose
 
 from torch.utils.data import DataLoader
 import torch
+from torchvision import transforms
 
 # from inout.logger import get_logger
 from models.NOCS import ModelNOCS
@@ -63,6 +64,13 @@ def load_img(item_path):
     img = imread_rgb_torch(item_path, Size=cfg.IMAGE_SIZE).type(torch.FloatTensor)
     # print(img.shape)
     img /= 255.0
+
+    mean = [0.46181917, 0.44638503, 0.40571916]
+    std = [0.24907675, 0.24536176, 0.24932721]
+    transform = transforms.Normalize(mean=mean, std=std)
+    
+    # img = transform(img)
+
     return img.unsqueeze(0)
 
 def save_img(output_dir, net_input, output, i=0, view_id=0):
@@ -90,49 +98,51 @@ if __name__ == "__main__":
 
     # single image input
     if os.path.isfile(inputs):
-        # assert (task in single_views or 
-        data = load_img(path)
+        imgs = [load_img(inputs).to(device=device)]
+        view_num = 1
+        multi_instance = False        
     # multi view
     else:
         assert task in multi_views
         items = os.listdir(inputs)
+        imgs = [load_img(os.path.join( inputs, i)).to(device=device) for i in items]
+        view_num = len(imgs)
+
         multi_instance = any([os.path.isdir(item) for item in items])
-        if multi_instance:
-            print("TODO")
-            exit()
-        else:
-            print(items)
-            imgs = [load_img(os.path.join( inputs, i)).to(device=device) for i in items]
-            view_num = len(imgs)
-            net_input = {}
-            net_input['color00'] = imgs
-            net_input['translation'] = [torch.Tensor((-0.5, -0.5, -0.5)).unsqueeze(0).to(device=device), ] * view_num
-            net_input['scale'] = [torch.Tensor([1]).unsqueeze(0).to(device=device), ] * view_num            
+    # print(items)
+    if multi_instance:
+        print("TODO")
+        exit()
+    
+    net_input = {}
+    net_input['color00'] = imgs
+    net_input['translation'] = [torch.Tensor((-0.5, -0.5, -0.5)).unsqueeze(0).to(device=device), ] * view_num
+    net_input['scale'] = [torch.Tensor([1]).unsqueeze(0).to(device=device), ] * view_num            
 
-            # grid_coords = Model.net.grid_coords
-            grid_coords = Model.net.init_grids(Model.net.resolution)
-            grid_points_split = torch.split(grid_coords, 100000, dim=1)
+    # grid_coords = Model.net.grid_coords
+    grid_coords = Model.net.init_grids(Model.net.resolution)
+    grid_points_split = torch.split(grid_coords, 100000, dim=1)
 
-        logits_list = []        
+    logits_list = []        
         
-        output = Model.net(net_input)
-        # for points in grid_points_split:
-        #     with torch.no_grad():
-        #         # net_input, target = self.preprocess(data, device)
-        #         # print(points.shape)
-        #         net_input['grid_coords'] = [points.to(device), ] * cfg.VIEW_NUM
-        #         net_input['cano_grid_coords'] = points.to(device)
-                
-        #         output = Model.net(net_input)
-                
-        save_img("../debug", net_input['color00'][0], output[0][0][:, 0:4, :, :])
-        #         # exit()
-        #         print(output[1].sum())
-        #         logits_list.append(output[1].squeeze(0).detach().cpu())
+    output = Model.net(net_input)
+    # for points in grid_points_split:
+    #     with torch.no_grad():
+    #         # net_input, target = self.preprocess(data, device)
+    #         # print(points.shape)
+    #         net_input['grid_coords'] = [points.to(device), ] * cfg.VIEW_NUM
+    #         net_input['cano_grid_coords'] = points.to(device)
+            
+    #         output = Model.net(net_input)
+            
+    save_img("../debug", net_input['color00'][0], output[0][0][:, 0:4, :, :])
+    #         # exit()
+    #         print(output[1].sum())
+    #         logits_list.append(output[1].squeeze(0).detach().cpu())
 
-        # # generate predicted mesh from occupancy and save
-        # logits = torch.cat(logits_list, dim=0).numpy()
-        # mesh = Model.mesh_from_logits(logits, Model.net.resolution)
-        # # export_pred_path = os.path.join(Model.output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
-        # export_pred_path = "/workspace/test.obj"
-        # mesh.export(export_pred_path)
+    # # generate predicted mesh from occupancy and save
+    # logits = torch.cat(logits_list, dim=0).numpy()
+    # mesh = Model.mesh_from_logits(logits, Model.net.resolution)
+    # # export_pred_path = os.path.join(Model.output_dir, "frame_{}_recon.off".format(str(i).zfill(3)))
+    # export_pred_path = "/workspace/test.obj"
+    # mesh.export(export_pred_path)
