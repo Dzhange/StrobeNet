@@ -22,41 +22,16 @@ from utils.DataUtils import *
 import argparse
 
 from resizeimage import resizeimage
-from PIL import Image, ImageColor
-
-# preparer configuration
-cfg = get_cfg()
-cfg.defrost()
-cfg.TRAIN = False
-cfg.freeze()
-
-task = cfg.TASK
-
-if task == "lbs":
-    Model = ModelLBSNOCS(cfg)
-if task == "lbs_seg":
-    Model = ModelSegLBS(cfg)
-if task == "occupancy":    
-    Model = ModelIFNOCS(cfg)
-
-if task == "sapien_lbs":
-    Model = PMLBS(cfg)
-if task == "lnrnet":    
-    Model = ModelLNRNET(cfg)
-if task == "mlnrnet":    
-    Model = ModelMLNRNet(cfg)
-if task == "mvmp":    
-    Model = ModelMVMPLNRNet(cfg)
-
-device = torch.device(cfg.GPU)
-
-Model.net.to(device=device)
+from PIL import Image, ImageColor, ImageOps
 
 
-def resize_img(img):
-    img = Image.open(img)
-    cover = resizeimage.resize_cover(img, [640, 480])
-    cover.save("test.png")
+
+
+def resize_img(img_path, pix=150):
+    img = Image.open(img_path)    
+    img = ImageOps.expand(img, border=(pix,pix,pix,pix), fill=(255, 255, 255))##left,top,right,bottom
+    img = resizeimage.resize_cover(img, [640, 480])
+    img.save(img_path.replace('.png', '_padding.png').replace('.jpg', '_padding.png'))
 
 def load_img(item_path):
     print("loading ", item_path)
@@ -69,7 +44,7 @@ def load_img(item_path):
     std = [0.24907675, 0.24536176, 0.24932721]
     transform = transforms.Normalize(mean=mean, std=std)
     
-    # img = transform(img)
+    img = transform(img)
 
     return img.unsqueeze(0)
 
@@ -78,12 +53,31 @@ def save_img(output_dir, net_input, output, i=0, view_id=0):
     cv2.imwrite(os.path.join(output_dir, 'frame_{}_view_{}_color00.png').format(str(i).zfill(3), view_id), cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB))
 
     out_target_str = ['nocs']
-    print(output.shape)
+    # print(output.shape)
     for target_str, pred, pred_mask in zip(out_target_str, pred_out_tuple_rgb, pred_out_tuple_mask):
         cv2.imwrite(os.path.join(output_dir, 'frame_{}_view_{}_{}_01pred.png').format(str(i).zfill(3), view_id, target_str),
                     cv2.cvtColor(pred, cv2.COLOR_BGR2RGB))
+        
+        # pred_mask = np.log(pred_mask / (1 - pred_mask))
         cv2.imwrite(os.path.join(output_dir, 'frame_{}_view_{}_{}_03predmask.png').format(str(i).zfill(3), view_id, target_str),
                     pred_mask)
+
+def gen_NOCS_pc(output_dir, pred_nocs_map, mask, target_str="pred_nocs", i=0, view_id=0):
+            
+    mask = sendToDevice(mask.detach(), 'cpu')
+    pred_nocs_map = sendToDevice(pred_nocs_map.detach(), 'cpu')
+    
+    # We use gt mask
+    mask_prob = torch2np(mask.squeeze())
+    pred_nocs_map = torch2np(torch.squeeze(pred_nocs_map))    
+
+    pred_nocs = pred_nocs_map[mask_prob > 0.7]    
+    
+    pred_nocs_path = os.path.join(output_dir, 'frame_{}_view_{}_{}_01pred.xyz').format(str(i).zfill(3), view_id, target_str)
+    write_off(pred_nocs_path, pred_nocs)
+
+
+
 
 
 if __name__ == "__main__":
@@ -91,14 +85,37 @@ if __name__ == "__main__":
     """
     If  use multi-view, should give a directory, contains different views of a same instance
     """
+    # preparer configuration
+    cfg = get_cfg()
+    cfg.defrost()
+    cfg.TRAIN = False
+    cfg.freeze()
+
+    task = cfg.TASK
 
     single_views = ['lnrnet', 'occupancy']
     multi_views = ['mlnrnet', 'mvmp']
     inputs = cfg.GEN_INPUT
 
+    if 0:
+        resize_img(inputs, 200)
+        exit()
+    
+    if task == "lnrnet":    
+        Model = ModelLNRNET(cfg)
+    elif task == "mlnrnet":    
+        Model = ModelMLNRNet(cfg)
+    elif task == "mvmp":    
+        Model = ModelMVMPLNRNet(cfg)
+    else:
+        exit()
+
+    device = torch.device(cfg.GPU)
+    Model.net.to(device=device)
+    Model.setup_checkpoint(device)
     # single image input
     if os.path.isfile(inputs):
-        imgs = [load_img(inputs).to(device=device)]
+        imgs = [load_img(inputs).to(device=device)]        
         view_num = 1
         multi_instance = False        
     # multi view
@@ -134,8 +151,12 @@ if __name__ == "__main__":
     #         net_input['cano_grid_coords'] = points.to(device)
             
     #         output = Model.net(net_input)
-            
-    save_img("../debug", net_input['color00'][0], output[0][0][:, 0:4, :, :])
+    outdir = "../debug"
+    index = len(os.listdir(outdir))
+    cur_out_dir = os.path.join(outdir, str(index).zfill(3))
+    os.mkdir(cur_out_dir)
+    save_img(cur_out_dir, net_input['color00'][0], output[0][0][:, 0:4, :, :])
+    gen_NOCS_pc(cur_out_dir, output[0][0][:, 0:3, :, :], output[0][0][:, 3, :, :])
     #         # exit()
     #         print(output[1].sum())
     #         logits_list.append(output[1].squeeze(0).detach().cpu())

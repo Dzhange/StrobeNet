@@ -178,7 +178,6 @@ class ModelLBSNOCS(object):
         # print("average validation loss is ", np.mean(np.asarray(epoch_losses)))
     
     def save_img(self, net_input, output, target, i, view_id=0):
-        # print(type(net_input), type(ou
         input_img, gt_out_tuple_rgb, gt_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(target, 'cpu'))
         _, pred_out_tuple_rgb, pred_out_tuple_mask = convertData(sendToDevice(net_input, 'cpu'), sendToDevice(output.detach(), 'cpu'), isMaskNOX=True)
         cv2.imwrite(os.path.join(self.output_dir, 'frame_{}_view_{}_color00.png').format(str(i).zfill(3), view_id), cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB))
